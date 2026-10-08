@@ -1,3 +1,6 @@
 [gd_scene format=3 uid="uid://dwiwdokcyjul2"]
 
+[ext_resource type="Script" uid="uid://120qwhnv8c1f" path="res://scripts/EchoLayer.gd" id="1_chnng"]
+
 [node name="EchoLayer" type="Node2D" unique_id=117399677]
+script = ExtResource("1_chnng")

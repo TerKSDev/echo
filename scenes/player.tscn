@@ -1,3 +1,14 @@
 [gd_scene format=3 uid="uid://kmcjf7wneot7"]
 
-[node name="Player" type="Node2D" unique_id=325232330]
+[ext_resource type="Script" uid="uid://0vwrpl3642q6" path="res://scripts/Player.gd" id="1_3vyb7"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_my0f1"]
+
+[node name="Player" type="CharacterBody2D" unique_id=132618848]
+script = ExtResource("1_3vyb7")
+
+[node name="PlayerCollision" type="CollisionShape2D" parent="." unique_id=1109115710]
+visibility_layer = 2
+shape = SubResource("CircleShape2D_my0f1")
+
+[node name="PlayerCamera" type="Camera2D" parent="." unique_id=806828979]
