@@ -1,0 +1,16 @@
+[gd_scene format=3 uid="uid://boqsesqd7dk0o"]
+
+[sub_resource type="GDScript" id="GDScript_ex8h3"]
+script/source = "extends CanvasLayer
+
+@onready var player = get_node(\"../Player\")
+
+# Called when the node enters the scene tree for the first time.
+func _ready() -> void:
+	$SoundBtn.button_down.connect(player.start_charge)
+	$SoundBtn.button_up.connect(player.release_charge)
+	$SneakBtn.pressed.connect(player.toggle_sneak)
+"
+
+[node name="CanvasLayer" type="CanvasLayer" unique_id=1908471222]
+script = SubResource("GDScript_ex8h3")

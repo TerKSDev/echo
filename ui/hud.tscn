@@ -1,0 +1,34 @@
+[gd_scene format=3 uid="uid://0yfl2ebjco17"]
+
+[ext_resource type="Script" uid="uid://du5ekcgyr2hb1" path="res://scripts/Hud.gd" id="1_rbyyf"]
+
+[node name="Hud" type="CanvasLayer" unique_id=1464888437]
+script = ExtResource("1_rbyyf")
+
+[node name="SneakBtn" type="Button" parent="." unique_id=332237175]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 40.0
+offset_top = -200.0
+offset_right = 200.0
+offset_bottom = -40.0
+grow_vertical = 0
+focus_mode = 0
+theme_override_font_sizes/font_size = 32
+text = "Sneak"
+
+[node name="SoundBtn" type="Button" parent="." unique_id=411369100]
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -240.0
+offset_top = -240.0
+offset_right = -40.0
+offset_bottom = -40.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_font_sizes/font_size = 32
+text = "Sound"
