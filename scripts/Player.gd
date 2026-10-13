@@ -25,6 +25,15 @@ var step_timer := 0.0
 var charging := false
 var charge := 0.0
 
+@onready var mic: MicInput = $MicInput
+
+func _ready():
+	mic.voice_detected.connect(make_voice_sound)
+	mic.start()
+
+func make_voice_sound(k: float):
+	make_sound(lerpf(MIN_LOUDNESS, MAX_LOUDNESS, k), true)
+
 func _unhandled_input(event):
 	# Handle touch input for movement (on mobile)
 	var pressed_pos = null

@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://kmcjf7wneot7"]
 
 [ext_resource type="Script" uid="uid://0vwrpl3642q6" path="res://scripts/Player.gd" id="1_3vyb7"]
+[ext_resource type="Script" uid="uid://pceql66dvmkf" path="res://scripts/MicInput.gd" id="2_g2els"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_my0f1"]
 
@@ -12,3 +13,6 @@ visibility_layer = 2
 shape = SubResource("CircleShape2D_my0f1")
 
 [node name="PlayerCamera" type="Camera2D" parent="." unique_id=806828979]
+
+[node name="MicInput" type="Node2D" parent="." unique_id=1183979332]
+script = ExtResource("2_g2els")
