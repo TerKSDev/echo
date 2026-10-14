@@ -1,4 +1,4 @@
-[gd_scene format=3 uid="uid://0yfl2ebjco17"]
+﻿[gd_scene format=3 uid="uid://0yfl2ebjco17"]
 
 [ext_resource type="Script" uid="uid://du5ekcgyr2hb1" path="res://scripts/Hud.gd" id="1_rbyyf"]
 
@@ -30,5 +30,6 @@ offset_right = -40.0
 offset_bottom = -40.0
 grow_horizontal = 0
 grow_vertical = 0
+focus_mode = 0
 theme_override_font_sizes/font_size = 32
 text = "Sound"

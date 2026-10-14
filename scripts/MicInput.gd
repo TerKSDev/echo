@@ -7,8 +7,8 @@ signal voice_detected(loudness: float)
 const BUS_NAME := "MicCapture"
 const PERMISSION := "android.permission.RECORD_AUDIO"
 const CALIBRATE_TIME := 1.0 # Time in seconds to calibrate the microphone
-const TRIGGER_MARGIN_DB := 10.0 # Margin in dB above the calibrated noise floor to trigger voice detection
-const MAX_MARGIN_DB := 30.0 # Maximum margin in dB to avoid false positives
+const TRIGGER_MARGIN_DB := 20.0 # Margin in dB above the calibrated noise floor to trigger voice detection
+const MAX_MARGIN_DB := 50.0 # Maximum margin in dB to avoid false positives
 const ATTACK_WINDOW := 0.1 # Time in seconds to consider as an attack window for voice detection
 const COOLDOWN := 0.5 # Time in seconds to wait before allowing another voice detection
 
@@ -85,7 +85,7 @@ func _process(delta: float) -> void:
 
 	match _state:
 		State.CALIBRATING:
-			_calib_max = max(_calib_max, level_db)
+			_calib_max = maxf(_calib_max, level_db)
 			if _timer >= CALIBRATE_TIME:
 				noise_floor_db = maxf(_calib_max, -50.0)
 				_state = State.IDLE

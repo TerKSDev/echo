@@ -1,8 +1,8 @@
 extends Node2D
 
-const RAY_COUNT := 96
+const RAY_COUNT := 180
 const LIFETIME := 2.0
-const WAVE_SPEED := 200.0
+const WAVE_SPEED := 400.0
 const DOT_SIZE := 3.0
 
 var points: Array = []

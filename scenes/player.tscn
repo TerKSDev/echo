@@ -5,6 +5,10 @@
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_my0f1"]
 
+[sub_resource type="Curve" id="Curve_g2els"]
+_data = [Vector2(0, 0), 0.0, 0.0, 0, 0, Vector2(1, 1), 0.0, 0.0, 0, 0]
+point_count = 2
+
 [node name="Player" type="CharacterBody2D" unique_id=132618848]
 script = ExtResource("1_3vyb7")
 
@@ -13,6 +17,15 @@ visibility_layer = 2
 shape = SubResource("CircleShape2D_my0f1")
 
 [node name="PlayerCamera" type="Camera2D" parent="." unique_id=806828979]
+position_smoothing_enabled = true
+position_smoothing_speed = 6.0
 
 [node name="MicInput" type="Node2D" parent="." unique_id=1183979332]
 script = ExtResource("2_g2els")
+
+[node name="TrailLine" type="Line2D" parent="." unique_id=476083647]
+top_level = true
+points = PackedVector2Array(0, 0)
+width = 12.0
+width_curve = SubResource("Curve_g2els")
+default_color = Color(0.3, 1, 1, 1)
