@@ -16,22 +16,29 @@ func emit_echo(origin: Vector2, radius: float, exclude: Array = [], show_wave: b
 			"age": 0.0
 		})
 	
-	var space = get_world_2d().direct_space_state
+	var space := get_world_2d().direct_space_state
 	var exclude_rids: Array[RID] = []
 	for item in exclude:
 		if item is RID:
 			exclude_rids.append(item)
 
+	# Always exclude the player body (layer 1) so enemy waves don't spawn wall dots on the player
+	var player = get_tree().get_first_node_in_group("player")
+	if player is CollisionObject2D:
+		var p_rid: RID = player.get_rid()
+		if not exclude_rids.has(p_rid):
+			exclude_rids.append(p_rid)
+
 	# Perform raycasts in a circular pattern to detect obstacles
 	for i in RAY_COUNT:
-		var dir = Vector2.RIGHT.rotated(TAU * i / RAY_COUNT)
-		var query = PhysicsRayQueryParameters2D.create(origin, origin + dir * radius)
+		var dir := Vector2.RIGHT.rotated(TAU * i / RAY_COUNT)
+		var query := PhysicsRayQueryParameters2D.create(origin, origin + dir * radius)
 		
 		query.collision_mask = 1
 		query.exclude = exclude_rids
 		
-		var hit = space.intersect_ray(query)
-		if hit:
+		var hit: Dictionary = space.intersect_ray(query)
+		if not hit.is_empty():
 			var dist: float = origin.distance_to(hit.position)
 			points.append({
 				"pos": hit.position,
@@ -39,12 +46,23 @@ func emit_echo(origin: Vector2, radius: float, exclude: Array = [], show_wave: b
 			})
 	
 	for enemy in get_tree().get_nodes_in_group("enemy"):
-		var dist: float = origin.distance_to(enemy.global_position)
+		var enemy_node := enemy as Node2D
+		if enemy_node == null:
+			continue
+		var dist: float = origin.distance_to(enemy_node.global_position)
 		if dist <= radius:
+			# Echoes bounce off walls; cannot reveal an enemy hidden behind a solid wall
+			var occ_query := PhysicsRayQueryParameters2D.create(origin, enemy_node.global_position)
+			occ_query.collision_mask = 1
+			occ_query.exclude = exclude_rids
+			var hit: Dictionary = space.intersect_ray(occ_query)
+			if not hit.is_empty():
+				continue
+
 			get_tree().create_timer(dist / WAVE_SPEED).timeout.connect(
 				func():
-					if is_instance_valid(enemy):
-						enemy.reveal(1.0)
+					if is_instance_valid(enemy_node):
+						enemy_node.reveal(1.0)
 			)
 	
 # Update the age of each point and remove old points

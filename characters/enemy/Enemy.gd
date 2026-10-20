@@ -43,6 +43,7 @@ enum State { SLEEP, PATROL, ALERT, INVESTIGATE, SEARCH, RETURN, SCREAM, ALARM }
 @export var patrol_points: Array[Vector2] = []
 
 const SEARCH_TIME := 2.5
+const RETURN_TIMEOUT := 6.0
 const SEARCH_RADIUS := 80.0
 const ARRIVE_DIST := 10.0
 const WARN_RADIUS := 160.0
@@ -70,6 +71,7 @@ var timer := 0.0
 var patrol_idx := 0
 var visible_alpha := 0.0
 var proximity := 0.0
+var is_wall_occluded: bool = false
 
 # Screamer: needs 2 sounds within 6s to shriek
 var screamer_count := 0
@@ -80,7 +82,6 @@ var scream_wave_radius := 0.0
 
 # Listener: a shout starts "listening"; counts sounds up to 5, then pulses the map
 var listener_count := 0
-var listener_decay_timer := 0.0
 var listener_cooldown := 0.0
 var listener_gap_timer := 0.0
 var alarm_wave_radius := 0.0
@@ -162,6 +163,12 @@ func on_sound(pos: Vector2, loudness: float, radius: float, is_voice: bool = fal
 	if dist > effective_max:
 		return
 
+	# Wall occlusion: footsteps cannot pass through walls; shouts lose 75% volume
+	if _is_blocked_by_wall(pos, global_position):
+		if not is_voice:
+			return
+		loudness *= 0.25
+
 	var heard := loudness * (1.0 - dist / effective_max)
 	if heard < hearing_threshold:
 		return
@@ -182,10 +189,13 @@ func _notice(pos: Vector2) -> void:
 			_enter(State.ALERT)
 			woke_up.emit(global_position)
 		State.SEARCH:
-			if timer >= 0.5:
+			# Already actively hunting after a chase: snap back to chasing without re-roaring every step
+			if timer >= 0.4:
 				_enter(State.INVESTIGATE)
-		# While chasing the target keeps updating, but the timer is not reset,
-		# so the chase timeout lets the player escape.
+		State.INVESTIGATE:
+			# While already chasing, update destination toward latest sound,
+			# but do not reset chase timer so chase timeout lets the player escape.
+			pass
 
 
 # Used by map-wide alarms: ignores hearing range
@@ -193,7 +203,7 @@ func force_alert_to(pos: Vector2) -> void:
 	if _is_stationary():
 		return
 	target = pos
-	_enter(State.INVESTIGATE)
+	_enter(State.ALERT)
 	reveal(1.0)
 
 
@@ -233,23 +243,21 @@ func _trigger_scream() -> void:
 
 
 # --- Listener ----------------------------------------------------------------
-# A shout starts listening. It then counts sounds (not sneaking); at 5 it sends a
+# A shout starts listening. It then counts sounds; at 5 it sends a
 # map-wide pulse that pulls every monster to it and speeds them up.
+# Count never decays automatically until triggered.
 
 func _handle_listener_sound(is_voice: bool) -> void:
 	if state == State.ALARM or listener_cooldown > 0.0:
 		return
 
-	if listener_count == 0 and not is_voice:
-		return
 	# Only voices count, and not faster than one per LISTENER_MIN_GAP
 	if not is_voice or (listener_count > 0 and listener_gap_timer > 0.0):
 		return
 
 	listener_count += 1
-	listener_decay_timer = 8.0
 	listener_gap_timer = LISTENER_MIN_GAP
-	reveal(1.0)
+	reveal(1.2)
 
 	if listener_count >= 5:
 		_trigger_listener_alarm()
@@ -259,7 +267,6 @@ func _handle_listener_sound(is_voice: bool) -> void:
 
 func _trigger_listener_alarm() -> void:
 	_enter(State.ALARM)
-	listener_count = 0
 	alarm_wave_radius = 0.0
 	alarmed.emit(global_position, global_position)
 
@@ -274,10 +281,27 @@ func _enter(s: State) -> void:
 		search_point = _random_search_point()
 	if changed:
 		reveal(float(STATE_FLASH.get(s, 0.5)))
+		# Survival-horror discovery shudder / camera jolt when a monster spots the player
+		if s == State.ALERT and not _is_stationary():
+			var player := _get_player()
+			if player != null and is_instance_valid(player):
+				var dist: float = global_position.distance_to(player.global_position)
+				if dist < 450.0:
+					player.camera_shake(0.28, 5.0 * (1.0 - dist / 450.0))
 
 
 func _random_search_point() -> Vector2:
-	return target + Vector2.from_angle(randf() * TAU) * randf_range(30.0, SEARCH_RADIUS)
+	var candidate: Vector2 = target + Vector2.from_angle(randf() * TAU) * randf_range(30.0, SEARCH_RADIUS)
+	var space := get_world_2d().direct_space_state
+	var query := PhysicsRayQueryParameters2D.create(global_position, candidate)
+	query.collision_mask = 1
+	query.exclude = [get_rid()]
+	var hit: Dictionary = space.intersect_ray(query)
+	if not hit.is_empty():
+		var hit_pos: Vector2 = hit.position
+		var dir: Vector2 = (hit_pos - global_position).normalized()
+		return hit_pos - dir * 18.0
+	return candidate
 
 
 func _get_player() -> Node2D:
@@ -286,6 +310,20 @@ func _get_player() -> Node2D:
 		return null
 	return player as Node2D
 
+
+# Checks if a solid wall (collision layer 1) blocks line of sight between two points
+func _is_blocked_by_wall(from_pos: Vector2, to_pos: Vector2) -> bool:
+	var space := get_world_2d().direct_space_state
+	var query := PhysicsRayQueryParameters2D.create(from_pos, to_pos)
+	query.collision_mask = 1
+	var exclude: Array[RID] = [get_rid()]
+	var player = get_tree().get_first_node_in_group("player")
+	if player != null and is_instance_valid(player):
+		exclude.append(player.get_rid())
+	query.exclude = exclude
+
+	var hit: Dictionary = space.intersect_ray(query)
+	return not hit.is_empty()
 
 # Notices a player who walks right next to it
 func _sense_player() -> void:
@@ -296,8 +334,12 @@ func _sense_player() -> void:
 		return
 	var dist: float = global_position.distance_to(player.global_position)
 
+	# Cannot sense player through solid walls
+	if is_wall_occluded:
+		return
+
 	if state == State.SLEEP:
-		var wake_radius := sneak_wake_radius if player.sneaking else sleep_wake_radius
+		var wake_radius: float = sneak_wake_radius if player.sneaking else sleep_wake_radius
 		if dist <= wake_radius:
 			if enemy_type == EnemyType.SCREAMER:
 				_handle_screamer_sound()
@@ -312,6 +354,8 @@ func _sense_player() -> void:
 
 func _update_proximity() -> void:
 	proximity = 0.0
+	if is_wall_occluded:
+		return
 	var player := _get_player()
 	if player == null:
 		return
@@ -324,26 +368,41 @@ func get_threat_level(player_pos: Vector2) -> float:
 	var dist: float = global_position.distance_to(player_pos)
 	# Active enemies far away are less scary: full threat within 300px, half beyond 600px
 	var active_threat := clampf(1.0 - maxf(dist - 300.0, 0.0) / 600.0, 0.5, 1.0)
+	var raw_threat := 0.0
 
 	match state:
 		State.ALERT, State.INVESTIGATE, State.SCREAM, State.ALARM:
-			return active_threat
+			raw_threat = active_threat
 		State.SEARCH:
-			return clampf(maxf(0.5, 1.0 - dist / 250.0), 0.0, 1.0)
+			raw_threat = clampf(maxf(0.5, 1.0 - dist / 250.0), 0.0, 1.0)
 		State.PATROL, State.RETURN:
-			return clampf(1.0 - dist / 220.0, 0.0, 1.0)
+			raw_threat = clampf(1.0 - dist / 220.0, 0.0, 1.0)
 		State.SLEEP:
 			if enemy_type == EnemyType.SCREAMER and screamer_count > 0:
-				return clampf(1.0 - dist / 280.0, 0.4, 0.95)
-			if enemy_type == EnemyType.LISTENER and listener_count > 0:
-				return clampf(0.3 * listener_count + (1.0 - dist / 260.0) * 0.4, 0.0, 0.9)
-			return clampf(inverse_lerp(180.0, sleep_wake_radius, dist), 0.0, 0.9)
-	return 0.0
+				raw_threat = clampf(1.0 - dist / 280.0, 0.4, 0.95)
+			elif enemy_type == EnemyType.LISTENER and listener_count > 0:
+				raw_threat = clampf(0.2 * listener_count + (1.0 - dist / 260.0) * 0.4, 0.0, 0.9)
+			else:
+				raw_threat = clampf(inverse_lerp(180.0, sleep_wake_radius, dist), 0.0, 0.9)
+
+	# Walls muffle threat: idle monsters behind a wall don't cause false heartbeat panic
+	if is_wall_occluded:
+		if state == State.SLEEP or state == State.PATROL or state == State.RETURN:
+			return 0.0
+		return raw_threat * 0.35
+	return raw_threat
 
 
 func _physics_process(delta: float) -> void:
 	timer += delta
 	visible_alpha = move_toward(visible_alpha, 0.0, delta * 0.7)
+
+	var player := _get_player()
+	if player != null and is_instance_valid(player):
+		is_wall_occluded = _is_blocked_by_wall(global_position, player.global_position)
+	else:
+		is_wall_occluded = false
+
 	_sense_player()
 	_tick_timers(delta)
 
@@ -373,13 +432,7 @@ func _tick_timers(delta: float) -> void:
 	screamer_cooldown = maxf(0.0, screamer_cooldown - delta)
 	screamer_gap_timer = maxf(0.0, screamer_gap_timer - delta)
 
-	if listener_decay_timer > 0.0:
-		listener_decay_timer -= delta
-		if listener_decay_timer <= 0.0 and listener_count > 0:
-			listener_count -= 1
-			listener_decay_timer = 5.0 if listener_count > 0 else 0.0
-			if listener_count == 0 and state == State.ALERT:
-				_enter(State.SLEEP)
+	# Listener counts do NOT decay over time (persists until 5 triggers alarm)
 	listener_cooldown = maxf(0.0, listener_cooldown - delta)
 	listener_gap_timer = maxf(0.0, listener_gap_timer - delta)
 
@@ -400,9 +453,14 @@ func _run_state(delta: float, cur_patrol: float, cur_chase: float) -> void:
 				patrol_idx = (patrol_idx + 1) % patrol_points.size()
 		State.ALERT:
 			velocity = Vector2.ZERO
-			# Stationary enemies stay alert until triggered again or the count decays
-			if timer >= alert_time and not _is_stationary():
-				_enter(State.INVESTIGATE)
+			# Stationary enemies (Screamer/Listener) return to sleep so they fade back into darkness;
+			# mobile enemies finish their discovery roar and begin chasing.
+			if _is_stationary():
+				if timer >= alert_time:
+					_enter(State.SLEEP)
+			else:
+				if timer >= alert_time:
+					_enter(State.INVESTIGATE)
 		State.INVESTIGATE:
 			if _move_toward(target, cur_chase) or timer >= investigate_timeout:
 				velocity = Vector2.ZERO
@@ -414,7 +472,9 @@ func _run_state(delta: float, cur_patrol: float, cur_chase: float) -> void:
 				_enter(State.RETURN)
 		State.RETURN:
 			var dest := patrol_points[patrol_idx] if patrol_points.size() > 0 else home
-			if _move_toward(dest, cur_patrol):
+			if _move_toward(dest, cur_patrol) or timer >= RETURN_TIMEOUT:
+				if patrol_points.size() < 2:
+					home = global_position
 				_enter(State.PATROL if patrol_points.size() > 1 else State.SLEEP)
 		State.SCREAM:
 			velocity = Vector2.ZERO
@@ -428,7 +488,8 @@ func _run_state(delta: float, cur_patrol: float, cur_chase: float) -> void:
 			alarm_wave_radius += delta * SOUND_WAVE_SPEED
 			reveal(1.0)
 			if timer >= 2.5:
-				listener_cooldown = 6.0
+				listener_cooldown = 8.0
+				listener_count = 0
 				_enter(State.SLEEP)
 
 
@@ -458,7 +519,17 @@ func _move_toward(dest: Vector2, speed: float) -> bool:
 	if to_dest.length() < ARRIVE_DIST:
 		velocity = Vector2.ZERO
 		return true
-	velocity = to_dest.normalized() * speed
+	var dir := to_dest.normalized()
+	# Slide smoothly along walls instead of headbutting into them
+	if get_slide_collision_count() > 0:
+		var col := get_slide_collision(0)
+		if col != null:
+			var normal := col.get_normal()
+			if dir.dot(normal) < -0.1:
+				var slide_dir := dir.slide(normal).normalized()
+				if not slide_dir.is_zero_approx():
+					dir = slide_dir
+	velocity = dir * speed
 	return false
 
 

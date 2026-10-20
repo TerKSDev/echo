@@ -66,6 +66,9 @@ func immobilize(duration: float = 1.6) -> void:
 	_stun_timer = maxf(_stun_timer, duration)
 	moving = false
 	charging = false
+	charge = 0.0
+	was_full = false
+	marker = 0.0
 	desired = Vector2.ZERO
 	velocity = Vector2.ZERO
 	camera_shake(0.35, 8.0)
@@ -139,6 +142,7 @@ func _physics_process(delta: float) -> void:
 		desired = Vector2.ZERO
 		velocity = velocity.move_toward(Vector2.ZERO, FRICTION * delta)
 		move_and_slide()
+		_update_trail()
 		queue_redraw()
 		return
 
@@ -198,8 +202,8 @@ func _physics_process(delta: float) -> void:
 	queue_redraw()
 
 func make_voice_sound(k: float):
-	# The click itself can be picked up by the mic, so ignore it
-	if click_cooldown > 0.0:
+	# Ignore mic while dead, stunned, or right after a click
+	if not alive or _stun_timer > 0.0 or click_cooldown > 0.0:
 		return
 	make_sound(lerpf(MIN_LOUDNESS, MAX_LOUDNESS, k), true)
 
@@ -223,12 +227,14 @@ func make_sound(loudness: float, is_voice := false) -> void:
 
 # Handle Sneak Toggle
 func toggle_sneak():
+	if not alive or _stun_timer > 0.0:
+		return
 	sneaking = not sneaking
 	sneak_toggled.emit(sneaking)
 
 # Handle Voice Charging
 func start_charge():
-	if not alive:
+	if not alive or _stun_timer > 0.0:
 		return
 	charging = true
 	charge = 0.0
@@ -291,6 +297,8 @@ func reset(pos: Vector2) -> void:
 	_burst_alpha = 0.0
 	_death_alpha = 0.0
 	_shake_timer = 0.0
+	_shake_intensity = 0.0
+	_stun_timer = 0.0
 	if camera != null:
 		camera.offset = Vector2.ZERO
 	trail.clear_points()

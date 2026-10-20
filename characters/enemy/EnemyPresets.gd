@@ -13,7 +13,7 @@ const PRESETS: Array[Dictionary] = [
 		"hearing_range": 350.0, "hearing_threshold": 0.14,
 		"can_hear_sneak": false, "can_hear_walk": true, "can_hear_voice": true,
 		"patrol_speed": 60.0, "chase_speed": 135.0,
-		"alert_time": 0.5, "investigate_timeout": 3.0,
+		"alert_time": 0.85, "investigate_timeout": 3.0,
 		"init_state": 0, "sleep_wake_radius": 70.0, "sneak_wake_radius": 35.0,
 		"color": Color(0.68, 0.42, 0.98), # Amethyst purple
 	},
@@ -21,7 +21,7 @@ const PRESETS: Array[Dictionary] = [
 		"hearing_range": 400.0, "hearing_threshold": 0.04,
 		"can_hear_sneak": true, "can_hear_walk": true, "can_hear_voice": true,
 		"patrol_speed": 75.0, "chase_speed": 150.0,
-		"alert_time": 0.4, "investigate_timeout": 3.5,
+		"alert_time": 0.7, "investigate_timeout": 3.5,
 		"init_state": 1, "sleep_wake_radius": 80.0, "sneak_wake_radius": 48.0,
 		"color": Color(1.0, 0.82, 0.25), # Amber gold
 	},
@@ -29,7 +29,7 @@ const PRESETS: Array[Dictionary] = [
 		"hearing_range": 300.0, "hearing_threshold": 0.03,
 		"can_hear_sneak": false, "can_hear_walk": true, "can_hear_voice": true,
 		"patrol_speed": 90.0, "chase_speed": 185.0,
-		"alert_time": 0.2, "investigate_timeout": 5.0,
+		"alert_time": 0.65, "investigate_timeout": 5.0,
 		"init_state": 1, "sleep_wake_radius": 90.0, "sneak_wake_radius": 54.0,
 		"color": Color(1.0, 0.18, 0.18), # Crimson
 	},
@@ -37,7 +37,7 @@ const PRESETS: Array[Dictionary] = [
 		"hearing_range": 450.0, "hearing_threshold": 0.08,
 		"can_hear_sneak": false, "can_hear_walk": false, "can_hear_voice": true,
 		"patrol_speed": 0.0, "chase_speed": 0.0,
-		"alert_time": 0.4, "investigate_timeout": 3.5,
+		"alert_time": 0.8, "investigate_timeout": 3.5,
 		"init_state": 0, "sleep_wake_radius": 50.0, "sneak_wake_radius": 30.0,
 		"color": Color(0.95, 0.28, 0.72), # Fuchsia
 	},
@@ -45,7 +45,7 @@ const PRESETS: Array[Dictionary] = [
 		"hearing_range": 500.0, "hearing_threshold": 0.02,
 		"can_hear_sneak": false, "can_hear_walk": false, "can_hear_voice": true,
 		"patrol_speed": 0.0, "chase_speed": 0.0,
-		"alert_time": 0.4, "investigate_timeout": 3.5,
+		"alert_time": 0.8, "investigate_timeout": 3.5,
 		"init_state": 0, "sleep_wake_radius": 60.0, "sneak_wake_radius": 36.0,
 		"color": Color(0.2, 0.94, 0.68), # Emerald
 	},

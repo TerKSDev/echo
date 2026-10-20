@@ -54,10 +54,21 @@ func _on_enemy_screamed(pos: Vector2, radius: float) -> void:
 	if is_instance_valid(_player) and _player.alive:
 		var dist: float = _player.global_position.distance_to(pos)
 		if dist <= radius:
-			# The wave takes time to reach the player
-			get_tree().create_timer(dist / WAVE_SPEED).timeout.connect(func():
+			var arrival_time: float = maxf(0.01, dist / WAVE_SPEED)
+			get_tree().create_timer(arrival_time).timeout.connect(func():
 				if is_instance_valid(_player) and _player.alive:
-					_player.immobilize(1.6)
+					var cur_dist: float = _player.global_position.distance_to(pos)
+					if cur_dist <= radius:
+						# Walls block the scream's physical shockwave: taking cover shields the player
+						var space := _player.get_world_2d().direct_space_state
+						var query := PhysicsRayQueryParameters2D.create(pos, _player.global_position)
+						query.collision_mask = 1
+						query.exclude = [_player.get_rid()]
+						var hit: Dictionary = space.intersect_ray(query)
+						var in_cover: bool = not hit.is_empty()
+
+						if not in_cover:
+							_player.immobilize(1.6)
 			)
 
 	for enemy in _enemies():

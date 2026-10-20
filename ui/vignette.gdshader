@@ -12,3 +12,4 @@ void fragment() {
 	float vignette = smoothstep(inner_radius, outer_radius, dist);
 	COLOR = vec4(vignette_color.rgb, vignette_color.a * vignette);
 }
+

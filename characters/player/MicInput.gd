@@ -65,6 +65,8 @@ func _setup() -> void:
 	AudioServer.set_bus_mute(idx, false)
 	AudioServer.set_bus_volume_db(idx, -80.0)
 	_capture = AudioServer.get_bus_effect(idx, 0) as AudioEffectCapture
+	if _capture != null:
+		_capture.clear_buffer()
 
 	var player_mic := AudioStreamPlayer.new()
 	player_mic.stream = AudioStreamMicrophone.new()

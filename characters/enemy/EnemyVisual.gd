@@ -7,7 +7,7 @@ var enemy: Enemy
 
 
 func _draw() -> void:
-	if enemy == null:
+	if enemy == null or enemy.is_wall_occluded:
 		return
 	var base := EnemyPresets.color_of(enemy.enemy_type)
 	var t := Time.get_ticks_msec() / 1000.0
@@ -84,7 +84,7 @@ func _draw_sleeper(t: float, col: Color, alpha: float) -> void:
 			draw_circle(Vector2.ZERO, 13.0, Color(col, 0.5 * alpha))
 			draw_line(Vector2(-9, 0), Vector2(9, 0), Color(0.18, 0.05, 0.3, alpha), 2.5)
 		Enemy.State.ALERT:
-			_draw_alert_eye(t, col, alpha)
+			_draw_alert_roar(t, col, alpha)
 		Enemy.State.INVESTIGATE:
 			draw_circle(Vector2.ZERO, 13.0, col)
 			draw_circle(Vector2.ZERO, 6.0, Color(1.0, 0.9, 1.0, alpha))
@@ -97,7 +97,7 @@ func _draw_sleeper(t: float, col: Color, alpha: float) -> void:
 # Patroller: amber orb with 3 orbiting scanner dots
 func _draw_patroller(t: float, col: Color, alpha: float) -> void:
 	if enemy.state == Enemy.State.ALERT:
-		_draw_alert_eye(t, col, alpha)
+		_draw_alert_roar(t, col, alpha)
 		return
 	draw_circle(Vector2.ZERO, 12.0, col)
 	draw_circle(Vector2.ZERO, 5.0, Color(1.0, 0.95, 0.85, alpha))
@@ -110,6 +110,9 @@ func _draw_patroller(t: float, col: Color, alpha: float) -> void:
 
 # Chaser: crimson core with 6 spiky barbs and a slit pupil
 func _draw_chaser(t: float, col: Color, alpha: float) -> void:
+	if enemy.state == Enemy.State.ALERT:
+		_draw_alert_roar(t, col, alpha)
+		return
 	var spike_count := 6
 	var vib := sin(t * 24.0) * 2.0
 	var core_r := 12.0
@@ -161,15 +164,39 @@ func _draw_listener(col: Color, alpha: float) -> void:
 			draw_circle(pip_pos, 3.0, Color(col, 0.3 * alpha))
 
 
-# Shared "woken up" eye with radial spikes
-func _draw_alert_eye(t: float, col: Color, alpha: float) -> void:
-	var eye_alpha := maxf(alpha, 0.8)
-	draw_arc(Vector2(0, 11), 15.0, -PI * 0.72, -PI * 0.28, 16, Color(1.0, 1.0, 1.0, eye_alpha), 2.5)
-	draw_arc(Vector2(0, -11), 15.0, PI * 0.28, PI * 0.72, 16, Color(1.0, 1.0, 1.0, eye_alpha), 2.5)
-	draw_line(Vector2(0, -8), Vector2(0, 8), Color(col, eye_alpha), 3.0)
-	draw_circle(Vector2.ZERO, 2.0, Color(1.0, 0.9, 0.9, eye_alpha))
-	for i in 6:
-		var ang := i * TAU / 6.0 + t * 5.0
-		var p1 := Vector2.from_angle(ang) * 16.0
-		var p2 := Vector2.from_angle(ang) * (25.0 + 4.0 * sin(t * 22.0))
-		draw_line(p1, p2, Color(col, 0.9 * eye_alpha), 2.0)
+# Discovery roar & stiff (Resident Evil style discovery windup)
+func _draw_alert_roar(t: float, col: Color, alpha: float) -> void:
+	var to_target: Vector2 = (enemy.target - enemy.global_position).normalized()
+	if to_target.is_zero_approx():
+		to_target = Vector2.UP
+	var face_ang: float = to_target.angle()
+
+	# 1. High frequency body tremor / twitching in shock & fury
+	var jitter := Vector2(sin(t * 55.0), cos(t * 47.0)) * 2.5
+	var eye_alpha := maxf(alpha, 0.85)
+
+	# 2. Expanding acoustic roar shockwaves blasting toward the player
+	var progress: float = clampf(enemy.timer / maxf(enemy.alert_time, 0.1), 0.0, 1.0)
+	var wave_r := 12.0 + progress * 48.0
+	var wave_a := (1.0 - progress) * 0.95 * eye_alpha
+	draw_arc(jitter + to_target * 8.0, wave_r, face_ang - 0.75, face_ang + 0.75, 16, Color(col, wave_a), 2.5)
+	if wave_r > 18.0:
+		draw_arc(jitter + to_target * 8.0, wave_r - 14.0, face_ang - 0.55, face_ang + 0.55, 12, Color(1.0, 0.95, 0.8, wave_a * 0.7), 1.8)
+
+	# 3. Flaring spiky barbs / acoustic mandible corona
+	var barb_count := 8
+	for i in barb_count:
+		var ang := i * TAU / float(barb_count) + t * 4.0
+		var p_base := jitter + Vector2.from_angle(ang) * 12.0
+		var spike_len := 22.0 + sin(t * 40.0 + i) * 4.0
+		var p_tip := jitter + Vector2.from_angle(ang) * spike_len
+		draw_line(p_base, p_tip, Color(col.r, col.g * 0.6, col.b * 0.6, 0.95 * eye_alpha), 2.4)
+
+	# 4. Central dilated core
+	draw_circle(jitter, 13.0, Color(col, 0.9 * eye_alpha))
+	draw_circle(jitter, 6.0, Color(1.0, 1.0, 1.0, eye_alpha))
+
+	# 5. Demonic vertical slit pupil locked onto target
+	var pupil_dir := to_target.orthogonal() * 7.0
+	draw_line(jitter - pupil_dir, jitter + pupil_dir, Color(0.1, 0.0, 0.0, eye_alpha), 3.0)
+	draw_circle(jitter, 2.0, Color(1.0, 0.2, 0.2, eye_alpha))
