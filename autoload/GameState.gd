@@ -11,9 +11,14 @@ const MAIN_SCENE := "res://scenes/main.tscn"
 
 const LEVELS: Array[String] = [
 	"res://levels/level_test.tscn",
+	"res://levels/level_01.tscn",
+	"res://levels/level_02.tscn",
+	"res://levels/level_03.tscn",
+	"res://levels/level_04.tscn",
 ]
 
 var current_level := 0
+var mic_enabled := true
 
 
 func current_level_path() -> String:
@@ -25,6 +30,7 @@ func has_next_level() -> bool:
 
 
 func start_game(level_index: int = 0) -> void:
+	get_tree().paused = false
 	current_level = level_index
 	get_tree().change_scene_to_file(MAIN_SCENE)
 

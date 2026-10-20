@@ -34,6 +34,10 @@ func _ready() -> void:
 	_update_mic_toggle_ui()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _player == null or not is_instance_valid(_player):
+		_player = get_tree().get_first_node_in_group("player")
+	if _player != null and is_instance_valid(_player) and not _player.get("alive"):
+		return
 	if event.is_action_pressed("ui_cancel") or (event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE):
 		if _is_open:
 			close()
@@ -43,6 +47,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func open() -> void:
 	if _is_open:
+		return
+	if _player == null or not is_instance_valid(_player):
+		_player = get_tree().get_first_node_in_group("player")
+	if _player != null and is_instance_valid(_player) and not _player.get("alive"):
 		return
 	_is_open = true
 	visible = true
@@ -78,20 +86,22 @@ func _update_volume_label(val: float) -> void:
 	volume_val.text = "%d%%" % pct
 
 func _on_mic_toggle_pressed() -> void:
+	GameState.mic_enabled = not GameState.mic_enabled
 	if _player == null or not is_instance_valid(_player):
 		_player = get_tree().get_first_node_in_group("player")
 	if _player != null and is_instance_valid(_player) and _player.has_node("MicInput"):
 		var mic = _player.get_node("MicInput")
-		mic.enabled = not mic.enabled
+		mic.enabled = GameState.mic_enabled
 	_update_mic_toggle_ui()
 
 func _update_mic_toggle_ui() -> void:
 	if _player == null or not is_instance_valid(_player):
 		_player = get_tree().get_first_node_in_group("player")
-	var enabled := true
+	var enabled: bool = GameState.mic_enabled
 	if _player != null and is_instance_valid(_player) and _player.has_node("MicInput"):
 		var mic = _player.get_node("MicInput")
 		enabled = mic.enabled
+		GameState.mic_enabled = enabled
 	
 	if enabled:
 		mic_toggle.text = "ENABLED"

@@ -77,7 +77,7 @@ func _setup() -> void:
 	_state = State.CALIBRATING
 	_timer = 0.0
 	_calib_max = -80.0
-	enabled = true
+	enabled = GameState.mic_enabled
 
 func _process(delta: float) -> void:
 	if not enabled:

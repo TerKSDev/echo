@@ -21,6 +21,30 @@ corner_radius_bottom_left = 18
 shadow_color = Color(0.08, 0.35, 0.65, 0.3)
 shadow_size = 12
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_close_normal"]
+bg_color = Color(0.05, 0.14, 0.24, 0.8)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.28, 0.56, 0.82, 0.75)
+corner_radius_top_left = 19
+corner_radius_top_right = 19
+corner_radius_bottom_right = 19
+corner_radius_bottom_left = 19
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_close_hover"]
+bg_color = Color(0.12, 0.28, 0.44, 0.95)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.48, 0.82, 1, 1)
+corner_radius_top_left = 19
+corner_radius_top_right = 19
+corner_radius_bottom_right = 19
+corner_radius_bottom_left = 19
+
 [node name="SettingsModal" type="Control"]
 process_mode = 3
 layout_mode = 3
@@ -83,9 +107,13 @@ size_flags_horizontal = 3
 [node name="CloseBtn" type="Button" parent="CenterContainer/Panel/VBox/Header"]
 custom_minimum_size = Vector2(38, 38)
 layout_mode = 2
+size_flags_vertical = 4
 focus_mode = 0
 theme = ExtResource("2_theme")
-theme_override_font_sizes/font_size = 16
+theme_override_font_sizes/font_size = 15
+theme_override_styles/normal = SubResource("StyleBoxFlat_close_normal")
+theme_override_styles/hover = SubResource("StyleBoxFlat_close_hover")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_close_hover")
 text = "✕"
 
 [node name="Divider1" type="ColorRect" parent="CenterContainer/Panel/VBox"]

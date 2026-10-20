@@ -4,6 +4,7 @@ class_name Enemy
 ## enemy_*.tscn presets). Stats live in EnemyPresets.gd, drawing in EnemyVisual.gd.
 
 signal woke_up(pos: Vector2)
+signal step_taken(pos: Vector2, is_chasing: bool, occluded: bool)
 signal screamed(pos: Vector2, radius: float)   # Screamer shriek
 signal alarmed(pos: Vector2, target_pos: Vector2)   # Listener map-wide pulse
 
@@ -204,6 +205,7 @@ func force_alert_to(pos: Vector2) -> void:
 		return
 	target = pos
 	_enter(State.ALERT)
+	woke_up.emit(global_position)
 	reveal(1.0)
 
 
@@ -231,6 +233,7 @@ func _handle_screamer_sound() -> void:
 
 	if screamer_count == 1:
 		_enter(State.ALERT)
+		woke_up.emit(global_position)
 	else:
 		_trigger_scream()
 
@@ -263,6 +266,7 @@ func _handle_listener_sound(is_voice: bool) -> void:
 		_trigger_listener_alarm()
 	else:
 		_enter(State.ALERT)
+		woke_up.emit(global_position)
 
 
 func _trigger_listener_alarm() -> void:
@@ -512,6 +516,7 @@ func _update_trail_and_steps(delta: float) -> void:
 				"age": 0.0,
 				"max_r": 35.0 if chasing else 22.0,
 			})
+			step_taken.emit(global_position, chasing, is_wall_occluded)
 
 
 func _move_toward(dest: Vector2, speed: float) -> bool:
@@ -535,7 +540,7 @@ func _move_toward(dest: Vector2, speed: float) -> bool:
 
 func _on_catch(body: Node) -> void:
 	if body.is_in_group("player") and body.has_method("die"):
-		body.die()
+		body.die(int(enemy_type))
 
 
 func reveal(amount: float = 1.0) -> void:

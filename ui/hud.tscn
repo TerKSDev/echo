@@ -7,6 +7,7 @@
 [ext_resource type="Script" path="res://ui/SoundButton.gd" id="5_sound"]
 [ext_resource type="Script" path="res://ui/PauseButton.gd" id="6_pause"]
 [ext_resource type="PackedScene" path="res://ui/settings_modal.tscn" id="7_modal"]
+[ext_resource type="PackedScene" path="res://ui/death_screen.tscn" id="8_death"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_vignette"]
 shader = ExtResource("2_shader")
@@ -81,4 +82,7 @@ flat = true
 script = ExtResource("5_sound")
 
 [node name="SettingsModal" parent="." instance=ExtResource("7_modal")]
+visible = false
+
+[node name="DeathScreen" parent="." instance=ExtResource("8_death")]
 visible = false

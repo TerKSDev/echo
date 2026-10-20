@@ -1,0 +1,544 @@
+extends Node
+class_name SfxManager
+## Unified procedural audio & heartbeat manager for ECHO.
+## Generates all sound effects and the dynamic "lub-dub" threat heartbeat in memory
+## as 16-bit PCM WAV streams on startup (zero external audio files needed).
+
+signal beat(threat: float)
+
+const MIX_RATE := 22050
+
+# Heartbeat parameters
+@export var interval_calm := 1.25   # Seconds between beats when safe
+@export var interval_panic := 0.42  # Seconds between beats when hunted
+@export var vol_calm := -12.0       # Quiet subtle pulse when safe
+@export var vol_panic := 2.0        # Pounding chest thump when hunted
+@export var pitch_calm := 0.92
+@export var pitch_panic := 1.18
+
+var _hb_players: Array[AudioStreamPlayer] = []
+var _hb_idx := 0
+var _hb_timer := 0.0
+var _threat := 0.0
+
+var _wav_step_walk: AudioStreamWAV
+var _wav_step_sneak: AudioStreamWAV
+var _wav_enemy_step: AudioStreamWAV
+var _wav_echo_ping: AudioStreamWAV
+var _wav_charge_full: AudioStreamWAV
+var _wav_roar_sleeper: AudioStreamWAV
+var _wav_roar_patroller: AudioStreamWAV
+var _wav_roar_chaser: AudioStreamWAV
+var _wav_screamer_crack: AudioStreamWAV
+var _wav_screamer_shriek: AudioStreamWAV
+var _wav_listener_pip: AudioStreamWAV
+var _wav_listener_alarm: AudioStreamWAV
+var _wav_player_stun: AudioStreamWAV
+var _wav_player_death: AudioStreamWAV
+var _wav_charge_loop: AudioStreamWAV
+
+var _charge_player: AudioStreamPlayer
+var _player_ref: Node2D
+
+
+func _ready() -> void:
+	_build_all_streams()
+	_setup_charge_player()
+	_setup_heartbeat_players()
+
+
+func _process(delta: float) -> void:
+	_process_heartbeat(delta)
+
+
+func set_player(player: Node2D) -> void:
+	_player_ref = player
+
+
+# Briefly mutes mic detection when loud game audio plays so speakers don't re-trigger the mic
+func _suppress_mic(duration: float) -> void:
+	if _player_ref != null and is_instance_valid(_player_ref):
+		if "click_cooldown" in _player_ref:
+			_player_ref.click_cooldown = maxf(float(_player_ref.click_cooldown), duration)
+
+
+# --- Public Playback API -----------------------------------------------------
+
+func play_step_walk() -> void:
+	_suppress_mic(0.18)
+	_play_non_spatial(_wav_step_walk, -6.0, randf_range(0.92, 1.08))
+
+
+func play_step_sneak() -> void:
+	_play_non_spatial(_wav_step_sneak, -14.0, randf_range(0.95, 1.06))
+
+
+func play_echo_ping(loudness: float) -> void:
+	_suppress_mic(0.45)
+	var vol_db: float = lerpf(-10.0, 2.0, clampf(loudness, 0.0, 1.0))
+	var pitch: float = lerpf(1.12, 0.88, clampf(loudness, 0.0, 1.0))
+	_play_non_spatial(_wav_echo_ping, vol_db, pitch)
+
+
+func play_charge_full() -> void:
+	_suppress_mic(0.2)
+	_play_non_spatial(_wav_charge_full, -4.0, 1.0)
+
+
+func update_charge_hum(charging: bool, charge_amount: float) -> void:
+	if _charge_player == null:
+		return
+	if charging:
+		if not _charge_player.playing:
+			_charge_player.play()
+		_charge_player.volume_db = lerpf(-22.0, -6.0, charge_amount)
+		_charge_player.pitch_scale = lerpf(0.75, 1.65, charge_amount)
+	else:
+		if _charge_player.playing:
+			_charge_player.stop()
+
+
+func play_player_stun() -> void:
+	_suppress_mic(0.5)
+	_play_non_spatial(_wav_player_stun, 0.0, 1.0)
+
+
+func play_player_death() -> void:
+	_suppress_mic(0.8)
+	update_charge_hum(false, 0.0)
+	_play_non_spatial(_wav_player_death, 2.0, 1.0)
+
+
+func play_monster_roar(pos: Vector2, enemy_type: int, occluded: bool = false) -> void:
+	_suppress_mic(0.65)
+	var stream: AudioStreamWAV = _wav_roar_patroller
+	var pitch: float = randf_range(0.94, 1.06)
+	match enemy_type:
+		0: # SLEEPER - deep guttural roar
+			stream = _wav_roar_sleeper
+			pitch = randf_range(0.88, 0.98)
+		1: # PATROLLER - mid metallic rasp roar
+			stream = _wav_roar_patroller
+			pitch = randf_range(0.95, 1.05)
+		2: # CHASER - feral high-aggression shriek-roar
+			stream = _wav_roar_chaser
+			pitch = randf_range(1.02, 1.12)
+	var vol_db: float = -7.0 if occluded else 1.5
+	_play_spatial(stream, pos, vol_db, pitch, 650.0)
+
+
+func play_screamer_crack(pos: Vector2, occluded: bool = false) -> void:
+	_suppress_mic(0.35)
+	var vol_db: float = -8.0 if occluded else -1.0
+	_play_spatial(_wav_screamer_crack, pos, vol_db, randf_range(0.96, 1.04), 600.0)
+
+
+func play_screamer_shriek(pos: Vector2) -> void:
+	_suppress_mic(0.9)
+	_play_spatial(_wav_screamer_shriek, pos, 3.0, 1.0, 800.0)
+
+
+func play_listener_pip(pos: Vector2, count: int, occluded: bool = false) -> void:
+	_suppress_mic(0.3)
+	# Pitch rises with each recorded shout (1..4) to build tension
+	var pitch: float = 0.85 + float(clampi(count, 1, 5)) * 0.14
+	var vol_db: float = -7.0 if occluded else 0.0
+	_play_spatial(_wav_listener_pip, pos, vol_db, pitch, 700.0)
+
+
+func play_listener_alarm(pos: Vector2) -> void:
+	_suppress_mic(1.1)
+	_play_spatial(_wav_listener_alarm, pos, 3.5, 1.0, 1400.0)
+
+
+func play_enemy_step(pos: Vector2, is_chasing: bool, occluded: bool) -> void:
+	var vol_db: float = -6.0 if is_chasing else -13.0
+	if occluded:
+		vol_db -= 9.0
+	var pitch: float = randf_range(1.05, 1.18) if is_chasing else randf_range(0.85, 0.98)
+	_play_spatial(_wav_enemy_step, pos, vol_db, pitch, 420.0)
+
+
+# --- Internal Player Spawners ------------------------------------------------
+
+func _setup_charge_player() -> void:
+	_charge_player = AudioStreamPlayer.new()
+	_charge_player.stream = _wav_charge_loop
+	_charge_player.bus = &"Master"
+	add_child(_charge_player)
+
+
+func _setup_heartbeat_players() -> void:
+	var hb_stream: AudioStreamWAV = _synth_heartbeat()
+	for i in 2:
+		var p := AudioStreamPlayer.new()
+		p.stream = hb_stream
+		p.bus = &"Master"
+		add_child(p)
+		_hb_players.append(p)
+
+
+func _process_heartbeat(delta: float) -> void:
+	if _hb_players.is_empty():
+		return
+	if _player_ref == null or not is_instance_valid(_player_ref) or not _player_ref.get("alive"):
+		for p in _hb_players:
+			if p.playing:
+				p.stop()
+		return
+
+	var max_threat := 0.0
+	var player_pos: Vector2 = _player_ref.global_position
+	for node in get_tree().get_nodes_in_group("enemy"):
+		var enemy := node as Enemy
+		if enemy != null and is_instance_valid(enemy):
+			max_threat = maxf(max_threat, enemy.get_threat_level(player_pos))
+
+	var rate := 3.5 if max_threat > _threat else 1.0
+	_threat = move_toward(_threat, max_threat, delta * rate)
+
+	_hb_timer += delta
+	if _hb_timer >= lerpf(interval_calm, interval_panic, _threat):
+		_hb_timer = 0.0
+		var p := _hb_players[_hb_idx]
+		_hb_idx = (_hb_idx + 1) % _hb_players.size()
+		p.volume_db = lerpf(vol_calm, vol_panic, _threat)
+		p.pitch_scale = lerpf(pitch_calm, pitch_panic, _threat)
+		p.play()
+		beat.emit(_threat)
+
+
+func _synth_heartbeat() -> AudioStreamWAV:
+	var dur := 0.42
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	var phase1 := 0.0
+	var phase2 := 0.0
+	var dub_start := 0.17
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var env1: float = minf(t / 0.008, 1.0) * exp(-t * 24.0)
+		var f1: float = lerpf(92.0, 38.0, clampf(t / 0.11, 0.0, 1.0))
+		phase1 += TAU * f1 / MIX_RATE
+		var lub: float = (sin(phase1) + 0.35 * sin(phase1 * 2.0)) * env1 * 0.9
+
+		var dub := 0.0
+		if t >= dub_start:
+			var td: float = t - dub_start
+			var env2: float = minf(td / 0.006, 1.0) * exp(-td * 30.0)
+			var f2: float = lerpf(108.0, 44.0, clampf(td / 0.09, 0.0, 1.0))
+			phase2 += TAU * f2 / MIX_RATE
+			dub = (sin(phase2) + 0.3 * sin(phase2 * 2.0)) * env2 * 0.72
+
+		out[i] = tanh((lub + dub) * 1.35) * 0.88
+	return _make_wav(out)
+
+
+func _play_non_spatial(stream: AudioStreamWAV, volume_db: float, pitch: float) -> void:
+	if stream == null:
+		return
+	var p := AudioStreamPlayer.new()
+	p.stream = stream
+	p.volume_db = volume_db
+	p.pitch_scale = pitch
+	p.bus = &"Master"
+	add_child(p)
+	p.finished.connect(p.queue_free)
+	p.play()
+
+
+func _play_spatial(stream: AudioStreamWAV, pos: Vector2, volume_db: float, pitch: float, max_dist: float) -> void:
+	if stream == null:
+		return
+	var p := AudioStreamPlayer2D.new()
+	p.stream = stream
+	p.global_position = pos
+	p.volume_db = volume_db
+	p.pitch_scale = pitch
+	p.max_distance = max_dist
+	p.attenuation = 1.5
+	p.panning_strength = 1.4
+	p.bus = &"Master"
+	add_child(p)
+	p.finished.connect(p.queue_free)
+	p.play()
+
+
+# --- Procedural Waveform Synthesis -------------------------------------------
+
+func _build_all_streams() -> void:
+	_wav_step_walk = _synth_step_walk()
+	_wav_step_sneak = _synth_step_sneak()
+	_wav_enemy_step = _synth_enemy_step()
+	_wav_echo_ping = _synth_echo_ping()
+	_wav_charge_full = _synth_charge_full()
+	_wav_charge_loop = _synth_charge_loop()
+	_wav_roar_sleeper = _synth_monster_roar(95.0, 0.78, 0.35)
+	_wav_roar_patroller = _synth_monster_roar(135.0, 0.68, 0.55)
+	_wav_roar_chaser = _synth_monster_roar(185.0, 0.62, 0.85)
+	_wav_screamer_crack = _synth_screamer_crack()
+	_wav_screamer_shriek = _synth_screamer_shriek()
+	_wav_listener_pip = _synth_listener_pip()
+	_wav_listener_alarm = _synth_listener_alarm()
+	_wav_player_stun = _synth_player_stun()
+	_wav_player_death = _synth_player_death()
+
+
+func _make_wav(samples: PackedFloat32Array, loop: bool = false) -> AudioStreamWAV:
+	var byte_data := PackedByteArray()
+	byte_data.resize(samples.size() * 2)
+	for i in samples.size():
+		var s: float = clampf(samples[i], -1.0, 1.0)
+		var pcm: int = int(s * 32767.0)
+		byte_data.encode_s16(i * 2, pcm)
+
+	var wav := AudioStreamWAV.new()
+	wav.format = AudioStreamWAV.FORMAT_16_BITS
+	wav.mix_rate = MIX_RATE
+	wav.stereo = false
+	wav.data = byte_data
+	if loop:
+		wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		wav.loop_begin = 0
+		wav.loop_end = samples.size()
+	return wav
+
+
+# Stone cavern footstep: low thump + crisp sole tap + subtle cave tail
+func _synth_step_walk() -> AudioStreamWAV:
+	var dur := 0.16
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	var phase := 0.0
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var freq: float = lerpf(145.0, 48.0, clampf(t / 0.08, 0.0, 1.0))
+		phase += TAU * freq / MIX_RATE
+		var thump: float = sin(phase) * exp(-t * 28.0)
+		var grit: float = randf_range(-1.0, 1.0) * exp(-t * 45.0) * sin(t * 900.0)
+		out[i] = (thump * 0.75 + grit * 0.35) * 0.85
+	return _make_wav(out)
+
+
+# Soft muffled sneak step
+func _synth_step_sneak() -> AudioStreamWAV:
+	var dur := 0.11
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	var phase := 0.0
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var freq: float = lerpf(95.0, 42.0, clampf(t / 0.07, 0.0, 1.0))
+		phase += TAU * freq / MIX_RATE
+		var soft: float = sin(phase) * exp(-t * 36.0)
+		var brush: float = randf_range(-1.0, 1.0) * exp(-t * 60.0) * 0.15
+		out[i] = (soft * 0.6 + brush) * 0.65
+	return _make_wav(out)
+
+
+# Heavy monster footstep thud
+func _synth_enemy_step() -> AudioStreamWAV:
+	var dur := 0.18
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	var phase := 0.0
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var freq: float = lerpf(110.0, 34.0, clampf(t / 0.12, 0.0, 1.0))
+		phase += TAU * freq / MIX_RATE
+		var sub: float = sin(phase) * exp(-t * 22.0)
+		var claw: float = randf_range(-1.0, 1.0) * exp(-t * 50.0) * 0.25
+		out[i] = tanh((sub + claw) * 1.4) * 0.8
+	return _make_wav(out)
+
+
+# Bioluminescent sonar ping + cavern shimmer
+func _synth_echo_ping() -> AudioStreamWAV:
+	var dur := 0.65
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var env: float = minf(t / 0.008, 1.0) * exp(-t * 5.8)
+		var f1: float = 528.0
+		var f2: float = 792.0
+		var f3: float = 1056.0
+		var sig: float = sin(TAU * f1 * t) * 0.6 + sin(TAU * f2 * t) * 0.25 * exp(-t * 8.0) + sin(TAU * f3 * t) * 0.15 * exp(-t * 12.0)
+		var sub: float = sin(TAU * 132.0 * t) * exp(-t * 14.0) * 0.35
+		out[i] = (sig * env + sub) * 0.78
+	return _make_wav(out)
+
+
+# Charge full harmonic chime
+func _synth_charge_full() -> AudioStreamWAV:
+	var dur := 0.28
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var env: float = minf(t / 0.006, 1.0) * exp(-t * 11.0)
+		out[i] = (sin(TAU * 880.0 * t) * 0.55 + sin(TAU * 1320.0 * t) * 0.35) * env * 0.7
+	return _make_wav(out)
+
+
+# Seamless loop for voice charging hum
+func _synth_charge_loop() -> AudioStreamWAV:
+	var freq := 220.0
+	var cycles := 44
+	var count := int(round(float(cycles) * MIX_RATE / freq))
+	var out := PackedFloat32Array()
+	out.resize(count)
+	for i in count:
+		var phase: float = TAU * float(cycles) * float(i) / float(count)
+		out[i] = (sin(phase) * 0.65 + sin(phase * 2.0) * 0.25 + sin(phase * 3.0) * 0.1) * 0.5
+	return _make_wav(out, true)
+
+
+# Resident Evil style monster discovery roar (growl + formant rasp + guttural distortion)
+func _synth_monster_roar(base_freq: float, dur: float, aggression: float) -> AudioStreamWAV:
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	var p1 := 0.0
+	var p2 := 0.0
+	var p3 := 0.0
+	var noise_lp := 0.0
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var norm_t: float = t / dur
+		# Envelope: sharp intake, intense sustained roar, ragged decay
+		var attack: float = clampf(t / 0.04, 0.0, 1.0)
+		var decay: float = clampf((1.0 - norm_t) / 0.28, 0.0, 1.0)
+		var env: float = attack * decay
+
+		# Pitch rises in fury then drops gutturally
+		var pitch_curve: float = 1.0 + 0.28 * sin(norm_t * PI) - 0.22 * norm_t
+		var vibrato: float = 1.0 + 0.06 * sin(TAU * 26.0 * t)
+		var f: float = base_freq * pitch_curve * vibrato
+
+		p1 += TAU * f / MIX_RATE
+		p2 += TAU * (f * 1.48) / MIX_RATE
+		p3 += TAU * (f * 0.5) / MIX_RATE
+
+		# Saw-like vocal cords + sub-growl + filtered breath rasp
+		var cords: float = sin(p1) + 0.55 * sin(p1 * 2.0) + 0.35 * sin(p2) + 0.6 * sin(p3)
+		var raw_noise: float = randf_range(-1.0, 1.0)
+		noise_lp = lerpf(noise_lp, raw_noise, 0.18 + 0.22 * aggression)
+		var rasp: float = noise_lp * (0.65 + 0.5 * sin(p1))
+
+		var mixed: float = tanh((cords * 0.7 + rasp * (0.6 + 0.4 * aggression)) * (1.8 + aggression))
+		out[i] = mixed * env * 0.85
+	return _make_wav(out)
+
+
+# Screamer 1st sound warning: crystalline fracture / crack
+func _synth_screamer_crack() -> AudioStreamWAV:
+	var dur := 0.38
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		# Two sharp fracture snaps + tense high metallic resonance
+		var snap1: float = randf_range(-1.0, 1.0) * exp(-t * 55.0)
+		var snap2: float = randf_range(-1.0, 1.0) * exp(-maxf(t - 0.07, 0.0) * 65.0) if t >= 0.07 else 0.0
+		var ring: float = (sin(TAU * 1480.0 * t) + 0.6 * sin(TAU * 2120.0 * t)) * exp(-t * 9.5)
+		out[i] = clampf((snap1 * 0.8 + snap2 * 0.7 + ring * 0.45) * 0.85, -1.0, 1.0)
+	return _make_wav(out)
+
+
+# Screamer 2nd sound: piercing banshee sonic shriek
+func _synth_screamer_shriek() -> AudioStreamWAV:
+	var dur := 1.15
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	var p1 := 0.0
+	var p2 := 0.0
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var norm_t: float = t / dur
+		var env: float = clampf(t / 0.03, 0.0, 1.0) * exp(-norm_t * 2.2)
+		var fm: float = sin(TAU * 38.0 * t) * 65.0
+		var f1: float = lerpf(1180.0, 760.0, norm_t) + fm
+		var f2: float = lerpf(1790.0, 1120.0, norm_t) - fm * 0.7
+		p1 += TAU * f1 / MIX_RATE
+		p2 += TAU * f2 / MIX_RATE
+		var shriek: float = sin(p1) * 0.55 + sin(p2) * 0.4 + randf_range(-0.35, 0.35) * exp(-t * 2.5)
+		var boom: float = sin(TAU * lerpf(160.0, 45.0, clampf(t / 0.25, 0.0, 1.0)) * t) * exp(-t * 8.0) * 0.5
+		out[i] = tanh((shriek + boom) * 1.6) * env * 0.82
+	return _make_wav(out)
+
+
+# Listener pip: tense sonar lock-on beep
+func _synth_listener_pip() -> AudioStreamWAV:
+	var dur := 0.24
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var env: float = minf(t / 0.005, 1.0) * exp(-t * 14.0)
+		var sig: float = sin(TAU * 740.0 * t) * 0.7 + sin(TAU * 1480.0 * t) * 0.3
+		out[i] = sig * env * 0.75
+	return _make_wav(out)
+
+
+# Listener 5-stack map-wide alarm: deep dread horn + sweeping radar pulse
+func _synth_listener_alarm() -> AudioStreamWAV:
+	var dur := 1.6
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	var p_horn := 0.0
+	var p_sweep := 0.0
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var norm_t: float = t / dur
+		var env: float = clampf(t / 0.05, 0.0, 1.0) * clampf((1.0 - norm_t) / 0.2, 0.0, 1.0)
+		var horn_f: float = 110.0 * (1.0 - 0.12 * norm_t)
+		var sweep_f: float = 440.0 + 320.0 * sin(TAU * 3.0 * t)
+		p_horn += TAU * horn_f / MIX_RATE
+		p_sweep += TAU * sweep_f / MIX_RATE
+		var horn: float = sin(p_horn) + 0.5 * sin(p_horn * 2.0) + 0.3 * sin(p_horn * 3.0)
+		var radar: float = sin(p_sweep) * 0.35 * (0.5 + 0.5 * sin(TAU * 6.0 * t))
+		out[i] = tanh((horn * 0.65 + radar) * 1.5) * env * 0.85
+	return _make_wav(out)
+
+
+# Player stunned: shock impact + high tinnitus ring
+func _synth_player_stun() -> AudioStreamWAV:
+	var dur := 0.85
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var impact: float = randf_range(-1.0, 1.0) * exp(-t * 25.0) * 0.7
+		var ring: float = sin(TAU * 2450.0 * t) * exp(-t * 2.6) * 0.35
+		var buzz: float = sin(TAU * 95.0 * t) * exp(-t * 6.0) * 0.45
+		out[i] = clampf(impact + ring + buzz, -1.0, 1.0) * 0.8
+	return _make_wav(out)
+
+
+# Player death: dark bass collapse + dissolving static
+func _synth_player_death() -> AudioStreamWAV:
+	var dur := 0.95
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	var phase := 0.0
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var freq: float = lerpf(190.0, 28.0, clampf(t / 0.7, 0.0, 1.0))
+		phase += TAU * freq / MIX_RATE
+		var drop: float = sin(phase) * exp(-t * 3.2)
+		var crunch: float = randf_range(-1.0, 1.0) * exp(-t * 9.0) * 0.5
+		out[i] = tanh((drop * 0.85 + crunch) * 1.7) * 0.9
+	return _make_wav(out)

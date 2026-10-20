@@ -5,7 +5,7 @@
 [ext_resource type="PackedScene" uid="uid://b415q8byb6eov" path="res://ui/hud.tscn" id="2_jyhfs"]
 [ext_resource type="Script" uid="uid://120qwhnv8c1f" path="res://systems/echo/EchoLayer.gd" id="2_sugp2"]
 [ext_resource type="Script" path="res://systems/sound/SoundBus.gd" id="3_soundbus"]
-[ext_resource type="Script" path="res://systems/audio/HeartbeatManager.gd" id="4_heartbeat"]
+[ext_resource type="Script" path="res://systems/audio/SfxManager.gd" id="5_sfx"]
 
 [node name="Main" type="Node2D" unique_id=1167702848]
 script = ExtResource("1_o5qli")
@@ -21,7 +21,7 @@ visibility_layer = 2
 [node name="SoundBus" type="Node" parent="."]
 script = ExtResource("3_soundbus")
 
-[node name="HeartbeatManager" type="Node" parent="."]
-script = ExtResource("4_heartbeat")
+[node name="SfxManager" type="Node" parent="."]
+script = ExtResource("5_sfx")
 
 [node name="Hud" parent="." unique_id=1464888437 instance=ExtResource("2_jyhfs")]

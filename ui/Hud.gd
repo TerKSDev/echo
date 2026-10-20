@@ -8,7 +8,8 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	var mat := _vignette_material()
 	if mat != null:
-		_base_inner_radius = float(mat.get_shader_parameter("inner_radius"))
+		mat.set_shader_parameter("vignette_color", Color(0.01, 0.035, 0.07, 0.7))
+		mat.set_shader_parameter("inner_radius", _base_inner_radius)
 	if player == null:
 		player = get_tree().get_first_node_in_group("player")
 	if player != null:
@@ -46,7 +47,19 @@ func flash_death() -> void:
 		return
 	var tw := create_tween()
 	tw.tween_property(mat, "shader_parameter/vignette_color", Color(0.65, 0.05, 0.08, 0.95), 0.08)
-	tw.tween_property(mat, "shader_parameter/vignette_color", Color(0.01, 0.035, 0.07, 0.7), 0.9)
+	tw.tween_property(mat, "shader_parameter/vignette_color", Color(0.28, 0.02, 0.04, 0.85), 0.6)
+
+func show_death_screen(killer_type: int = -1) -> void:
+	if has_node("SettingsModal") and $SettingsModal.visible:
+		$SettingsModal.visible = false
+	if has_node("PauseBtn"):
+		$PauseBtn.visible = false
+	if has_node("SneakBtn"):
+		$SneakBtn.visible = false
+	if has_node("SoundBtn"):
+		$SoundBtn.visible = false
+	if has_node("DeathScreen"):
+		$DeathScreen.open(killer_type)
 
 func _vignette_material() -> ShaderMaterial:
 	var vig := get_node_or_null("Vignette") as ColorRect

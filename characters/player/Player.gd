@@ -33,6 +33,7 @@ const TRAIL_LENGTH := 12
 
 # Player States
 var alive := true
+var killed_by_type := -1
 var target := Vector2.ZERO
 var desired := Vector2.ZERO
 var marker := 0.0
@@ -140,6 +141,9 @@ func _physics_process(delta: float) -> void:
 		_stun_timer -= delta
 		moving = false
 		desired = Vector2.ZERO
+		var sfx_stun := get_node_or_null("../SfxManager") as SfxManager
+		if sfx_stun != null:
+			sfx_stun.update_charge_hum(false, 0.0)
 		velocity = velocity.move_toward(Vector2.ZERO, FRICTION * delta)
 		move_and_slide()
 		_update_trail()
@@ -193,6 +197,12 @@ func _physics_process(delta: float) -> void:
 			was_full = true
 			full_charge = 1.0
 			Input.vibrate_handheld(40)
+			var sfx_node := get_node_or_null("../SfxManager") as SfxManager
+			if sfx_node != null:
+				sfx_node.play_charge_full()
+	var sfx_mgr := get_node_or_null("../SfxManager") as SfxManager
+	if sfx_mgr != null:
+		sfx_mgr.update_charge_hum(charging, charge)
 	full_charge = move_toward(full_charge, 0.0, delta * 4.0)
 
 	# Ignore mic right after a click for a short time
@@ -264,13 +274,14 @@ func _update_trail() -> void:
 	trail.modulate.a = 0.15 if sneaking else 0.5
 
 # Handle Player Death
-func die() -> void:
+func die(killer_type: int = -1) -> void:
 	# Ignore death if the player is already dead
 	if not alive:
 		return
 	
 	# Stop all movement and actions
 	alive = false
+	killed_by_type = killer_type
 	moving = false
 	charging = false
 	velocity = Vector2.ZERO
@@ -284,6 +295,7 @@ func die() -> void:
 # Handle Player State Reset
 func reset(pos: Vector2) -> void:
 	alive = true
+	killed_by_type = -1
 	global_position = pos
 	velocity = Vector2.ZERO
 	moving = false

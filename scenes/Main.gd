@@ -6,16 +6,17 @@ extends Node2D
 @onready var echo_layer: Node2D = $EchoLayer
 @onready var level_container: Node2D = $LevelContainer
 @onready var sound_bus: SoundBus = $SoundBus
-@onready var heartbeat: HeartbeatManager = $HeartbeatManager
+@onready var sfx: SfxManager = $SfxManager
 @onready var hud: CanvasLayer = $Hud
 
 
 func _ready() -> void:
 	_load_level(GameState.current_level_path())
 
-	sound_bus.setup(player, echo_layer)
+	sfx.set_player(player)
+	sound_bus.setup(player, echo_layer, sfx)
 	sound_bus.connect_enemies()
-	heartbeat.beat.connect(hud.pulse_vignette)
+	sfx.beat.connect(hud.pulse_vignette)
 	player.died.connect(_on_player_died)
 
 
@@ -34,6 +35,8 @@ func _load_level(path: String) -> void:
 
 
 func _on_player_died() -> void:
+	sfx.play_player_death()
 	hud.flash_death()
-	await get_tree().create_timer(1.1).timeout
-	GameState.restart_level()
+	await get_tree().create_timer(0.55).timeout
+	var killer_type: int = int(player.get("killed_by_type")) if "killed_by_type" in player else -1
+	hud.show_death_screen(killer_type)
