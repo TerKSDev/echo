@@ -1,9 +1,10 @@
 [gd_scene format=3 uid="uid://cn0mdw3ju0ns3"]
 
-[ext_resource type="Script" uid="uid://b357khg6liqas" path="res://scripts/Main.gd" id="1_o5qli"]
-[ext_resource type="PackedScene" uid="uid://kmcjf7wneot7" path="res://scenes/player.tscn" id="2_0wfyh"]
-[ext_resource type="PackedScene" uid="uid://0yfl2ebjco17" path="res://ui/hud.tscn" id="2_jyhfs"]
-[ext_resource type="Script" uid="uid://120qwhnv8c1f" path="res://scripts/EchoLayer.gd" id="2_sugp2"]
+[ext_resource type="Script" uid="uid://b357khg6liqas" path="res://scenes/Main.gd" id="1_o5qli"]
+[ext_resource type="PackedScene" uid="uid://kmcjf7wneot7" path="res://characters/player/player.tscn" id="2_0wfyh"]
+[ext_resource type="PackedScene" path="res://ui/hud.tscn" id="2_jyhfs"]
+[ext_resource type="Script" uid="uid://120qwhnv8c1f" path="res://systems/echo/EchoLayer.gd" id="2_sugp2"]
+[ext_resource type="PackedScene" uid="uid://bpvejuifgqmxp" path="res://characters/enemy/enemy.tscn" id="5_tbgi4"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_sugp2"]
 size = Vector2(400, 20)
@@ -24,3 +25,6 @@ visibility_layer = 2
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Wall_01" unique_id=891905440]
 position = Vector2(-82, -420)
 shape = SubResource("RectangleShape2D_sugp2")
+
+[node name="Enemy" parent="." unique_id=771095043 instance=ExtResource("5_tbgi4")]
+position = Vector2(194, -164)

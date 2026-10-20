@@ -1,22 +1,52 @@
-﻿[gd_scene format=3 uid="uid://0yfl2ebjco17"]
+[gd_scene format=3 uid="uid://b415q8byb6eov"]
 
-[ext_resource type="Script" uid="uid://du5ekcgyr2hb1" path="res://scripts/Hud.gd" id="1_rbyyf"]
+[ext_resource type="Script" uid="uid://du5ekcgyr2hb1" path="res://ui/Hud.gd" id="1_rbyyf"]
+[ext_resource type="Shader" uid="uid://ckd4aagpo88jw" path="res://ui/vignette.gdshader" id="2_shader"]
+[ext_resource type="Script" uid="uid://keyshueitgsh" path="res://ui/MicVisualizer.gd" id="3_mic"]
+[ext_resource type="Script" uid="uid://dsxu85kwggsu0" path="res://ui/SneakButton.gd" id="4_sneak"]
+[ext_resource type="Script" uid="uid://bdj0wfedh4747" path="res://ui/SoundButton.gd" id="5_sound"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_vignette"]
+shader = ExtResource("2_shader")
+shader_parameter/vignette_color = Color(0.01, 0.035, 0.07, 0.7)
+shader_parameter/inner_radius = 0.42
+shader_parameter/outer_radius = 0.95
 
 [node name="Hud" type="CanvasLayer" unique_id=1464888437]
 script = ExtResource("1_rbyyf")
+
+[node name="Vignette" type="ColorRect" parent="." unique_id=1029384756]
+material = SubResource("ShaderMaterial_vignette")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="MicIndicator" type="Control" parent="." unique_id=837261549]
+layout_mode = 3
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_top = 50.0
+offset_bottom = 50.0
+grow_horizontal = 2
+mouse_filter = 2
+script = ExtResource("3_mic")
 
 [node name="SneakBtn" type="Button" parent="." unique_id=332237175]
 anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
 offset_left = 40.0
-offset_top = -200.0
-offset_right = 200.0
-offset_bottom = -40.0
+offset_top = -186.0
+offset_right = 150.0
+offset_bottom = -50.0
 grow_vertical = 0
 focus_mode = 0
-theme_override_font_sizes/font_size = 32
-text = "Sneak"
+flat = true
+script = ExtResource("4_sneak")
 
 [node name="SoundBtn" type="Button" parent="." unique_id=411369100]
 anchors_preset = 3
@@ -24,12 +54,12 @@ anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -240.0
-offset_top = -240.0
+offset_left = -150.0
+offset_top = -186.0
 offset_right = -40.0
-offset_bottom = -40.0
+offset_bottom = -50.0
 grow_horizontal = 0
 grow_vertical = 0
 focus_mode = 0
-theme_override_font_sizes/font_size = 32
-text = "Sound"
+flat = true
+script = ExtResource("5_sound")

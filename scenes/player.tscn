@@ -1,7 +1,7 @@
-[gd_scene format=3 uid="uid://kmcjf7wneot7"]
+[gd_scene format=3 uid="uid://wdvw8ik6d1ty"]
 
-[ext_resource type="Script" uid="uid://0vwrpl3642q6" path="res://scripts/Player.gd" id="1_3vyb7"]
-[ext_resource type="Script" uid="uid://pceql66dvmkf" path="res://scripts/MicInput.gd" id="2_g2els"]
+[ext_resource type="Script" path="res://scripts/Player.gd" id="1_3vyb7"]
+[ext_resource type="Script" path="res://scripts/MicInput.gd" id="2_g2els"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_my0f1"]
 

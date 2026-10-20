@@ -17,7 +17,6 @@ func emit_echo(origin: Vector2, radius: float, exclude: Array[RID] = [], show_wa
 		})
 	
 	var space = get_world_2d().direct_space_state
-	var hits := 0
 
 	# Perform raycasts in a circular pattern to detect obstacles
 	for i in RAY_COUNT:
@@ -29,12 +28,20 @@ func emit_echo(origin: Vector2, radius: float, exclude: Array[RID] = [], show_wa
 		
 		var hit = space.intersect_ray(query)
 		if hit:
-			hits += 1
 			var dist := origin.distance_to(hit.position)
 			points.append({
 				"pos": hit.position,
 				"age": -dist / WAVE_SPEED,
 			})
+	
+	for enemy in get_tree().get_nodes_in_group("enemy"):
+		var dist: float = origin.distance_to(enemy.global_position)
+		if dist <= radius:
+			get_tree().create_timer(dist / WAVE_SPEED).timeout.connect(
+				func():
+					if is_instance_valid(enemy):
+						enemy.reveal(1.0)
+			)
 	
 # Update the age of each point and remove old points
 func _process(delta):
