@@ -82,7 +82,7 @@ func _on_enemy_screamed(pos: Vector2, radius: float) -> void:
 	if _sfx != null:
 		_sfx.play_screamer_shriek(pos)
 	var no_exclude: Array[RID] = []
-	_echo.emit_echo(pos, radius, no_exclude, true)
+	_echo.emit_echo(pos, radius, no_exclude, true, Color(1.0, 0.28, 0.52))
 
 	if is_instance_valid(_player) and _player.alive:
 		var dist: float = _player.global_position.distance_to(pos)
@@ -115,7 +115,7 @@ func _on_enemy_alarmed(pos: Vector2, _target_pos: Vector2) -> void:
 	if _sfx != null:
 		_sfx.play_listener_alarm(pos)
 	var no_exclude: Array[RID] = []
-	_echo.emit_echo(pos, 1100.0, no_exclude, true)
+	_echo.emit_echo(pos, 1100.0, no_exclude, true, Color(1.0, 0.38, 0.16))
 
 	if is_instance_valid(_player) and _player.alive:
 		_player.camera_shake(0.65, 8.0)

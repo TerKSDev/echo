@@ -8,12 +8,13 @@ const DOT_SIZE := 3.0
 var points: Array = []
 var waves: Array = []
 
-func emit_echo(origin: Vector2, radius: float, exclude: Array = [], show_wave: bool = true) -> void:
+func emit_echo(origin: Vector2, radius: float, exclude: Array = [], show_wave: bool = true, wave_color: Color = Color(0.3, 1.0, 1.0)) -> void:
 	if show_wave:
 		waves.append({
 			"pos": origin,
 			"max_radius": radius,
-			"age": 0.0
+			"age": 0.0,
+			"col": wave_color
 		})
 	
 	var space := get_world_2d().direct_space_state
@@ -43,6 +44,7 @@ func emit_echo(origin: Vector2, radius: float, exclude: Array = [], show_wave: b
 			points.append({
 				"pos": hit.position,
 				"age": -dist / WAVE_SPEED,
+				"col": wave_color
 			})
 	
 	for enemy in get_tree().get_nodes_in_group("enemy"):
@@ -77,15 +79,27 @@ func _process(delta):
 	
 	queue_redraw()
 
-# Draw the points with fading alpha based on their age
+# Draw the points with arrival shimmer and fading alpha based on their age
 func _draw():
 	for p in points:
-		if p["age"] < 0.0:
+		var age: float = float(p["age"])
+		if age < 0.0:
 			continue
-		var alpha = 1.0 - p["age"] / LIFETIME
-		draw_circle(to_local(p["pos"]), DOT_SIZE, Color(0.3, 1.0, 1.0, alpha))
+		var alpha: float = clampf(1.0 - age / LIFETIME, 0.0, 1.0)
+		var base_col: Color = p.get("col", Color(0.3, 1.0, 1.0))
+		var lp: Vector2 = to_local(Vector2(p["pos"]))
+		# Crisp impact flash when the sound wave first strikes the wall
+		var impact: float = clampf(1.0 - age / 0.18, 0.0, 1.0)
+		var dot_col: Color = base_col.lerp(Color.WHITE, impact * 0.65)
+		if impact > 0.05:
+			draw_circle(lp, DOT_SIZE * (1.8 + impact * 0.8), Color(base_col.r, base_col.g, base_col.b, alpha * impact * 0.28))
+		draw_circle(lp, DOT_SIZE * (1.0 + impact * 0.35), Color(dot_col.r, dot_col.g, dot_col.b, alpha))
 
 	for w in waves:
-		var radius: float = w["age"] * WAVE_SPEED
-		var fade: float = 1.0 - radius / float(w["max_radius"])
-		draw_arc(to_local(w["pos"]), radius, 0.0, TAU, 64, Color(0.3, 1.0, 1.0, fade), 2.0)
+		var radius: float = float(w["age"]) * WAVE_SPEED
+		var fade: float = clampf(1.0 - radius / float(w["max_radius"]), 0.0, 1.0)
+		var w_col: Color = w.get("col", Color(0.3, 1.0, 1.0))
+		var lw: Vector2 = to_local(Vector2(w["pos"]))
+		draw_arc(lw, radius, 0.0, TAU, 64, Color(w_col.r, w_col.g, w_col.b, fade * 0.9), 2.2)
+		if radius > 8.0:
+			draw_arc(lw, radius - 5.0, 0.0, TAU, 64, Color(w_col.r, w_col.g, w_col.b, fade * 0.25), 4.0)

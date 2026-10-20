@@ -41,13 +41,19 @@ func _draw() -> void:
 	# 3. Base Border Ring
 	draw_arc(center, radius, 0.0, TAU, 48, Color(0.26, 0.54, 0.82, 0.65), 1.8)
 
-	# 4. Dynamic Charge Ring (tracked from player)
+	# 4. Dynamic Charge Ring & Stun State (tracked from player)
 	var charging := false
 	var charge_val := 0.0
+	var is_stunned := false
 	if _player != null and is_instance_valid(_player):
+		if "_stun_timer" in _player and float(_player._stun_timer) > 0.0:
+			is_stunned = true
 		if "charging" in _player and _player.charging:
 			charging = true
 			charge_val = float(_player.charge)
+
+	if is_stunned:
+		draw_arc(center, radius, 0.0, TAU, 48, Color(1.0, 0.28, 0.5, 0.75), 2.0)
 
 	if charging and charge_val > 0.01:
 		var start_angle := -PI * 0.5
@@ -67,6 +73,8 @@ func _draw() -> void:
 
 	# 5. Concentric Echo Icon (( · ))
 	var icon_col := Color(0.85, 0.94, 1.0, 0.92) if not charging else Color.WHITE
+	if is_stunned:
+		icon_col = Color(1.0, 0.45, 0.6, 0.45)
 	# Center dot
 	draw_circle(center, 4.5, icon_col)
 	# Inner echo waves (left and right)
@@ -78,7 +86,9 @@ func _draw() -> void:
 	draw_arc(center, 22.0, PI * 0.72, PI * 1.28, 16, outer_wave_col, 1.8)
 
 	# 6. Micro Label Below
-	var label_text := "CALLING..." if charging else "ECHO"
+	var label_text := "STUNNED" if is_stunned else ("CALLING..." if charging else "ECHO")
 	var label_col := Color(0.55, 0.8, 1.0, 0.7 if not charging else 0.95)
+	if is_stunned:
+		label_col = Color(1.0, 0.38, 0.55, 0.85)
 	draw_string(ThemeDB.fallback_font, Vector2(0.0, 114.0), label_text, HORIZONTAL_ALIGNMENT_CENTER, int(size.x), 11, label_col)
 	draw_string(ThemeDB.fallback_font, Vector2(0.0, 127.0), "[SPACE / HOLD]", HORIZONTAL_ALIGNMENT_CENTER, int(size.x), 9, Color(label_col, 0.45))

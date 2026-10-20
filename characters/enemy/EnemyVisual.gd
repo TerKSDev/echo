@@ -15,9 +15,9 @@ func _draw() -> void:
 
 	# 1. Footstep ripples (mobile enemies)
 	for r in enemy.step_ripples:
-		var prog: float = r["age"]
+		var prog: float = float(r["age"])
 		var rad: float = prog * float(r["max_r"])
-		draw_arc(to_local(r["pos"]), rad, 0.0, TAU, 20, Color(base, (1.0 - prog) * 0.4), 1.2)
+		draw_arc(to_local(Vector2(r["pos"])), rad, 0.0, TAU, 20, Color(base, (1.0 - prog) * 0.4), 1.2)
 
 	# 2. Proximity aura and pulse
 	var proximity := enemy.proximity
@@ -76,9 +76,16 @@ func _draw() -> void:
 		Enemy.EnemyType.LISTENER:
 			_draw_listener(col, alpha)
 
+	# 6. Active search scanning cone when monster is prowling in SEARCH state
+	if state == Enemy.State.SEARCH:
+		var sweep_ang: float = enemy.facing_dir.angle() + sin(t * 5.2) * 0.55
+		draw_arc(Vector2.ZERO, 22.0, sweep_ang - 0.5, sweep_ang + 0.5, 14, Color(base, 0.55 * alpha), 2.0)
+		draw_arc(Vector2.ZERO, 30.0, sweep_ang - 0.35, sweep_ang + 0.35, 12, Color(base, 0.3 * alpha), 1.4)
+
 
 # Sleeper: violet orb, closed eye slit while asleep
 func _draw_sleeper(t: float, col: Color, alpha: float) -> void:
+	var gaze: Vector2 = enemy.facing_dir * 3.0
 	match enemy.state:
 		Enemy.State.SLEEP:
 			draw_circle(Vector2.ZERO, 13.0, Color(col, 0.5 * alpha))
@@ -87,11 +94,11 @@ func _draw_sleeper(t: float, col: Color, alpha: float) -> void:
 			_draw_alert_roar(t, col, alpha)
 		Enemy.State.INVESTIGATE:
 			draw_circle(Vector2.ZERO, 13.0, col)
-			draw_circle(Vector2.ZERO, 6.0, Color(1.0, 0.9, 1.0, alpha))
+			draw_circle(gaze, 6.0, Color(1.0, 0.9, 1.0, alpha))
 			draw_arc(Vector2.ZERO, 18.0 + 2.0 * sin(t * 8.0), 0.0, TAU, 24, Color(col, 0.6 * alpha), 2.0)
 		_:
 			draw_circle(Vector2.ZERO, 12.0, col)
-			draw_circle(Vector2.ZERO, 5.0, Color(1.0, 1.0, 1.0, alpha))
+			draw_circle(gaze * 0.7, 5.0, Color(1.0, 1.0, 1.0, alpha))
 
 
 # Patroller: amber orb with 3 orbiting scanner dots
@@ -99,16 +106,18 @@ func _draw_patroller(t: float, col: Color, alpha: float) -> void:
 	if enemy.state == Enemy.State.ALERT:
 		_draw_alert_roar(t, col, alpha)
 		return
+	var gaze: Vector2 = enemy.facing_dir * 2.8
 	draw_circle(Vector2.ZERO, 12.0, col)
-	draw_circle(Vector2.ZERO, 5.0, Color(1.0, 0.95, 0.85, alpha))
+	draw_circle(gaze, 5.0, Color(1.0, 0.95, 0.85, alpha))
 	var orbit_r := 18.0
+	var orbit_speed := 6.0 if enemy.state == Enemy.State.INVESTIGATE else 3.5
 	draw_arc(Vector2.ZERO, orbit_r, 0.0, TAU, 24, Color(col, 0.35 * alpha), 1.2)
 	for i in 3:
-		var ang := t * 3.5 + i * TAU / 3.0
+		var ang := t * orbit_speed + i * TAU / 3.0
 		draw_circle(Vector2.from_angle(ang) * orbit_r, 2.5, Color(1.0, 0.95, 0.5, alpha))
 
 
-# Chaser: crimson core with 6 spiky barbs and a slit pupil
+# Chaser: crimson core with 6 spiky barbs and a directional slit pupil
 func _draw_chaser(t: float, col: Color, alpha: float) -> void:
 	if enemy.state == Enemy.State.ALERT:
 		_draw_alert_roar(t, col, alpha)
@@ -116,15 +125,17 @@ func _draw_chaser(t: float, col: Color, alpha: float) -> void:
 	var spike_count := 6
 	var vib := sin(t * 24.0) * 2.0
 	var core_r := 12.0
-	var spin := 4.0 if enemy.state == Enemy.State.INVESTIGATE else 1.5
+	var spin := 4.5 if enemy.state == Enemy.State.INVESTIGATE else 1.5
 	for i in spike_count:
 		var ang := i * TAU / float(spike_count) + t * spin
 		var p_base := Vector2.from_angle(ang) * core_r
 		var p_tip := Vector2.from_angle(ang) * (core_r + 8.0 + vib)
 		draw_line(p_base, p_tip, Color(1.0, 0.2, 0.2, alpha), 2.4)
 	draw_circle(Vector2.ZERO, core_r, col)
-	draw_line(Vector2(0, -7), Vector2(0, 7), Color(0.1, 0.0, 0.0, alpha), 2.8)
-	draw_circle(Vector2.ZERO, 2.0, Color(1.0, 0.8, 0.8, alpha))
+	var gaze: Vector2 = enemy.facing_dir * 2.2
+	var slit_dir: Vector2 = enemy.facing_dir.orthogonal() * 7.0
+	draw_line(gaze - slit_dir, gaze + slit_dir, Color(0.1, 0.0, 0.0, alpha), 2.8)
+	draw_circle(gaze, 2.2, Color(1.0, 0.8, 0.8, alpha))
 
 
 # Screamer: crystal cocoon; cracks after the 1st sound, bursts when screaming

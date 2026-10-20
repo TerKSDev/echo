@@ -3,6 +3,7 @@ extends Button
 var _player: Node = null
 var _press_scale := 1.0
 var _timer := 0.0
+var _active_blend := 0.0
 
 func _ready() -> void:
 	flat = true
@@ -24,6 +25,10 @@ func _process(delta: float) -> void:
 	if _player == null or not is_instance_valid(_player):
 		_player = get_tree().get_first_node_in_group("player")
 	_timer += delta
+	var is_sneaking := false
+	if _player != null and is_instance_valid(_player):
+		is_sneaking = bool(_player.get("sneaking"))
+	_active_blend = move_toward(_active_blend, 1.0 if is_sneaking else 0.0, delta * 9.0)
 	scale = Vector2(_press_scale, _press_scale)
 	queue_redraw()
 
@@ -31,42 +36,43 @@ func _draw() -> void:
 	var center := Vector2(size.x * 0.5, 48.0)
 	var radius := 44.0
 	var is_sneaking := false
+	var is_stunned := false
 	if _player != null and is_instance_valid(_player):
 		is_sneaking = bool(_player.get("sneaking"))
+		if "_stun_timer" in _player and float(_player._stun_timer) > 0.0:
+			is_stunned = true
 
-	if is_sneaking:
-		# --- Active Sneak State: Luminous breathing glow ---
-		var pulse := 0.5 + 0.5 * sin(_timer * 3.5)
-		# Outer pulsing aura
-		draw_circle(center, radius + 4.0 + 3.0 * pulse, Color(0.18, 0.65, 1.0, 0.15 + 0.12 * pulse))
-		# Luminous glass disc
-		draw_circle(center, radius, Color(0.06, 0.22, 0.36, 0.9))
-		# Vibrant cyan border rim
-		draw_arc(center, radius, 0.0, TAU, 40, Color(0.38, 0.88, 1.0, 0.95), 2.2)
+	var b: float = _active_blend
+	var pulse := 0.5 + 0.5 * sin(_timer * 3.5)
 
-		# Center Icon: Soft footprint/dampener lines in bright cyan
-		var icon_col := Color(0.5, 0.95, 1.0, 1.0)
-		_draw_stealth_icon(center, icon_col)
+	# Outer aura (blended smoothly)
+	var halo_r: float = radius + lerpf(3.0, 4.0 + 3.0 * pulse, b)
+	var halo_col: Color = Color(0.1, 0.35, 0.6, 0.1).lerp(Color(0.18, 0.65, 1.0, 0.15 + 0.12 * pulse), b)
+	draw_circle(center, halo_r, halo_col)
 
-		# Label with ample padding below the circle
-		draw_string(ThemeDB.fallback_font, Vector2(0.0, 114.0), "SNEAKING", HORIZONTAL_ALIGNMENT_CENTER, int(size.x), 11, Color(0.5, 0.95, 1.0, 0.95))
-		draw_string(ThemeDB.fallback_font, Vector2(0.0, 127.0), "[SHIFT]", HORIZONTAL_ALIGNMENT_CENTER, int(size.x), 9, Color(0.5, 0.95, 1.0, 0.45))
-	else:
-		# --- Normal Walk State: Discreet dark glass ---
-		# Subtle glow
-		draw_circle(center, radius + 3.0, Color(0.1, 0.35, 0.6, 0.1))
-		# Dark cavern glass disc
-		draw_circle(center, radius, Color(0.04, 0.11, 0.2, 0.72))
-		# Subtle rim
-		draw_arc(center, radius, 0.0, TAU, 40, Color(0.24, 0.48, 0.72, 0.55), 1.6)
+	# Glass disc
+	var disc_col: Color = Color(0.04, 0.11, 0.2, 0.72).lerp(Color(0.06, 0.22, 0.36, 0.9), b)
+	draw_circle(center, radius, disc_col)
 
-		# Center Icon in dim ice blue
-		var icon_col := Color(0.7, 0.85, 0.98, 0.6)
-		_draw_stealth_icon(center, icon_col)
+	# Border rim
+	var rim_col: Color = Color(0.24, 0.48, 0.72, 0.55).lerp(Color(0.38, 0.88, 1.0, 0.95), b)
+	if is_stunned:
+		rim_col = Color(1.0, 0.28, 0.5, 0.75)
+	draw_arc(center, radius, 0.0, TAU, 40, rim_col, lerpf(1.6, 2.2, b))
 
-		# Label with ample padding below the circle
-		draw_string(ThemeDB.fallback_font, Vector2(0.0, 114.0), "SNEAK", HORIZONTAL_ALIGNMENT_CENTER, int(size.x), 11, Color(0.48, 0.72, 0.92, 0.7))
-		draw_string(ThemeDB.fallback_font, Vector2(0.0, 127.0), "[SHIFT]", HORIZONTAL_ALIGNMENT_CENTER, int(size.x), 9, Color(0.48, 0.72, 0.92, 0.4))
+	# Center Icon
+	var icon_col: Color = Color(0.7, 0.85, 0.98, 0.6).lerp(Color(0.5, 0.95, 1.0, 1.0), b)
+	if is_stunned:
+		icon_col = Color(1.0, 0.45, 0.6, 0.45)
+	_draw_stealth_icon(center, icon_col)
+
+	# Label below
+	var lbl_text := "STUNNED" if is_stunned else ("SNEAKING" if is_sneaking else "SNEAK")
+	var lbl_col: Color = Color(0.48, 0.72, 0.92, 0.7).lerp(Color(0.5, 0.95, 1.0, 0.95), b)
+	if is_stunned:
+		lbl_col = Color(1.0, 0.38, 0.55, 0.85)
+	draw_string(ThemeDB.fallback_font, Vector2(0.0, 114.0), lbl_text, HORIZONTAL_ALIGNMENT_CENTER, int(size.x), 11, lbl_col)
+	draw_string(ThemeDB.fallback_font, Vector2(0.0, 127.0), "[SHIFT]", HORIZONTAL_ALIGNMENT_CENTER, int(size.x), 9, Color(lbl_col, 0.45))
 
 func _draw_stealth_icon(center: Vector2, col: Color) -> void:
 	# Stylized Sound Dampener: 3 curved horizontal stealth ripples with a center mute bar

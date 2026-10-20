@@ -91,10 +91,15 @@ var alarm_wave_radius := 0.0
 var speed_boost_timer := 0.0
 var speed_boost_mult := 1.0
 
-# Data for EnemyVisual
+# Data for EnemyVisual & AI steering
 var trail_points: Array[Vector2] = []
 var step_ripples: Array[Dictionary] = []
+var facing_dir := Vector2.DOWN
 var _step_echo_timer := 0.0
+var _patrol_wait_timer := 0.0
+var _search_wait_timer := 0.0
+var _stuck_timer := 0.0
+var _last_progress_pos := Vector2.ZERO
 var _visual: EnemyVisual
 
 
@@ -185,6 +190,7 @@ func on_sound(pos: Vector2, loudness: float, radius: float, is_voice: bool = fal
 
 func _notice(pos: Vector2) -> void:
 	target = pos
+	_stuck_timer = 0.0
 	match state:
 		State.SLEEP, State.PATROL, State.RETURN:
 			_enter(State.ALERT)
@@ -281,8 +287,15 @@ func _enter(s: State) -> void:
 	var changed := s != state
 	state = s
 	timer = 0.0
+	_stuck_timer = 0.0
+	_last_progress_pos = global_position
 	if s == State.SEARCH:
+		_search_wait_timer = 0.18
 		search_point = _random_search_point()
+	elif s == State.ALERT:
+		var to_t: Vector2 = target - global_position
+		if not to_t.is_zero_approx():
+			facing_dir = to_t.normalized()
 	if changed:
 		reveal(float(STATE_FLASH.get(s, 0.5)))
 		# Survival-horror discovery shudder / camera jolt when a monster spots the player
@@ -295,17 +308,28 @@ func _enter(s: State) -> void:
 
 
 func _random_search_point() -> Vector2:
-	var candidate: Vector2 = target + Vector2.from_angle(randf() * TAU) * randf_range(30.0, SEARCH_RADIUS)
+	var origin: Vector2 = global_position
 	var space := get_world_2d().direct_space_state
-	var query := PhysicsRayQueryParameters2D.create(global_position, candidate)
-	query.collision_mask = 1
-	query.exclude = [get_rid()]
-	var hit: Dictionary = space.intersect_ray(query)
-	if not hit.is_empty():
-		var hit_pos: Vector2 = hit.position
-		var dir: Vector2 = (hit_pos - global_position).normalized()
-		return hit_pos - dir * 18.0
-	return candidate
+	var best_pt: Vector2 = origin
+	var best_dist := 0.0
+	var excl: Array[RID] = _wall_query_exclude()
+	# Try up to 4 angles and pick the most open reachable direction so the monster doesn't search into a corner
+	for attempt in 4:
+		var candidate: Vector2 = origin + Vector2.from_angle(randf() * TAU) * randf_range(40.0, SEARCH_RADIUS)
+		var query := PhysicsRayQueryParameters2D.create(origin, candidate)
+		query.collision_mask = 1
+		query.exclude = excl
+		var hit: Dictionary = space.intersect_ray(query)
+		var reach_pt: Vector2 = candidate
+		if not hit.is_empty():
+			var hit_pos: Vector2 = hit.position
+			var dir: Vector2 = (hit_pos - origin).normalized()
+			reach_pt = hit_pos - dir * 18.0
+		var d: float = origin.distance_to(reach_pt)
+		if d > best_dist:
+			best_dist = d
+			best_pt = reach_pt
+	return best_pt
 
 
 func _get_player() -> Node2D:
@@ -315,16 +339,21 @@ func _get_player() -> Node2D:
 	return player as Node2D
 
 
+# Excludes this enemy and the player so wall raycasts only detect physical walls/obstacles
+func _wall_query_exclude() -> Array[RID]:
+	var exclude: Array[RID] = [get_rid()]
+	var player = get_tree().get_first_node_in_group("player")
+	if player is CollisionObject2D and is_instance_valid(player):
+		exclude.append(player.get_rid())
+	return exclude
+
+
 # Checks if a solid wall (collision layer 1) blocks line of sight between two points
 func _is_blocked_by_wall(from_pos: Vector2, to_pos: Vector2) -> bool:
 	var space := get_world_2d().direct_space_state
 	var query := PhysicsRayQueryParameters2D.create(from_pos, to_pos)
 	query.collision_mask = 1
-	var exclude: Array[RID] = [get_rid()]
-	var player = get_tree().get_first_node_in_group("player")
-	if player != null and is_instance_valid(player):
-		exclude.append(player.get_rid())
-	query.exclude = exclude
+	query.exclude = _wall_query_exclude()
 
 	var hit: Dictionary = space.intersect_ray(query)
 	return not hit.is_empty()
@@ -449,14 +478,18 @@ func _tick_timers(delta: float) -> void:
 func _run_state(delta: float, cur_patrol: float, cur_chase: float) -> void:
 	match state:
 		State.SLEEP:
-			velocity = Vector2.ZERO
+			velocity = velocity.move_toward(Vector2.ZERO, 600.0 * delta)
 		State.PATROL:
 			if patrol_points.size() < 2:
-				velocity = Vector2.ZERO
-			elif _move_toward(patrol_points[patrol_idx], cur_patrol):
+				velocity = velocity.move_toward(Vector2.ZERO, 600.0 * delta)
+			elif _patrol_wait_timer > 0.0:
+				_patrol_wait_timer -= delta
+				velocity = velocity.move_toward(Vector2.ZERO, 700.0 * delta)
+			elif _move_toward(patrol_points[patrol_idx], cur_patrol, delta):
 				patrol_idx = (patrol_idx + 1) % patrol_points.size()
+				_patrol_wait_timer = 0.42
 		State.ALERT:
-			velocity = Vector2.ZERO
+			velocity = velocity.move_toward(Vector2.ZERO, 950.0 * delta)
 			# Stationary enemies (Screamer/Listener) return to sleep so they fade back into darkness;
 			# mobile enemies finish their discovery roar and begin chasing.
 			if _is_stationary():
@@ -466,17 +499,21 @@ func _run_state(delta: float, cur_patrol: float, cur_chase: float) -> void:
 				if timer >= alert_time:
 					_enter(State.INVESTIGATE)
 		State.INVESTIGATE:
-			if _move_toward(target, cur_chase) or timer >= investigate_timeout:
+			if _move_toward(target, cur_chase, delta) or timer >= investigate_timeout or _is_stuck(delta):
 				velocity = Vector2.ZERO
 				_enter(State.SEARCH)
 		State.SEARCH:
-			if _move_toward(search_point, cur_patrol):
+			if _search_wait_timer > 0.0:
+				_search_wait_timer -= delta
+				velocity = velocity.move_toward(Vector2.ZERO, 700.0 * delta)
+			elif _move_toward(search_point, cur_patrol, delta) or _is_stuck(delta):
+				_search_wait_timer = 0.35
 				search_point = _random_search_point()
 			if timer >= SEARCH_TIME:
 				_enter(State.RETURN)
 		State.RETURN:
 			var dest := patrol_points[patrol_idx] if patrol_points.size() > 0 else home
-			if _move_toward(dest, cur_patrol) or timer >= RETURN_TIMEOUT:
+			if _move_toward(dest, cur_patrol, delta) or timer >= RETURN_TIMEOUT or _is_stuck(delta):
 				if patrol_points.size() < 2:
 					home = global_position
 				_enter(State.PATROL if patrol_points.size() > 1 else State.SLEEP)
@@ -497,8 +534,25 @@ func _run_state(delta: float, cur_patrol: float, cur_chase: float) -> void:
 				_enter(State.SLEEP)
 
 
+func _is_stuck(delta: float) -> bool:
+	if global_position.distance_to(_last_progress_pos) > 10.0:
+		_last_progress_pos = global_position
+		_stuck_timer = 0.0
+		return false
+	_stuck_timer += delta
+	if _stuck_timer >= 0.65:
+		_stuck_timer = 0.0
+		_last_progress_pos = global_position
+		return true
+	return false
+
+
 # Chaser afterimage + footstep ripples (visual only)
 func _update_trail_and_steps(delta: float) -> void:
+	if velocity.length() > 8.0:
+		var target_face := velocity.normalized()
+		facing_dir = facing_dir.slerp(target_face, clampf(delta * 12.0, 0.0, 1.0)).normalized()
+
 	if enemy_type == EnemyType.CHASER and state == State.INVESTIGATE and velocity.length() > 20.0:
 		trail_points.push_front(global_position)
 		if trail_points.size() > 10:
@@ -509,7 +563,7 @@ func _update_trail_and_steps(delta: float) -> void:
 	if velocity.length() > 15.0:
 		_step_echo_timer += delta
 		var chasing := state == State.INVESTIGATE
-		if _step_echo_timer >= (0.4 if chasing else 0.75):
+		if _step_echo_timer >= (0.42 if chasing else 0.78):
 			_step_echo_timer = 0.0
 			step_ripples.append({
 				"pos": global_position,
@@ -519,26 +573,68 @@ func _update_trail_and_steps(delta: float) -> void:
 			step_taken.emit(global_position, chasing, is_wall_occluded)
 
 
-func _move_toward(dest: Vector2, speed: float) -> bool:
+func _move_toward(dest: Vector2, speed: float, delta: float) -> bool:
 	var to_dest := dest - global_position
-	if to_dest.length() < ARRIVE_DIST:
-		velocity = Vector2.ZERO
+	var dist := to_dest.length()
+	if dist < ARRIVE_DIST:
+		velocity = velocity.move_toward(Vector2.ZERO, 900.0 * delta)
 		return true
 	var dir := to_dest.normalized()
-	# Slide smoothly along walls instead of headbutting into them
+
+	# Whisker obstacle avoidance so monsters steer around corners instead of grinding head-first into walls
+	var space := get_world_2d().direct_space_state
+	var feel_dist := 26.0
+	var excl: Array[RID] = _wall_query_exclude()
+	var q_fwd := PhysicsRayQueryParameters2D.create(global_position, global_position + dir * feel_dist)
+	q_fwd.collision_mask = 1
+	q_fwd.exclude = excl
+	var hit_fwd: Dictionary = space.intersect_ray(q_fwd)
+	if not hit_fwd.is_empty():
+		var left_dir := dir.rotated(-0.65)
+		var right_dir := dir.rotated(0.65)
+		var q_left := PhysicsRayQueryParameters2D.create(global_position, global_position + left_dir * feel_dist)
+		q_left.collision_mask = 1
+		q_left.exclude = excl
+		var q_right := PhysicsRayQueryParameters2D.create(global_position, global_position + right_dir * feel_dist)
+		q_right.collision_mask = 1
+		q_right.exclude = excl
+		var hit_l: Dictionary = space.intersect_ray(q_left)
+		var hit_r: Dictionary = space.intersect_ray(q_right)
+		if hit_l.is_empty() and not hit_r.is_empty():
+			dir = left_dir
+		elif hit_r.is_empty() and not hit_l.is_empty():
+			dir = right_dir
+		else:
+			var n: Vector2 = hit_fwd.normal
+			var slide := dir.slide(n)
+			if slide.length() > 0.2:
+				dir = slide.normalized()
+			else:
+				dir = n.orthogonal()
+
+	# Slide smoothly along walls on physical contact
 	if get_slide_collision_count() > 0:
 		var col := get_slide_collision(0)
 		if col != null:
 			var normal := col.get_normal()
-			if dir.dot(normal) < -0.1:
-				var slide_dir := dir.slide(normal).normalized()
-				if not slide_dir.is_zero_approx():
-					dir = slide_dir
-	velocity = dir * speed
+			if dir.dot(normal) < -0.05:
+				var slide_dir := dir.slide(normal)
+				if slide_dir.length() > 0.2:
+					dir = slide_dir.normalized()
+				else:
+					dir = normal.orthogonal()
+
+	# Smooth acceleration & deceleration near destination
+	var slow_factor := clampf(dist / 24.0, 0.35, 1.0)
+	var desired_vel := dir * (speed * slow_factor)
+	var accel := 950.0 if state == State.INVESTIGATE else 620.0
+	velocity = velocity.move_toward(desired_vel, accel * delta)
 	return false
 
 
 func _on_catch(body: Node) -> void:
+	if is_wall_occluded:
+		return
 	if body.is_in_group("player") and body.has_method("die"):
 		body.die(int(enemy_type))
 

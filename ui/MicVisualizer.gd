@@ -29,8 +29,8 @@ func _process(delta: float) -> void:
 				is_muted = true
 			else:
 				raw_level = mic.level_db
-				var floor_db: float = mic.noise_floor_db
-				var target_e: float = clampf(inverse_lerp(floor_db + 2.0, floor_db + 25.0, raw_level), 0.0, 1.0)
+				var trig_db: float = mic.get_trigger_db() if mic.has_method("get_trigger_db") else (mic.noise_floor_db + 14.0)
+				var target_e: float = clampf(inverse_lerp(trig_db - 12.0, trig_db + 14.0, raw_level), 0.0, 1.0)
 				_energy = lerpf(_energy, target_e, delta * 16.0)
 
 	if is_muted:
@@ -50,12 +50,21 @@ func _draw() -> void:
 	var t := Time.get_ticks_msec() / 1000.0
 
 	var is_muted := false
-	if _player != null and is_instance_valid(_player) and _player.has_node("MicInput"):
-		var mic = _player.get_node("MicInput")
-		if mic != null and not mic.enabled:
-			is_muted = true
+	var calibrating := false
+	var is_stunned := false
+	if _player != null and is_instance_valid(_player):
+		if "_stun_timer" in _player and float(_player._stun_timer) > 0.0:
+			is_stunned = true
+		if _player.has_node("MicInput"):
+			var mic = _player.get_node("MicInput")
+			if mic != null:
+				if not mic.enabled:
+					is_muted = true
+				elif mic.has_method("is_calibrating") and mic.is_calibrating():
+					calibrating = true
 
 	# 1. Subtle dark glass capsule background
+	_bg_box.border_color = Color(1.0, 0.28, 0.5, 0.85) if is_stunned else Color(0.25, 0.52, 0.78, 0.45)
 	draw_style_box(_bg_box, rect)
 
 	# 2. 5 dynamic acoustic equalizer bars
@@ -66,11 +75,13 @@ func _draw() -> void:
 
 	var bar_weights := [0.55, 0.8, 1.0, 0.8, 0.55]
 	var base_col := Color(0.35, 0.75, 1.0, 0.75) if not is_muted else Color(0.5, 0.5, 0.5, 0.4)
+	if is_stunned:
+		base_col = Color(1.0, 0.28, 0.52, 0.85)
 	var active_col := Color(0.9, 0.98, 1.0, 1.0)
 
 	for i in range(5):
 		var x_offset := (i - 2) * gap
-		var idle_breathe := 0.5 + 0.5 * sin(t * 3.0 + i * 0.9) if not is_muted else 0.0
+		var idle_breathe := 0.5 + 0.5 * sin(t * (22.0 if is_stunned else 3.0) + i * 0.9) if not is_muted else 0.0
 		var bar_h: float = lerpf(min_h + 2.5 * idle_breathe, max_h * bar_weights[i], _energy)
 		var c := base_col.lerp(active_col, _energy + _flash)
 		draw_line(
@@ -83,10 +94,16 @@ func _draw() -> void:
 	# 3. Micro text status below
 	var text: String
 	var text_col: Color
-	if is_muted:
+	if is_stunned:
+		text = "SONIC STUNNED!"
+		text_col = Color(1.0, 0.35, 0.58, 0.98)
+	elif is_muted:
 		text = "MIC MUTED"
 		text_col = Color(0.7, 0.45, 0.45, 0.6)
-	elif _energy > 0.15 or _flash > 0.1:
+	elif calibrating:
+		text = "CALIBRATING..."
+		text_col = Color(1.0, 0.85, 0.35, 0.95)
+	elif _flash > 0.1:
 		text = "VOICE ACTIVE"
 		text_col = Color(0.4, 0.95, 1.0, 1.0)
 	else:

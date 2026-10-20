@@ -22,6 +22,9 @@ var _modal_title: Label
 var _modal_subtitle: Label
 var _modal_body: VBoxContainer
 var _is_modal_open := false
+var _menu_mic: MicInput
+var _menu_meter_canvas: Control
+var _menu_calib_btn: Button
 
 # Procedural UI audio
 var _wav_click: AudioStreamWAV
@@ -77,6 +80,15 @@ func _process(delta: float) -> void:
 		s["pos"] = pos
 
 	sonar_backdrop.queue_redraw()
+	if _is_modal_open and _menu_meter_canvas != null and is_instance_valid(_menu_meter_canvas):
+		_menu_meter_canvas.queue_redraw()
+		if _menu_calib_btn != null and is_instance_valid(_menu_calib_btn) and _menu_mic != null:
+			if _menu_mic.is_calibrating():
+				_menu_calib_btn.text = "SAMPLING..."
+				_menu_calib_btn.disabled = true
+			else:
+				_menu_calib_btn.text = "CALIBRATE ROOM"
+				_menu_calib_btn.disabled = not GameState.mic_enabled
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -148,9 +160,9 @@ func _on_start_pressed() -> void:
 	test_btn.text = "◈   TEST ARENA (ALL MONSTERS SANDBOX)"
 	test_btn.add_theme_font_size_override("font_size", 13)
 	test_btn.pressed.connect(func():
-		_play_ui_sound(_wav_click, -5.0, 1.05)
 		GameState.start_game(0)
 	)
+	_wire_button_Juice(test_btn)
 	_modal_body.add_child(test_btn)
 
 	# 14-Level Grid
@@ -172,9 +184,9 @@ func _on_start_pressed() -> void:
 		if not exists:
 			btn.modulate = Color(0.65, 0.75, 0.88, 0.7)
 		btn.pressed.connect(func():
-			_play_ui_sound(_wav_click, -5.0, 1.05)
 			_launch_level_by_number(i, lvl_path)
 		)
+		_wire_button_Juice(btn)
 		grid.add_child(btn)
 
 
@@ -217,7 +229,7 @@ func _on_settings_pressed() -> void:
 	slider.value = cur_vol
 	slider.focus_mode = Control.FOCUS_NONE
 	slider.value_changed.connect(func(v: float):
-		AudioServer.set_bus_volume_db(bus_idx, linear_to_db(maxf(v, 0.0001)))
+		GameState.set_master_volume(v)
 		vol_val.text = "%d%%" % int(round(v * 100.0))
 	)
 	_modal_body.add_child(slider)
@@ -237,12 +249,104 @@ func _on_settings_pressed() -> void:
 	mic_btn.pressed.connect(func():
 		_play_ui_sound(_wav_click, -5.0, 1.0)
 		GameState.mic_enabled = not GameState.mic_enabled
+		GameState.save_settings()
+		if _menu_mic != null:
+			_menu_mic.enabled = GameState.mic_enabled
 		_refresh_mic_btn(mic_btn)
 	)
 
 	mic_row.add_child(mic_lbl)
 	mic_row.add_child(mic_btn)
 	_modal_body.add_child(mic_row)
+
+	# Ensure live MicInput exists for testing & calibration in Main Menu
+	if _menu_mic == null:
+		_menu_mic = MicInput.new()
+		add_child(_menu_mic)
+		_menu_mic.start()
+	_menu_mic.enabled = GameState.mic_enabled
+
+	# Mic Sensitivity Header + Slider
+	var sens_header := HBoxContainer.new()
+	var sens_lbl := Label.new()
+	sens_lbl.text = "MIC SENSITIVITY"
+	sens_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sens_lbl.add_theme_color_override("font_color", Color(0.65, 0.85, 1.0, 0.9))
+	sens_lbl.add_theme_font_size_override("font_size", 13)
+
+	var sens_val := Label.new()
+	sens_val.text = "%d%%" % int(round(GameState.mic_sensitivity * 100.0))
+	sens_val.add_theme_color_override("font_color", Color(0.88, 0.96, 1.0, 1.0))
+	sens_val.add_theme_font_size_override("font_size", 13)
+
+	sens_header.add_child(sens_lbl)
+	sens_header.add_child(sens_val)
+	_modal_body.add_child(sens_header)
+
+	var sens_slider := HSlider.new()
+	sens_slider.custom_minimum_size = Vector2(0, 26)
+	sens_slider.max_value = 1.0
+	sens_slider.step = 0.01
+	sens_slider.value = GameState.mic_sensitivity
+	sens_slider.focus_mode = Control.FOCUS_NONE
+	sens_slider.value_changed.connect(func(v: float):
+		GameState.mic_sensitivity = v
+		sens_val.text = "%d%%" % int(round(v * 100.0))
+		GameState.save_settings()
+	)
+	_modal_body.add_child(sens_slider)
+
+	# Live Mic Meter + Calibrate Room Button
+	var calib_row := HBoxContainer.new()
+	calib_row.add_theme_constant_override("separation", 12)
+
+	_menu_meter_canvas = Control.new()
+	_menu_meter_canvas.custom_minimum_size = Vector2(0, 32)
+	_menu_meter_canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_menu_meter_canvas.draw.connect(_draw_menu_mic_meter)
+	calib_row.add_child(_menu_meter_canvas)
+
+	_menu_calib_btn = Button.new()
+	_menu_calib_btn.custom_minimum_size = Vector2(142, 34)
+	_menu_calib_btn.focus_mode = Control.FOCUS_NONE
+	_menu_calib_btn.add_theme_font_size_override("font_size", 12)
+	_menu_calib_btn.text = "CALIBRATE ROOM"
+	_menu_calib_btn.pressed.connect(func():
+		_play_ui_sound(_wav_click, -5.0, 1.0)
+		if _menu_mic != null:
+			_menu_mic.recalibrate()
+	)
+	calib_row.add_child(_menu_calib_btn)
+	_modal_body.add_child(calib_row)
+
+
+func _draw_menu_mic_meter() -> void:
+	if _menu_meter_canvas == null or not is_instance_valid(_menu_meter_canvas):
+		return
+	var w: float = _menu_meter_canvas.size.x
+	var bar_y := 6.0
+	var bar_h := 12.0
+
+	_menu_meter_canvas.draw_rect(Rect2(0.0, bar_y, w, bar_h), Color(0.03, 0.08, 0.15, 0.9))
+
+	var cur_db: float = _menu_mic.level_db if (_menu_mic != null and GameState.mic_enabled) else -80.0
+	var trig_db: float = GameState.get_mic_trigger_db()
+
+	var fill_frac: float = clampf(inverse_lerp(-70.0, -5.0, cur_db), 0.0, 1.0)
+	var trig_frac: float = clampf(inverse_lerp(-70.0, -5.0, trig_db), 0.0, 1.0)
+
+	var active: bool = cur_db >= trig_db
+	var fill_col: Color = Color(0.35, 0.95, 1.0, 0.95) if active else Color(0.22, 0.58, 0.85, 0.75)
+	if fill_frac > 0.01:
+		_menu_meter_canvas.draw_rect(Rect2(0.0, bar_y, w * fill_frac, bar_h), fill_col)
+
+	_menu_meter_canvas.draw_rect(Rect2(0.0, bar_y, w, bar_h), Color(0.24, 0.52, 0.78, 0.6), false, 1.0)
+
+	var tx: float = w * trig_frac
+	_menu_meter_canvas.draw_line(Vector2(tx, bar_y - 3.0), Vector2(tx, bar_y + bar_h + 3.0), Color(1.0, 0.82, 0.28, 0.95), 2.0)
+
+	var hint_text := "SPEAK TO TEST  (YELLOW LINE = TRIGGER)"
+	_menu_meter_canvas.draw_string(ThemeDB.fallback_font, Vector2(0.0, bar_y + bar_h + 12.0), hint_text, HORIZONTAL_ALIGNMENT_LEFT, int(w), 9, Color(0.55, 0.78, 0.95, 0.65))
 
 
 func _refresh_mic_btn(btn: Button) -> void:

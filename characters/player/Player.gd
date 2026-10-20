@@ -15,8 +15,8 @@ const FRICTION := 1200.0
 # Step Sound
 const STEP_LOUDNESS_WALK := 0.22
 const STEP_LOUDNESS_SNEAK := 0.03
-const STEP_INTERVAL_WALK := 0.5
-const STEP_INTERVAL_SNEAK := 0.8
+const STEP_INTERVAL_WALK := 0.62
+const STEP_INTERVAL_SNEAK := 0.98
 
 # Voice Sound
 const CHARGE_TIME := 0.8
@@ -25,6 +25,9 @@ const MAX_LOUDNESS := 0.6
 const CLICK_MIC_IGNORE_TIME := 0.3 # Ignore mic right after a click (the click noise itself)
 
 const TRAIL_LENGTH := 12
+const IDLE_ZOOM_DELAY := 1.8   # Seconds of standing still before camera drifts in
+const IDLE_ZOOM_LEVEL := 1.42  # Gentle focus zoom when idle (1.0 = normal view)
+const ENTRY_ZOOM_LEVEL := 2.35 # Initial close-up zoom on level entry
 
 # Nodes
 @onready var mic: MicInput = $MicInput
@@ -54,6 +57,14 @@ var _death_alpha := 0.0
 var _shake_timer := 0.0
 var _shake_intensity := 0.0
 var _stun_timer := 0.0
+var _idle_timer := 0.0
+var _entry_timer := 1.2 # Prevents idle zoom during the initial level entry pull-back
+var _sneak_blend := 0.0 # Smooth 0..1 transition between normal and sneak visual state
+var _step_ripples: Array[Dictionary] = [] # World-space micro-ripples under footsteps
+var _tap_flash := 0.0 # Crisp ripple animation at destination marker when tapped
+var _wall_bump_pos := Vector2.ZERO
+var _wall_bump_normal := Vector2.UP
+var _wall_bump_alpha := 0.0
 
 # Shake Camera
 func camera_shake(duration: float = 0.4, intensity: float = 8.0) -> void:
@@ -80,6 +91,8 @@ func _ready() -> void:
 	add_to_group("player")
 	trail.top_level = true
 	trail.global_position = Vector2.ZERO
+	if camera != null:
+		camera.zoom = Vector2(ENTRY_ZOOM_LEVEL, ENTRY_ZOOM_LEVEL)
 	mic.voice_detected.connect(make_voice_sound)
 	mic.start()
 
@@ -89,19 +102,28 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not alive or _stun_timer > 0.0:
 		return
 	
-	# Handle touch input (on mobile)
+	# Handle touch / mouse tap & drag steering
 	var pressed_pos = null
+	var is_new_tap := false
 	if event is InputEventScreenTouch and event.pressed:
+		pressed_pos = get_canvas_transform().affine_inverse() * event.position
+		is_new_tap = true
+	elif event is InputEventScreenDrag:
 		pressed_pos = get_canvas_transform().affine_inverse() * event.position
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		pressed_pos = get_global_mouse_position()
+		is_new_tap = true
+	elif event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
+		pressed_pos = get_global_mouse_position()
 	
-	# Move the player to the pressed position
+	# Move the player to the pressed/dragged position
 	if pressed_pos != null:
-		print("move to: ", pressed_pos)
 		target = pressed_pos
 		moving = true
-		click_cooldown = CLICK_MIC_IGNORE_TIME
+		if is_new_tap:
+			_tap_flash = 1.0
+		if event is InputEventScreenTouch and OS.get_name() == "Android" and mic != null:
+			mic.suppress_timer = 0.08
 	
 	# Handle keyboard input (on desktop)
 	if event.is_action_pressed("ui_accept"):
@@ -175,20 +197,27 @@ func _physics_process(delta: float) -> void:
 	velocity = velocity.move_toward(desired, rate * delta)
 	move_and_slide()
 
-	# Stop moving after hitting the wall
-	if moving and get_slide_collision_count() > 0 and velocity.length() < 5.0:
-		moving = false
-		desired = Vector2.ZERO
-		velocity = Vector2.ZERO
+	# Stop moving after hitting the wall, and give a tactile wall-contact spark in the dark
+	if get_slide_collision_count() > 0:
+		var col := get_slide_collision(0)
+		if col != null and _wall_bump_alpha < 0.25 and velocity.length() < 45.0:
+			_wall_bump_pos = col.get_position()
+			_wall_bump_normal = col.get_normal()
+			_wall_bump_alpha = 0.85
+		if moving and velocity.length() < 5.0:
+			moving = false
+			desired = Vector2.ZERO
+			velocity = Vector2.ZERO
+			camera_shake(0.08, 1.2)
 	
-	# Step sound
+	# Step sound (decay smoothly when idle instead of hard-resetting to 0 so micro-taps don't machine-gun steps)
 	if velocity.length() > 1.0:
 		step_timer -= delta
 		if step_timer <= 0.0:
 			step_timer = STEP_INTERVAL_SNEAK if sneaking else STEP_INTERVAL_WALK
 			make_sound(STEP_LOUDNESS_SNEAK if sneaking else STEP_LOUDNESS_WALK)
 	else:
-		step_timer = 0.0
+		step_timer = maxf(step_timer - delta * 0.5, 0.16)
 	
 	# Voice charging
 	if charging:
@@ -208,12 +237,41 @@ func _physics_process(delta: float) -> void:
 	# Ignore mic right after a click for a short time
 	click_cooldown = maxf(click_cooldown - delta, 0.0)
 
+	# Smooth sneak transition, tap flash, wall contact spark, and world-space footstep ripples
+	_sneak_blend = move_toward(_sneak_blend, 1.0 if sneaking else 0.0, delta * 8.0)
+	_tap_flash = move_toward(_tap_flash, 0.0, delta * 3.2)
+	_wall_bump_alpha = move_toward(_wall_bump_alpha, 0.0, delta * 2.8)
+	var alive_ripples: Array[Dictionary] = []
+	for r: Dictionary in _step_ripples:
+		var next_age: float = float(r["age"]) + delta
+		if next_age < 0.65:
+			r["age"] = next_age
+			alive_ripples.append(r)
+	_step_ripples = alive_ripples
+
+	# Dynamic camera zoom: initial pull-back on entry, gentle zoom-in when idle, wide view when active
+	if _entry_timer > 0.0:
+		_entry_timer = maxf(0.0, _entry_timer - delta)
+	var is_active: bool = moving or velocity.length() > 5.0 or charging or _burst_alpha > 0.15
+	if is_active or _entry_timer > 0.0:
+		_idle_timer = 0.0
+	else:
+		_idle_timer += delta
+
+	if camera != null:
+		var target_z: float = IDLE_ZOOM_LEVEL if (_idle_timer >= IDLE_ZOOM_DELAY) else 1.0
+		if charging:
+			target_z -= 0.06 * charge # Subtle camera pull-back tension while charging
+		var zoom_speed: float = 0.75 if (_idle_timer >= IDLE_ZOOM_DELAY) else 2.6
+		var cur_z: float = lerpf(camera.zoom.x, target_z, clampf(delta * zoom_speed, 0.0, 1.0))
+		camera.zoom = Vector2(cur_z, cur_z)
+
 	_update_trail()
 	queue_redraw()
 
 func make_voice_sound(k: float):
-	# Ignore mic while dead, stunned, or right after a click
-	if not alive or _stun_timer > 0.0 or click_cooldown > 0.0:
+	# Ignore mic while dead or stunned
+	if not alive or _stun_timer > 0.0:
 		return
 	make_sound(lerpf(MIN_LOUDNESS, MAX_LOUDNESS, k), true)
 
@@ -230,16 +288,30 @@ func make_sound(loudness: float, is_voice := false) -> void:
 	_burst_radius = 8.0
 	_burst_alpha = clampf(loudness * 2.0, 0.4, 1.0)
 
-	if loudness > STEP_LOUDNESS_WALK:
+	if is_voice:
+		camera_shake(0.16, lerpf(1.4, 4.2, clampf(loudness, 0.0, 1.0)))
 		var tween := create_tween()
 		pulse_scale = 1.0 + loudness * 0.8
 		tween.tween_property(self, "pulse_scale", 1.0, 0.25).set_ease(Tween.EASE_OUT)
+	else:
+		_step_ripples.append({
+			"pos": global_position,
+			"age": 0.0,
+			"max_r": 16.0 if sneaking else 30.0,
+			"alpha": 0.24 if sneaking else 0.46
+		})
+		var step_tw := create_tween()
+		pulse_scale = 1.05 if sneaking else 1.13
+		step_tw.tween_property(self, "pulse_scale", 1.0, 0.18).set_ease(Tween.EASE_OUT)
 
 # Handle Sneak Toggle
 func toggle_sneak():
 	if not alive or _stun_timer > 0.0:
 		return
 	sneaking = not sneaking
+	var sfx_node := get_node_or_null("../SfxManager") as SfxManager
+	if sfx_node != null:
+		sfx_node.play_sneak_toggle(sneaking)
 	sneak_toggled.emit(sneaking)
 
 # Handle Voice Charging
@@ -311,14 +383,33 @@ func reset(pos: Vector2) -> void:
 	_shake_timer = 0.0
 	_shake_intensity = 0.0
 	_stun_timer = 0.0
+	_idle_timer = 0.0
+	_entry_timer = 1.2
+	_sneak_blend = 0.0
+	_tap_flash = 0.0
+	_wall_bump_alpha = 0.0
+	_step_ripples.clear()
 	if camera != null:
 		camera.offset = Vector2.ZERO
+		camera.zoom = Vector2(ENTRY_ZOOM_LEVEL, ENTRY_ZOOM_LEVEL)
 	trail.clear_points()
 	queue_redraw()
 	modulate = Color.WHITE
 
 # Handle Player Drawing
 func _draw() -> void:
+	# Draw world-space footstep water ripples first (underneath player core)
+	for r: Dictionary in _step_ripples:
+		var age: float = float(r["age"])
+		var p_ratio: float = clampf(age / 0.65, 0.0, 1.0)
+		var ease_p: float = 1.0 - pow(1.0 - p_ratio, 2.2)
+		var rad: float = lerpf(3.0, float(r["max_r"]), ease_p)
+		var a: float = float(r["alpha"]) * (1.0 - p_ratio)
+		var local_pos: Vector2 = to_local(Vector2(r["pos"]))
+		draw_arc(local_pos, rad, 0.0, TAU, 24, Color(0.32, 0.86, 1.0, a), 1.4)
+		if p_ratio < 0.45:
+			draw_arc(local_pos, rad * 0.55, 0.0, TAU, 18, Color(0.55, 0.95, 1.0, a * 0.55), 1.0)
+
 	# Ignore drawing if the player is dead, show death collapse effect
 	if not alive:
 		if _death_alpha > 0.01:
@@ -329,33 +420,46 @@ func _draw() -> void:
 
 	var t := Time.get_ticks_msec() / 1000.0
 	var breathe := 0.5 + 0.5 * sin(t * 2.8)
+	var sb: float = _sneak_blend
 
-	if sneaking:
-		# --- Sneak Mode: Condensed acoustic dampener core ---
-		# Subtle focused dampener ring
-		draw_arc(Vector2.ZERO, 10.0 + 1.2 * breathe, 0.0, TAU, 24, Color(0.2, 0.65, 0.85, 0.35), 1.5)
-		# Concentrated silent core
-		draw_circle(Vector2.ZERO, 5.0 * pulse_scale, Color(0.3, 0.8, 1.0, 0.55))
-		draw_circle(Vector2.ZERO, 2.5 * pulse_scale, Color(0.8, 0.95, 1.0, 0.8))
-	else:
-		# --- Normal Mode: Radiant bioluminescent acoustic core ---
+	# Subtle high-frequency core vibration when holding a high voice charge
+	var core_ofs := Vector2.ZERO
+	if charging and charge > 0.25:
+		var jitter: float = (charge - 0.25) * 1.8
+		core_ofs = Vector2(sin(t * 55.0), cos(t * 49.0)) * jitter
+
+	# Smoothly blended Normal <-> Sneak bioluminescent core
+	if sb < 0.99:
+		var norm_a: float = 1.0 - sb
 		# Outer ambient breathing glow
-		draw_circle(Vector2.ZERO, 20.0 + 3.0 * breathe, Color(0.15, 0.6, 0.9, 0.08))
+		draw_circle(core_ofs, (20.0 + 3.0 * breathe) * lerpf(1.0, 0.65, sb), Color(0.15, 0.6, 0.9, 0.08 * norm_a))
 		# Inner soft aura
-		draw_circle(Vector2.ZERO, 13.0 + 1.5 * breathe, Color(0.25, 0.8, 1.0, 0.18))
-		# Main body core
-		draw_circle(Vector2.ZERO, 7.5 * pulse_scale, Color(0.3, 0.92, 1.0, 0.95))
-		# Hot white center
-		draw_circle(Vector2.ZERO, 3.5 * pulse_scale, Color(0.9, 0.98, 1.0, 1.0))
+		draw_circle(core_ofs, (13.0 + 1.5 * breathe) * lerpf(1.0, 0.75, sb), Color(0.25, 0.8, 1.0, 0.18 * norm_a))
 
-		# Directional sonar heading cue when moving
-		if velocity.length() > 10.0:
-			var heading := velocity.normalized()
-			var tip := heading * (13.0 + 2.0 * breathe)
-			var left_wing := heading.rotated(2.4) * 8.0
-			var right_wing := heading.rotated(-2.4) * 8.0
-			draw_line(tip, tip + left_wing, Color(0.4, 0.9, 1.0, 0.45), 1.5)
-			draw_line(tip, tip + right_wing, Color(0.4, 0.9, 1.0, 0.45), 1.5)
+	if sb > 0.01:
+		# Subtle focused dampener ring in Sneak mode
+		var ring_r: float = lerpf(14.0, 10.0 + 1.2 * breathe, sb)
+		draw_arc(core_ofs, ring_r, 0.0, TAU, 24, Color(0.2, 0.65, 0.85, 0.38 * sb), 1.5)
+
+	# Main body core & hot center (smoothly interpolated size and opacity)
+	var body_r: float = lerpf(7.5, 5.0, sb) * pulse_scale
+	var body_a: float = lerpf(0.95, 0.58, sb)
+	draw_circle(core_ofs, body_r, Color(0.3, lerpf(0.92, 0.8, sb), 1.0, body_a))
+
+	var center_r: float = lerpf(3.5, 2.5, sb) * pulse_scale
+	var center_a: float = lerpf(1.0, 0.82, sb)
+	draw_circle(core_ofs, center_r, Color(0.88, 0.97, 1.0, center_a))
+
+	# Directional sonar heading cue when moving
+	if velocity.length() > 10.0:
+		var heading := velocity.normalized()
+		var cue_scale: float = lerpf(1.0, 0.75, sb)
+		var cue_alpha: float = lerpf(0.45, 0.24, sb)
+		var tip := core_ofs + heading * (13.0 + 2.0 * breathe) * cue_scale
+		var left_wing := heading.rotated(2.4) * (8.0 * cue_scale)
+		var right_wing := heading.rotated(-2.4) * (8.0 * cue_scale)
+		draw_line(tip, tip + left_wing, Color(0.4, 0.9, 1.0, cue_alpha), 1.5)
+		draw_line(tip, tip + right_wing, Color(0.4, 0.9, 1.0, cue_alpha), 1.5)
 
 	# Sound emission burst shockwave
 	if _burst_alpha > 0.01:
@@ -373,12 +477,23 @@ func _draw() -> void:
 	if full_charge > 0.01:
 		draw_arc(Vector2.ZERO, 32.0, 0.0, TAU, 32, Color(1, 1, 1, full_charge), 3.0)
 
-	# Target marker (when tap to move)
+	# Target marker (when tap/drag to move)
 	if marker > 0.01:
 		var p := to_local(target)
 		var p_pulse := 1.0 + 0.15 * sin(t * 8.0)
-		draw_arc(p, 10.0 * p_pulse, 0.0, TAU, 24, Color(0.3, 1.0, 1.0, 0.5 * marker), 2.0)
-		draw_circle(p, 2.0, Color(0.8, 1.0, 1.0, 0.7 * marker))
+		draw_arc(p, 9.0 * p_pulse, 0.0, TAU, 24, Color(0.3, 1.0, 1.0, 0.48 * marker), 1.8)
+		draw_circle(p, 2.2, Color(0.85, 1.0, 1.0, 0.78 * marker))
+		if _tap_flash > 0.01:
+			var tap_r: float = lerpf(22.0, 9.0, 1.0 - _tap_flash)
+			draw_arc(p, tap_r, 0.0, TAU, 24, Color(0.65, 0.98, 1.0, 0.65 * _tap_flash), 1.4)
+
+	# Tactile wall contact shimmer when brushing/stopping against a wall in darkness
+	if _wall_bump_alpha > 0.01:
+		var bp := to_local(_wall_bump_pos)
+		var tangent := Vector2(-_wall_bump_normal.y, _wall_bump_normal.x)
+		var span: float = lerpf(6.0, 15.0, 1.0 - _wall_bump_alpha)
+		draw_line(bp - tangent * span, bp + tangent * span, Color(0.45, 0.92, 1.0, 0.75 * _wall_bump_alpha), 2.2)
+		draw_circle(bp, 2.5, Color(0.85, 0.98, 1.0, 0.85 * _wall_bump_alpha))
 
 	# Acoustic paralysis / Stun visual feedback
 	if _stun_timer > 0.0:

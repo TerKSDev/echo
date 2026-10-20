@@ -1,15 +1,16 @@
 extends Node
 class_name MicInput
 
-# Handles microphone input and detects voice activity based on loudness.
+# Handles microphone input, user calibration, and voice activity detection.
 signal voice_detected(loudness: float)
+signal calibration_finished(floor_db: float)
 
 const BUS_NAME := "MicCapture"
 const PERMISSION := "android.permission.RECORD_AUDIO"
+const WARMUP_TIME := 0.15
 const CALIBRATE_TIME := 1.0
-const TRIGGER_MARGIN_DB := 10.0 # Sensitive to normal voice and whispers
-const MAX_MARGIN_DB := 30.0
-const ATTACK_WINDOW := 0.1
+const MAX_MARGIN_DB := 24.0
+const ATTACK_WINDOW := 0.09
 const COOLDOWN := 0.35
 
 enum State {
@@ -21,13 +22,22 @@ enum State {
 
 var enabled := false
 var level_db := -80.0
-var noise_floor_db := -50.0
+var noise_floor_db := -48.0
+var suppress_timer := 0.0
 
 var _capture: AudioEffectCapture
-var _state := State.CALIBRATING
+var _state := State.IDLE
 var _timer := 0.0
 var _peak_db := -80.0
-var _calib_max := -80.0
+var _calib_peak := -80.0
+var _calib_sum := 0.0
+var _calib_count := 0
+
+
+func _ready() -> void:
+	# Allow MicInput to run while paused so the Settings Modal can show live mic levels & calibrate
+	process_mode = Node.PROCESS_MODE_ALWAYS
+
 
 func start() -> void:
 	if enabled:
@@ -39,6 +49,7 @@ func start() -> void:
 	else:
 		_setup()
 
+
 func _on_permission_result(permission: String, granted: bool) -> void:
 	if permission != PERMISSION:
 		return
@@ -48,9 +59,8 @@ func _on_permission_result(permission: String, granted: bool) -> void:
 	else:
 		print("Microphone permission denied. Only button press detection will work.")
 
+
 func _setup() -> void:
-	if enabled:
-		return
 	var idx := AudioServer.get_bus_index(BUS_NAME)
 	if idx == -1:
 		AudioServer.add_bus()
@@ -74,49 +84,100 @@ func _setup() -> void:
 	add_child(player_mic)
 	player_mic.play()
 
+	enabled = GameState.mic_enabled
+	noise_floor_db = GameState.mic_noise_floor_db
+	if not GameState.mic_calibrated:
+		recalibrate()
+	else:
+		_state = State.IDLE
+		_timer = 0.0
+
+
+# Starts a fresh 1.0s room ambient noise calibration
+func recalibrate() -> void:
+	if _capture != null:
+		_capture.clear_buffer()
 	_state = State.CALIBRATING
 	_timer = 0.0
-	_calib_max = -80.0
-	enabled = GameState.mic_enabled
+	_calib_peak = -80.0
+	_calib_sum = 0.0
+	_calib_count = 0
+
+
+func is_calibrating() -> bool:
+	return _state == State.CALIBRATING
+
+
+func get_trigger_db() -> float:
+	return GameState.get_mic_trigger_db()
+
 
 func _process(delta: float) -> void:
+	if suppress_timer > 0.0:
+		suppress_timer = maxf(0.0, suppress_timer - delta)
+
 	if not enabled:
+		if _capture != null:
+			_capture.clear_buffer()
+		level_db = -80.0
 		return
 
 	var peak := 0.0
 	if _capture != null:
-		var frame := _capture.get_frames_available()
-		if frame > 0:
-			for buffer in _capture.get_buffer(frame):
-				peak = maxf(peak, maxf(absf(buffer.x), absf(buffer.y)))
-	level_db = linear_to_db(maxf(peak, 0.00001)) # Avoid log(0) by using a small value
+		var frames := _capture.get_frames_available()
+		if frames > 0:
+			var buf := _capture.get_buffer(frames)
+			for sample in buf:
+				peak = maxf(peak, maxf(absf(sample.x), absf(sample.y)))
+			level_db = linear_to_db(maxf(peak, 0.00001))
+		else:
+			level_db = move_toward(level_db, -80.0, delta * 95.0)
+
 	_timer += delta
+	var trigger_db: float = get_trigger_db()
 
 	match _state:
 		State.CALIBRATING:
-			_calib_max = maxf(_calib_max, level_db)
+			if _timer >= WARMUP_TIME and level_db > -78.0:
+				var clamped_sample: float = minf(level_db, -32.0)
+				_calib_peak = maxf(_calib_peak, clamped_sample)
+				_calib_sum += clamped_sample
+				_calib_count += 1
 			if _timer >= CALIBRATE_TIME:
-				noise_floor_db = clampf(_calib_max, -65.0, -42.0)
+				var avg_db: float = (_calib_sum / float(_calib_count)) if _calib_count > 0 else -50.0
+				# Blend average and peak of ambient noise so breathing/hum stays safely below floor
+				var measured_floor: float = lerpf(avg_db, maxf(_calib_peak, avg_db), 0.6)
+				noise_floor_db = clampf(measured_floor, -54.0, -34.0)
+				GameState.mic_noise_floor_db = noise_floor_db
+				GameState.mic_calibrated = true
+				GameState.save_settings()
 				_state = State.IDLE
-				print("Calibration complete. Noise floor set to:", noise_floor_db, "dB")
+				_timer = 0.0
+				calibration_finished.emit(noise_floor_db)
 
 		State.IDLE:
-			if level_db > noise_floor_db + TRIGGER_MARGIN_DB:
+			# Do not emit gameplay voice echoes while the game is paused in Settings
+			if get_tree().paused:
+				return
+			if suppress_timer <= 0.0 and level_db > trigger_db:
 				_state = State.ATTACK
 				_timer = 0.0
 				_peak_db = level_db
-		
+
 		State.ATTACK:
+			if get_tree().paused:
+				_state = State.IDLE
+				return
 			_peak_db = maxf(_peak_db, level_db)
 			if _timer >= ATTACK_WINDOW:
-				var lowest := noise_floor_db + TRIGGER_MARGIN_DB
-				# A peak can never exceed 0 dB, so keep the upper bound reachable
-				var highest := maxf(minf(noise_floor_db + MAX_MARGIN_DB, -1.0), lowest + 1.0)
-				var k := clampf(inverse_lerp(lowest, highest, _peak_db), 0.0, 1.0)
+				var lowest: float = trigger_db
+				var highest: float = maxf(minf(lowest + MAX_MARGIN_DB, -1.0), lowest + 1.0)
+				var k: float = clampf(inverse_lerp(lowest, highest, _peak_db), 0.0, 1.0)
 
 				voice_detected.emit(k)
 				_state = State.COOLDOWN
 				_timer = 0.0
+
 		State.COOLDOWN:
 			if _timer >= COOLDOWN:
 				_state = State.IDLE

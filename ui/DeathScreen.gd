@@ -50,6 +50,23 @@ func _ready() -> void:
 	wave_canvas.draw.connect(_draw_flatline_wave)
 	retry_btn.pressed.connect(_on_retry_pressed)
 	menu_btn.pressed.connect(_on_menu_pressed)
+	for b: Button in [retry_btn, menu_btn]:
+		b.mouse_entered.connect(func():
+			b.pivot_offset = b.size * 0.5
+			create_tween().tween_property(b, "scale", Vector2(1.02, 1.02), 0.08)
+		)
+		b.mouse_exited.connect(func():
+			b.pivot_offset = b.size * 0.5
+			create_tween().tween_property(b, "scale", Vector2.ONE, 0.1)
+		)
+		b.button_down.connect(func():
+			b.pivot_offset = b.size * 0.5
+			create_tween().tween_property(b, "scale", Vector2(0.96, 0.96), 0.05)
+		)
+		b.button_up.connect(func():
+			b.pivot_offset = b.size * 0.5
+			create_tween().tween_property(b, "scale", Vector2(1.02, 1.02), 0.1)
+		)
 
 
 func _process(delta: float) -> void:

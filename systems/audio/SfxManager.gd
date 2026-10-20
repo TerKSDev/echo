@@ -35,6 +35,8 @@ var _wav_listener_pip: AudioStreamWAV
 var _wav_listener_alarm: AudioStreamWAV
 var _wav_player_stun: AudioStreamWAV
 var _wav_player_death: AudioStreamWAV
+var _wav_level_intro: AudioStreamWAV
+var _wav_sneak_toggle: AudioStreamWAV
 var _wav_charge_loop: AudioStreamWAV
 
 var _charge_player: AudioStreamPlayer
@@ -55,11 +57,9 @@ func set_player(player: Node2D) -> void:
 	_player_ref = player
 
 
-# Briefly mutes mic detection when loud game audio plays so speakers don't re-trigger the mic
-func _suppress_mic(duration: float) -> void:
-	if _player_ref != null and is_instance_valid(_player_ref):
-		if "click_cooldown" in _player_ref:
-			_player_ref.click_cooldown = maxf(float(_player_ref.click_cooldown), duration)
+# Optional brief mic suppression only on extreme speaker bursts if needed
+func _suppress_mic(_duration: float) -> void:
+	pass
 
 
 # --- Public Playback API -----------------------------------------------------
@@ -107,6 +107,16 @@ func play_player_death() -> void:
 	_suppress_mic(0.8)
 	update_charge_hum(false, 0.0)
 	_play_non_spatial(_wav_player_death, 2.0, 1.0)
+
+
+func play_level_intro() -> void:
+	_suppress_mic(0.55)
+	_play_non_spatial(_wav_level_intro, -3.0, 1.0)
+
+
+func play_sneak_toggle(entering_sneak: bool) -> void:
+	var pitch: float = 0.82 if entering_sneak else 1.18
+	_play_non_spatial(_wav_sneak_toggle, -10.0, pitch)
 
 
 func play_monster_roar(pos: Vector2, enemy_type: int, occluded: bool = false) -> void:
@@ -283,6 +293,8 @@ func _build_all_streams() -> void:
 	_wav_listener_alarm = _synth_listener_alarm()
 	_wav_player_stun = _synth_player_stun()
 	_wav_player_death = _synth_player_death()
+	_wav_level_intro = _synth_level_intro()
+	_wav_sneak_toggle = _synth_sneak_toggle()
 
 
 func _make_wav(samples: PackedFloat32Array, loop: bool = false) -> AudioStreamWAV:
@@ -541,4 +553,45 @@ func _synth_player_death() -> AudioStreamWAV:
 		var drop: float = sin(phase) * exp(-t * 3.2)
 		var crunch: float = randf_range(-1.0, 1.0) * exp(-t * 9.0) * 0.5
 		out[i] = tanh((drop * 0.85 + crunch) * 1.7) * 0.9
+	return _make_wav(out)
+
+
+# Level entry: deep cavern sub-swell + crystalline awakening sonar ping
+func _synth_level_intro() -> AudioStreamWAV:
+	var dur := 1.1
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	var sub_phase := 0.0
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var swell_env: float = clampf(t / 0.18, 0.0, 1.0) * exp(-t * 2.8)
+		var sub_f: float = lerpf(68.0, 110.0, clampf(t / 0.45, 0.0, 1.0))
+		sub_phase += TAU * sub_f / MIX_RATE
+		var sub: float = sin(sub_phase) * swell_env * 0.55
+
+		var ping := 0.0
+		if t >= 0.16:
+			var tp: float = t - 0.16
+			var p_env: float = minf(tp / 0.01, 1.0) * exp(-tp * 4.2)
+			ping = (sin(TAU * 528.0 * tp) * 0.5 + sin(TAU * 792.0 * tp) * 0.3 + sin(TAU * 1056.0 * tp) * 0.2) * p_env * 0.65
+
+		out[i] = clampf(sub + ping, -1.0, 1.0)
+	return _make_wav(out)
+
+
+# Subtle acoustic dampener whoosh when toggling sneak mode
+func _synth_sneak_toggle() -> AudioStreamWAV:
+	var dur := 0.14
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	var phase := 0.0
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var env: float = sin((t / dur) * PI) * exp(-t * 14.0)
+		var f: float = lerpf(320.0, 190.0, t / dur)
+		phase += TAU * f / MIX_RATE
+		var breath: float = randf_range(-1.0, 1.0) * 0.25
+		out[i] = (sin(phase) * 0.65 + breath) * env * 0.7
 	return _make_wav(out)
