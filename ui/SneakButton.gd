@@ -49,7 +49,8 @@ func _draw() -> void:
 		_draw_stealth_icon(center, icon_col)
 
 		# Label with ample padding below the circle
-		draw_string(ThemeDB.fallback_font, Vector2(0.0, 120.0), "SNEAKING", HORIZONTAL_ALIGNMENT_CENTER, int(size.x), 11, Color(0.5, 0.95, 1.0, 0.95))
+		draw_string(ThemeDB.fallback_font, Vector2(0.0, 114.0), "SNEAKING", HORIZONTAL_ALIGNMENT_CENTER, int(size.x), 11, Color(0.5, 0.95, 1.0, 0.95))
+		draw_string(ThemeDB.fallback_font, Vector2(0.0, 127.0), "[SHIFT]", HORIZONTAL_ALIGNMENT_CENTER, int(size.x), 9, Color(0.5, 0.95, 1.0, 0.45))
 	else:
 		# --- Normal Walk State: Discreet dark glass ---
 		# Subtle glow
@@ -64,7 +65,8 @@ func _draw() -> void:
 		_draw_stealth_icon(center, icon_col)
 
 		# Label with ample padding below the circle
-		draw_string(ThemeDB.fallback_font, Vector2(0.0, 120.0), "SNEAK", HORIZONTAL_ALIGNMENT_CENTER, int(size.x), 11, Color(0.48, 0.72, 0.92, 0.6))
+		draw_string(ThemeDB.fallback_font, Vector2(0.0, 114.0), "SNEAK", HORIZONTAL_ALIGNMENT_CENTER, int(size.x), 11, Color(0.48, 0.72, 0.92, 0.7))
+		draw_string(ThemeDB.fallback_font, Vector2(0.0, 127.0), "[SHIFT]", HORIZONTAL_ALIGNMENT_CENTER, int(size.x), 9, Color(0.48, 0.72, 0.92, 0.4))
 
 func _draw_stealth_icon(center: Vector2, col: Color) -> void:
 	# Stylized Sound Dampener: 3 curved horizontal stealth ripples with a center mute bar

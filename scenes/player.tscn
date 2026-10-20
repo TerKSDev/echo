@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://dq5nmx3ud3oky"]
 
-[ext_resource type="Script" path="res://scripts/Player.gd" id="1_3vyb7"]
-[ext_resource type="Script" path="res://scripts/MicInput.gd" id="2_g2els"]
+[ext_resource type="Script" path="res://characters/player/Player.gd" id="1_3vyb7"]
+[ext_resource type="Script" path="res://characters/player/MicInput.gd" id="2_g2els"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_my0f1"]
 

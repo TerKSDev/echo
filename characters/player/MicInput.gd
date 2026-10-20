@@ -7,10 +7,10 @@ signal voice_detected(loudness: float)
 const BUS_NAME := "MicCapture"
 const PERMISSION := "android.permission.RECORD_AUDIO"
 const CALIBRATE_TIME := 1.0
-const TRIGGER_MARGIN_DB := 20.0
-const MAX_MARGIN_DB := 50.0
+const TRIGGER_MARGIN_DB := 10.0 # Sensitive to normal voice and whispers
+const MAX_MARGIN_DB := 30.0
 const ATTACK_WINDOW := 0.1
-const COOLDOWN := 0.2
+const COOLDOWN := 0.35
 
 enum State {
 	CALIBRATING,
@@ -56,8 +56,14 @@ func _setup() -> void:
 		AudioServer.add_bus()
 		idx = AudioServer.bus_count - 1
 		AudioServer.set_bus_name(idx, BUS_NAME)
-		AudioServer.set_bus_mute(idx, true)
 		AudioServer.add_bus_effect(idx, AudioEffectCapture.new())
+	elif AudioServer.get_bus_effect_count(idx) == 0:
+		AudioServer.add_bus_effect(idx, AudioEffectCapture.new())
+
+	# Ensure bus is unmuted so AudioEffectCapture receives samples,
+	# but keep volume at -80 dB to prevent speaker/headphone feedback loop!
+	AudioServer.set_bus_mute(idx, false)
+	AudioServer.set_bus_volume_db(idx, -80.0)
 	_capture = AudioServer.get_bus_effect(idx, 0) as AudioEffectCapture
 
 	var player_mic := AudioStreamPlayer.new()
@@ -76,10 +82,11 @@ func _process(delta: float) -> void:
 		return
 
 	var peak := 0.0
-	var frame := _capture.get_frames_available()
-	if frame > 0:
-		for buffer in _capture.get_buffer(frame):
-			peak = maxf(peak, maxf(absf(buffer.x), absf(buffer.y)))
+	if _capture != null:
+		var frame := _capture.get_frames_available()
+		if frame > 0:
+			for buffer in _capture.get_buffer(frame):
+				peak = maxf(peak, maxf(absf(buffer.x), absf(buffer.y)))
 	level_db = linear_to_db(maxf(peak, 0.00001)) # Avoid log(0) by using a small value
 	_timer += delta
 
@@ -87,7 +94,7 @@ func _process(delta: float) -> void:
 		State.CALIBRATING:
 			_calib_max = maxf(_calib_max, level_db)
 			if _timer >= CALIBRATE_TIME:
-				noise_floor_db = maxf(_calib_max, -50.0)
+				noise_floor_db = clampf(_calib_max, -65.0, -42.0)
 				_state = State.IDLE
 				print("Calibration complete. Noise floor set to:", noise_floor_db, "dB")
 

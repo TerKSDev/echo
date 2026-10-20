@@ -8,7 +8,7 @@ const DOT_SIZE := 3.0
 var points: Array = []
 var waves: Array = []
 
-func emit_echo(origin: Vector2, radius: float, exclude: Array[RID] = [], show_wave: bool = true) -> void:
+func emit_echo(origin: Vector2, radius: float, exclude: Array = [], show_wave: bool = true) -> void:
 	if show_wave:
 		waves.append({
 			"pos": origin,
@@ -17,6 +17,10 @@ func emit_echo(origin: Vector2, radius: float, exclude: Array[RID] = [], show_wa
 		})
 	
 	var space = get_world_2d().direct_space_state
+	var exclude_rids: Array[RID] = []
+	for item in exclude:
+		if item is RID:
+			exclude_rids.append(item)
 
 	# Perform raycasts in a circular pattern to detect obstacles
 	for i in RAY_COUNT:
@@ -24,11 +28,11 @@ func emit_echo(origin: Vector2, radius: float, exclude: Array[RID] = [], show_wa
 		var query = PhysicsRayQueryParameters2D.create(origin, origin + dir * radius)
 		
 		query.collision_mask = 1
-		query.exclude = exclude
+		query.exclude = exclude_rids
 		
 		var hit = space.intersect_ray(query)
 		if hit:
-			var dist := origin.distance_to(hit.position)
+			var dist: float = origin.distance_to(hit.position)
 			points.append({
 				"pos": hit.position,
 				"age": -dist / WAVE_SPEED,

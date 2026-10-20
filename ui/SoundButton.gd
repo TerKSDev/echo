@@ -78,6 +78,7 @@ func _draw() -> void:
 	draw_arc(center, 22.0, PI * 0.72, PI * 1.28, 16, outer_wave_col, 1.8)
 
 	# 6. Micro Label Below
-	var label_text := "HOLD TO CALL" if charging else "ECHO"
-	var label_col := Color(0.55, 0.8, 1.0, 0.65 if not charging else 0.95)
-	draw_string(ThemeDB.fallback_font, Vector2(0.0, 120.0), label_text, HORIZONTAL_ALIGNMENT_CENTER, int(size.x), 11, label_col)
+	var label_text := "CALLING..." if charging else "ECHO"
+	var label_col := Color(0.55, 0.8, 1.0, 0.7 if not charging else 0.95)
+	draw_string(ThemeDB.fallback_font, Vector2(0.0, 114.0), label_text, HORIZONTAL_ALIGNMENT_CENTER, int(size.x), 11, label_col)
+	draw_string(ThemeDB.fallback_font, Vector2(0.0, 127.0), "[SPACE / HOLD]", HORIZONTAL_ALIGNMENT_CENTER, int(size.x), 9, Color(label_col, 0.45))

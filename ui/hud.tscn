@@ -1,10 +1,12 @@
 [gd_scene format=3 uid="uid://b415q8byb6eov"]
 
-[ext_resource type="Script" uid="uid://du5ekcgyr2hb1" path="res://ui/Hud.gd" id="1_rbyyf"]
-[ext_resource type="Shader" uid="uid://ckd4aagpo88jw" path="res://ui/vignette.gdshader" id="2_shader"]
-[ext_resource type="Script" uid="uid://keyshueitgsh" path="res://ui/MicVisualizer.gd" id="3_mic"]
-[ext_resource type="Script" uid="uid://dsxu85kwggsu0" path="res://ui/SneakButton.gd" id="4_sneak"]
-[ext_resource type="Script" uid="uid://bdj0wfedh4747" path="res://ui/SoundButton.gd" id="5_sound"]
+[ext_resource type="Script" path="res://ui/Hud.gd" id="1_rbyyf"]
+[ext_resource type="Shader" path="res://ui/vignette.gdshader" id="2_shader"]
+[ext_resource type="Script" path="res://ui/MicVisualizer.gd" id="3_mic"]
+[ext_resource type="Script" path="res://ui/SneakButton.gd" id="4_sneak"]
+[ext_resource type="Script" path="res://ui/SoundButton.gd" id="5_sound"]
+[ext_resource type="Script" path="res://ui/PauseButton.gd" id="6_pause"]
+[ext_resource type="PackedScene" path="res://ui/settings_modal.tscn" id="7_modal"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_vignette"]
 shader = ExtResource("2_shader")
@@ -13,6 +15,7 @@ shader_parameter/inner_radius = 0.42
 shader_parameter/outer_radius = 0.95
 
 [node name="Hud" type="CanvasLayer" unique_id=1464888437]
+process_mode = 3
 script = ExtResource("1_rbyyf")
 
 [node name="Vignette" type="ColorRect" parent="." unique_id=1029384756]
@@ -34,6 +37,19 @@ offset_bottom = 50.0
 grow_horizontal = 2
 mouse_filter = 2
 script = ExtResource("3_mic")
+
+[node name="PauseBtn" type="Button" parent="."]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -82.0
+offset_top = 45.0
+offset_right = -37.0
+offset_bottom = 90.0
+grow_horizontal = 0
+focus_mode = 0
+flat = true
+script = ExtResource("6_pause")
 
 [node name="SneakBtn" type="Button" parent="." unique_id=332237175]
 anchors_preset = 2
@@ -63,3 +79,6 @@ grow_vertical = 0
 focus_mode = 0
 flat = true
 script = ExtResource("5_sound")
+
+[node name="SettingsModal" parent="." instance=ExtResource("7_modal")]
+visible = false

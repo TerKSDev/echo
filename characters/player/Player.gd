@@ -52,6 +52,25 @@ var _burst_alpha := 0.0
 var _death_alpha := 0.0
 var _shake_timer := 0.0
 var _shake_intensity := 0.0
+var _stun_timer := 0.0
+
+# Shake Camera
+func camera_shake(duration: float = 0.4, intensity: float = 8.0) -> void:
+	_shake_timer = maxf(_shake_timer, duration)
+	_shake_intensity = maxf(_shake_intensity, intensity)
+
+# Immobilize / Stun player (e.g. hit by Screamer sonic shriek)
+func immobilize(duration: float = 1.6) -> void:
+	if not alive:
+		return
+	_stun_timer = maxf(_stun_timer, duration)
+	moving = false
+	charging = false
+	desired = Vector2.ZERO
+	velocity = Vector2.ZERO
+	camera_shake(0.35, 8.0)
+	Input.vibrate_handheld(80)
+	queue_redraw()
 
 func _ready() -> void:
 	add_to_group("player")
@@ -62,8 +81,8 @@ func _ready() -> void:
 
 # Handle Player Input
 func _unhandled_input(event: InputEvent) -> void:
-	# Ignore input if the player is dead
-	if not alive:
+	# Ignore input if the player is dead or immobilized
+	if not alive or _stun_timer > 0.0:
 		return
 	
 	# Handle touch input (on mobile)
@@ -111,6 +130,16 @@ func _physics_process(delta: float) -> void:
 		if _death_alpha > 0.0:
 			_death_alpha = move_toward(_death_alpha, 0.0, delta * 1.5)
 			queue_redraw()
+		return
+
+	# Handle immobilization / stun
+	if _stun_timer > 0.0:
+		_stun_timer -= delta
+		moving = false
+		desired = Vector2.ZERO
+		velocity = velocity.move_toward(Vector2.ZERO, FRICTION * delta)
+		move_and_slide()
+		queue_redraw()
 		return
 
 	# Handle movement
@@ -330,3 +359,13 @@ func _draw() -> void:
 		var p_pulse := 1.0 + 0.15 * sin(t * 8.0)
 		draw_arc(p, 10.0 * p_pulse, 0.0, TAU, 24, Color(0.3, 1.0, 1.0, 0.5 * marker), 2.0)
 		draw_circle(p, 2.0, Color(0.8, 1.0, 1.0, 0.7 * marker))
+
+	# Acoustic paralysis / Stun visual feedback
+	if _stun_timer > 0.0:
+		var stun_pulse := 16.0 + 2.5 * sin(t * 26.0)
+		draw_arc(Vector2.ZERO, stun_pulse, 0.0, TAU, 28, Color(1.0, 0.3, 0.5, 0.85), 2.0)
+		draw_circle(Vector2.ZERO, 6.0, Color(1.0, 0.15, 0.3, 0.35))
+		for i in 4:
+			var ang := i * PI * 0.5 + t * 6.0
+			var spark := Vector2.from_angle(ang) * (stun_pulse + 4.0)
+			draw_circle(spark, 2.0, Color(1.0, 0.85, 0.9, 0.9))

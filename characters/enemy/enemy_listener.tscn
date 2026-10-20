@@ -1,0 +1,6 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="PackedScene" uid="uid://bpvejuifgqmxp" path="res://characters/enemy/enemy.tscn" id="1_base"]
+
+[node name="EnemyListener" instance=ExtResource("1_base")]
+enemy_type = 4
