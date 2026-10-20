@@ -1,0 +1,32 @@
+[gd_scene format=3 uid="uid://caxj3bxnae267"]
+
+[ext_resource type="Script" path="res://scripts/Enemy.gd" id="1_7p1mj"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_my0f1"]
+radius = 14.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_jyydq"]
+radius = 18.0
+
+[node name="Enemy" type="CharacterBody2D" unique_id=771095043]
+collision_layer = 2
+script = ExtResource("1_7p1mj")
+
+[node name="EnemyCollision" type="CollisionShape2D" parent="." unique_id=1998749402]
+visibility_layer = 4
+shape = SubResource("CircleShape2D_my0f1")
+
+[node name="CatchArea" type="Area2D" parent="." unique_id=562662842]
+
+[node name="AreaCollision" type="CollisionShape2D" parent="CatchArea" unique_id=1243589216]
+light_mask = 2
+visibility_layer = 0
+shape = SubResource("CircleShape2D_jyydq")
+
+[node name="EnemyPath" type="Node2D" parent="." unique_id=1682322632]
+
+[node name="Path01" type="Marker2D" parent="EnemyPath" unique_id=1578674210]
+
+[node name="Path02" type="Marker2D" parent="EnemyPath" unique_id=724839177]
+
+[node name="Path03" type="Marker2D" parent="EnemyPath" unique_id=1298936269]
