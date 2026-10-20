@@ -101,9 +101,7 @@ func _update_mic_toggle_ui() -> void:
 		mic_toggle.self_modulate = Color(0.7, 0.7, 0.7, 0.7)
 
 func _on_restart_pressed() -> void:
-	get_tree().paused = false
-	get_tree().reload_current_scene()
+	GameState.restart_level()
 
 func _on_menu_pressed() -> void:
-	get_tree().paused = false
-	get_tree().change_scene_to_file("res://scenes/menu.tscn")
+	GameState.go_to_menu()
