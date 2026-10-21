@@ -24,6 +24,7 @@ var sneaking := false
 var step_timer := 0.0
 var charging := false
 var charge := 0.0
+var water_count := 0  # >0 表示站在水里(由 LevelGenerator 设置)
 
 func _unhandled_input(event):
 	# Handle touch input for movement (on mobile)
@@ -51,6 +52,8 @@ func _unhandled_input(event):
 func _physics_process(delta):
 	# Handle movement
 	var speed = SNEAK_SPEED if sneaking else WALK_SPEED
+	if water_count > 0:
+		speed *= 0.55
 	if moving:
 		var dir = target - global_position
 		if dir.length() < ARRIVE_DIST:
@@ -71,7 +74,10 @@ func _physics_process(delta):
 		step_timer -= delta
 		if step_timer <= 0.0:
 			step_timer = STEP_INTERVAL_SNEAK if sneaking else STEP_INTERVAL_WALK
-			make_sound(STEP_LOUDNESS_SNEAK if sneaking else STEP_LOUDNESS_WALK)
+			var step_loud = STEP_LOUDNESS_SNEAK if sneaking else STEP_LOUDNESS_WALK
+			if water_count > 0:
+				step_loud *= 2.5
+			make_sound(step_loud)
 	else:
 		step_timer = 0.0
 	
