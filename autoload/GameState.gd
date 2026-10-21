@@ -13,6 +13,15 @@ const LEVELS: Array[String] = [
 	"res://levels/level_02.tscn",
 	"res://levels/level_03.tscn",
 	"res://levels/level_04.tscn",
+	"res://levels/level_05.tscn",
+	"res://levels/level_06.tscn",
+	"res://levels/level_07.tscn",
+	"res://levels/level_08.tscn",
+	"res://levels/level_09.tscn",
+	"res://levels/level_10.tscn",
+	"res://levels/level_11.tscn",
+	"res://levels/level_12.tscn",
+	"res://levels/level_13.tscn",
 ]
 
 var current_level := 0

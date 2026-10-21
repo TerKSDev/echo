@@ -1,7 +1,7 @@
 extends Control
 
 const MIX_RATE := 22050
-const TOTAL_LEVEL_COUNT := 14
+const TOTAL_LEVEL_COUNT := 13
 
 @onready var sonar_backdrop: Control = $SonarBackdrop
 @onready var title_label: Label = $Content/VBoxContainer/Title

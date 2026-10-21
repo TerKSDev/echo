@@ -49,6 +49,7 @@ var pulse_scale := 1.0
 var was_full := false
 var full_charge := 0.0
 var click_cooldown := 0.0
+var water_count := 0 # > 0 when standing in water tiles (slows player & amplifies footsteps)
 
 # Visual Enhancements
 var _burst_radius := 0.0
@@ -91,6 +92,7 @@ func _ready() -> void:
 	add_to_group("player")
 	trail.top_level = true
 	trail.global_position = Vector2.ZERO
+	trail.clear_points()
 	if camera != null:
 		camera.zoom = Vector2(ENTRY_ZOOM_LEVEL, ENTRY_ZOOM_LEVEL)
 	mic.voice_detected.connect(make_voice_sound)
@@ -174,6 +176,8 @@ func _physics_process(delta: float) -> void:
 
 	# Handle movement
 	var speed: float = SNEAK_SPEED if sneaking else WALK_SPEED
+	if water_count > 0:
+		speed *= 0.55
 	if moving:
 		marker = move_toward(marker, 1.0, delta * 8.0)
 		var to_target: Vector2 = target - global_position
@@ -215,7 +219,10 @@ func _physics_process(delta: float) -> void:
 		step_timer -= delta
 		if step_timer <= 0.0:
 			step_timer = STEP_INTERVAL_SNEAK if sneaking else STEP_INTERVAL_WALK
-			make_sound(STEP_LOUDNESS_SNEAK if sneaking else STEP_LOUDNESS_WALK)
+			var step_loud: float = STEP_LOUDNESS_SNEAK if sneaking else STEP_LOUDNESS_WALK
+			if water_count > 0:
+				step_loud *= 2.5
+			make_sound(step_loud)
 	else:
 		step_timer = maxf(step_timer - delta * 0.5, 0.16)
 	
@@ -294,11 +301,13 @@ func make_sound(loudness: float, is_voice := false) -> void:
 		pulse_scale = 1.0 + loudness * 0.8
 		tween.tween_property(self, "pulse_scale", 1.0, 0.25).set_ease(Tween.EASE_OUT)
 	else:
+		var ripple_r: float = (16.0 if sneaking else 30.0) * (1.45 if water_count > 0 else 1.0)
+		var ripple_a: float = (0.24 if sneaking else 0.46) * (1.35 if water_count > 0 else 1.0)
 		_step_ripples.append({
 			"pos": global_position,
 			"age": 0.0,
-			"max_r": 16.0 if sneaking else 30.0,
-			"alpha": 0.24 if sneaking else 0.46
+			"max_r": ripple_r,
+			"alpha": clampf(ripple_a, 0.0, 0.85)
 		})
 		var step_tw := create_tween()
 		pulse_scale = 1.05 if sneaking else 1.13
@@ -388,6 +397,7 @@ func reset(pos: Vector2) -> void:
 	_sneak_blend = 0.0
 	_tap_flash = 0.0
 	_wall_bump_alpha = 0.0
+	water_count = 0
 	_step_ripples.clear()
 	if camera != null:
 		camera.offset = Vector2.ZERO

@@ -1,6 +1,10 @@
 extends Node2D
 ## Game container: loads the current level, then wires the systems together.
-## Levels live in res://levels/ and are listed in the GameState autoload.
+## Supports both LevelRoot tilemap levels (level_01..level_13 with Water/Switch/Door/Exit)
+## and freeform arena scenes (level_test.tscn).
+
+const TILE := 32.0
+const DOOR_COLOR := Color(1.0, 0.85, 0.2)
 
 @onready var player: Node2D = $Player
 @onready var echo_layer: Node2D = $EchoLayer
@@ -8,6 +12,19 @@ extends Node2D
 @onready var sound_bus: SoundBus = $SoundBus
 @onready var sfx: SfxManager = $SfxManager
 @onready var hud: CanvasLayer = $Hud
+
+var _level_root: LevelRoot = null
+var _features: Node2D = null
+var _enemies: Node2D = null
+var _changing := false
+
+var player_start_cell := Vector2i.ZERO
+var exit_cell := Vector2i.ZERO
+var has_exit := false
+var water_cells: Dictionary = {}  # Vector2i -> true
+var switch_cells: Dictionary = {} # Vector2i -> String
+var door_nodes: Dictionary = {}   # String -> Array[StaticBody2D]
+var pressed: Dictionary = {}
 
 
 func _ready() -> void:
@@ -24,16 +41,23 @@ func _ready() -> void:
 func _play_entry_sequence() -> void:
 	sfx.play_level_intro()
 
-	# Format level title banner
+	# Format level title & subtitle banner
 	var path: String = GameState.current_level_path()
 	var title_text := "TEST ARENA"
+	var subtitle_text := "Listen closely. Stay unseen."
 	if path.find("level_") != -1 and path.find("test") == -1:
 		var num_str: String = path.get_file().get_basename().replace("level_", "")
 		title_text = "DEPTH %s" % num_str.to_upper()
 	elif GameState.current_level > 0:
 		title_text = "DEPTH %02d" % GameState.current_level
 
-	hud.play_level_intro(title_text)
+	if _level_root != null:
+		if _level_root.level_name != "" and _level_root.level_name != "未命名":
+			title_text = "%s  •  %s" % [title_text, _level_root.level_name]
+		if _level_root.hint != "":
+			subtitle_text = _level_root.hint
+
+	hud.play_level_intro(title_text, subtitle_text)
 
 	if "pulse_scale" in player:
 		player.pulse_scale = 0.25
@@ -50,6 +74,14 @@ func _play_entry_sequence() -> void:
 
 
 func _load_level(path: String) -> void:
+	water_cells.clear()
+	switch_cells.clear()
+	door_nodes.clear()
+	pressed.clear()
+	has_exit = false
+	_changing = false
+	_level_root = null
+
 	var scene := load(path) as PackedScene
 	if scene == null:
 		push_error("Cannot load level: %s" % path)
@@ -57,10 +89,128 @@ func _load_level(path: String) -> void:
 	var level := scene.instantiate()
 	level_container.add_child(level)
 
-	# Optional spawn point: a Marker2D named "PlayerStart" inside the level
-	var start := level.get_node_or_null("PlayerStart") as Marker2D
-	if start != null:
-		player.global_position = start.global_position
+	if level is LevelRoot:
+		_level_root = level as LevelRoot
+		if _level_root.walls != null:
+			_level_root.walls.modulate.a = 0.0
+		_features = Node2D.new()
+		_features.name = "RuntimeFeatures"
+		_level_root.add_child(_features)
+		_enemies = Node2D.new()
+		_enemies.name = "RuntimeEnemies"
+		_level_root.add_child(_enemies)
+		_ingest_markers()
+		_spawn_enemies()
+		player.global_position = cell_to_world(player_start_cell)
+		if "water_count" in player:
+			player.water_count = 0
+	else:
+		# Optional spawn point: a Marker2D named "PlayerStart" inside the level
+		var start := level.get_node_or_null("PlayerStart") as Marker2D
+		if start != null:
+			player.global_position = start.global_position
+
+
+func _ingest_markers() -> void:
+	if _level_root == null or _level_root.walls == null:
+		return
+	var walls: TileMapLayer = _level_root.walls
+	for m: LevelMarker in _level_root.get_markers():
+		var cell: Vector2i = walls.local_to_map(walls.to_local(m.global_position))
+		match m.kind:
+			LevelMarker.Kind.PLAYER_START:
+				player_start_cell = cell
+			LevelMarker.Kind.EXIT:
+				exit_cell = cell
+				has_exit = true
+			LevelMarker.Kind.WATER:
+				water_cells[cell] = true
+			LevelMarker.Kind.SWITCH:
+				var sid: String = m.link_id.strip_edges().to_lower()
+				if sid != "":
+					switch_cells[cell] = sid
+			LevelMarker.Kind.DOOR:
+				var did: String = m.link_id.strip_edges().to_upper()
+				if did != "":
+					_make_door(cell, did)
+
+
+func _make_door(cell: Vector2i, id: String) -> void:
+	var walls: TileMapLayer = _level_root.walls
+	var body := StaticBody2D.new()
+	body.collision_layer = 1
+	body.collision_mask = 0
+	body.position = walls.map_to_local(cell)
+	body.set_meta("echo_color", DOOR_COLOR)
+	var shape := CollisionShape2D.new()
+	var rect := RectangleShape2D.new()
+	rect.size = Vector2(TILE, TILE)
+	shape.shape = rect
+	body.add_child(shape)
+	_features.add_child(body)
+	if not door_nodes.has(id):
+		door_nodes[id] = []
+	door_nodes[id].append(body)
+
+
+func _spawn_enemies() -> void:
+	if _level_root == null:
+		return
+	for spawn: EnemySpawn in _level_root.get_enemy_spawns():
+		if not spawn.spawn_on_level_start:
+			continue
+		spawn.spawn_enemy(_enemies)
+
+
+func _physics_process(_delta: float) -> void:
+	if _changing or _level_root == null or _level_root.walls == null or player == null or not is_instance_valid(player):
+		return
+	if "alive" in player and not bool(player.get("alive")):
+		return
+	var c: Vector2i = _level_root.walls.local_to_map(_level_root.walls.to_local(player.global_position))
+	if "water_count" in player:
+		player.water_count = 1 if water_cells.has(c) else 0
+	if switch_cells.has(c) and not pressed.has(c):
+		_press_switch(c)
+	if has_exit and c == exit_cell:
+		_changing = true
+		GameState.call_deferred("next_level")
+
+
+func _press_switch(cell: Vector2i) -> void:
+	pressed[cell] = true
+	var id: String = str(switch_cells[cell]).to_upper()
+	for body in door_nodes.get(id, []):
+		if is_instance_valid(body) and not body.has_meta("open"):
+			body.set_meta("open", true)
+			body.get_child(0).set_deferred("disabled", true)
+	if sfx != null:
+		sfx.play_sneak_toggle(false)
+	if player != null and player.has_method("make_sound"):
+		player.make_sound(0.06, false)
+
+
+func echo_features() -> Array:
+	var out: Array = []
+	if _level_root == null or _level_root.walls == null:
+		return out
+	for c in water_cells:
+		out.append({"type": "water", "pos": cell_to_world(c)})
+	for c in switch_cells:
+		out.append({"type": "switch", "pos": cell_to_world(c), "pressed": pressed.has(c)})
+	for id in door_nodes:
+		for body in door_nodes[id]:
+			if is_instance_valid(body) and not body.has_meta("open"):
+				out.append({"type": "door", "pos": body.global_position, "body": body})
+	if has_exit:
+		out.append({"type": "exit", "pos": cell_to_world(exit_cell)})
+	return out
+
+
+func cell_to_world(cell: Vector2i) -> Vector2:
+	if _level_root != null and _level_root.walls != null:
+		return _level_root.walls.to_global(_level_root.walls.map_to_local(cell))
+	return Vector2.ZERO
 
 
 func _on_player_died() -> void:

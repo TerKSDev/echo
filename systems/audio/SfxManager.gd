@@ -41,6 +41,7 @@ var _wav_charge_loop: AudioStreamWAV
 
 var _charge_player: AudioStreamPlayer
 var _player_ref: Node2D
+static var _cache: Dictionary = {}
 
 
 func _ready() -> void:
@@ -179,7 +180,9 @@ func _setup_charge_player() -> void:
 
 
 func _setup_heartbeat_players() -> void:
-	var hb_stream: AudioStreamWAV = _synth_heartbeat()
+	if not _cache.has("heartbeat"):
+		_cache["heartbeat"] = _synth_heartbeat()
+	var hb_stream: AudioStreamWAV = _cache["heartbeat"]
 	for i in 2:
 		var p := AudioStreamPlayer.new()
 		p.stream = hb_stream
@@ -278,23 +281,42 @@ func _play_spatial(stream: AudioStreamWAV, pos: Vector2, volume_db: float, pitch
 # --- Procedural Waveform Synthesis -------------------------------------------
 
 func _build_all_streams() -> void:
-	_wav_step_walk = _synth_step_walk()
-	_wav_step_sneak = _synth_step_sneak()
-	_wav_enemy_step = _synth_enemy_step()
-	_wav_echo_ping = _synth_echo_ping()
-	_wav_charge_full = _synth_charge_full()
-	_wav_charge_loop = _synth_charge_loop()
-	_wav_roar_sleeper = _synth_monster_roar(95.0, 0.78, 0.35)
-	_wav_roar_patroller = _synth_monster_roar(135.0, 0.68, 0.55)
-	_wav_roar_chaser = _synth_monster_roar(185.0, 0.62, 0.85)
-	_wav_screamer_crack = _synth_screamer_crack()
-	_wav_screamer_shriek = _synth_screamer_shriek()
-	_wav_listener_pip = _synth_listener_pip()
-	_wav_listener_alarm = _synth_listener_alarm()
-	_wav_player_stun = _synth_player_stun()
-	_wav_player_death = _synth_player_death()
-	_wav_level_intro = _synth_level_intro()
-	_wav_sneak_toggle = _synth_sneak_toggle()
+	if _cache.is_empty():
+		_cache["step_walk"] = _synth_step_walk()
+		_cache["step_sneak"] = _synth_step_sneak()
+		_cache["enemy_step"] = _synth_enemy_step()
+		_cache["echo_ping"] = _synth_echo_ping()
+		_cache["charge_full"] = _synth_charge_full()
+		_cache["charge_loop"] = _synth_charge_loop()
+		_cache["roar_sleeper"] = _synth_monster_roar(95.0, 0.78, 0.35)
+		_cache["roar_patroller"] = _synth_monster_roar(135.0, 0.68, 0.55)
+		_cache["roar_chaser"] = _synth_monster_roar(185.0, 0.62, 0.85)
+		_cache["screamer_crack"] = _synth_screamer_crack()
+		_cache["screamer_shriek"] = _synth_screamer_shriek()
+		_cache["listener_pip"] = _synth_listener_pip()
+		_cache["listener_alarm"] = _synth_listener_alarm()
+		_cache["player_stun"] = _synth_player_stun()
+		_cache["player_death"] = _synth_player_death()
+		_cache["level_intro"] = _synth_level_intro()
+		_cache["sneak_toggle"] = _synth_sneak_toggle()
+
+	_wav_step_walk = _cache["step_walk"]
+	_wav_step_sneak = _cache["step_sneak"]
+	_wav_enemy_step = _cache["enemy_step"]
+	_wav_echo_ping = _cache["echo_ping"]
+	_wav_charge_full = _cache["charge_full"]
+	_wav_charge_loop = _cache["charge_loop"]
+	_wav_roar_sleeper = _cache["roar_sleeper"]
+	_wav_roar_patroller = _cache["roar_patroller"]
+	_wav_roar_chaser = _cache["roar_chaser"]
+	_wav_screamer_crack = _cache["screamer_crack"]
+	_wav_screamer_shriek = _cache["screamer_shriek"]
+	_wav_listener_pip = _cache["listener_pip"]
+	_wav_listener_alarm = _cache["listener_alarm"]
+	_wav_player_stun = _cache["player_stun"]
+	_wav_player_death = _cache["player_death"]
+	_wav_level_intro = _cache["level_intro"]
+	_wav_sneak_toggle = _cache["sneak_toggle"]
 
 
 func _make_wav(samples: PackedFloat32Array, loop: bool = false) -> AudioStreamWAV:
