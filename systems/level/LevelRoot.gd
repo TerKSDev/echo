@@ -2,7 +2,7 @@ extends Node2D
 class_name LevelRoot
 ## 单关场景的根节点。在编辑器中打开 levels/level_XX.tscn 即可改地形与标记。
 
-@export var level_name: String = "未命名"
+@export var level_name: String = "UNTITLED"
 @export_multiline var hint: String = ""
 
 @onready var walls: TileMapLayer = $Walls

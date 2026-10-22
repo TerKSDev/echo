@@ -1,11 +1,12 @@
 extends Node2D
 
-const RAY_COUNT := 160
+const RAY_COUNT := 144
 const LIFETIME := 2.0
 const WAVE_SPEED := 400.0
-const MARK_HALF_LENGTH := 14.0
-const MARK_WIDTH := 2.4
-const MAX_POINTS := 550
+const MARK_HALF_LENGTH := 5.5
+const MARK_WIDTH := 2.0
+const MAX_POINTS := 520
+const MAX_MARKS := 120
 const MAX_BOUNCES := 2
 const BOUNCE_ATTENUATION := 0.58
 const MIN_BOUNCE_REMAINING := 20.0
@@ -26,14 +27,6 @@ func clear_all() -> void:
 	queue_redraw()
 
 func emit_echo(origin: Vector2, radius: float, exclude: Array = [], show_wave: bool = true, wave_color: Color = Color(0.3, 1.0, 1.0)) -> void:
-	if show_wave:
-		waves.append({
-			"pos": origin,
-			"max_radius": radius,
-			"age": 0.0,
-			"col": wave_color
-		})
-	
 	var space := get_world_2d().direct_space_state
 	var exclude_rids: Array[RID] = []
 	for item in exclude:
@@ -57,8 +50,10 @@ func emit_echo(origin: Vector2, radius: float, exclude: Array = [], show_wave: b
 
 	# Dynamic rays & bounce count by sound loudness to keep physics & drawing silky smooth
 	var is_small_sound: bool = radius < 220.0
-	var ray_count: int = 90 if is_small_sound else RAY_COUNT
+	var ray_count: int = 84 if is_small_sound else RAY_COUNT
 	var max_allowed_bounces: int = 0 if is_small_sound else (MAX_BOUNCES if radius > 360.0 else 1)
+	var wave_clip_dists := PackedFloat32Array()
+	wave_clip_dists.resize(ray_count)
 	var last_primary_hit := Vector2(-99999.0, -99999.0)
 	var last_bounce_hit := Vector2(-99999.0, -99999.0)
 	for i in ray_count:
@@ -67,6 +62,7 @@ func emit_echo(origin: Vector2, radius: float, exclude: Array = [], show_wave: b
 		var remaining_dist: float = radius
 		var cum_dist: float = 0.0
 		var cur_energy: float = 1.0
+		wave_clip_dists[i] = radius
 
 		for bounce in range(max_allowed_bounces + 1):
 			if remaining_dist < MIN_BOUNCE_REMAINING or cur_energy < 0.12:
@@ -85,6 +81,9 @@ func emit_echo(origin: Vector2, radius: float, exclude: Array = [], show_wave: b
 			if seg_len < 1.0:
 				break
 
+			if bounce == 0:
+				wave_clip_dists[i] = seg_len
+
 			cum_dist += seg_len
 			remaining_dist -= seg_len
 
@@ -96,12 +95,12 @@ func emit_echo(origin: Vector2, radius: float, exclude: Array = [], show_wave: b
 
 			var should_record := true
 			if bounce == 0:
-				if hit_pos.distance_squared_to(last_primary_hit) < 22.0:
+				if hit_pos.distance_squared_to(last_primary_hit) < 36.0:
 					should_record = false
 				else:
 					last_primary_hit = hit_pos
 			else:
-				if hit_pos.distance_squared_to(last_bounce_hit) < 26.0:
+				if hit_pos.distance_squared_to(last_bounce_hit) < 42.0:
 					should_record = false
 				else:
 					last_bounce_hit = hit_pos
@@ -111,10 +110,14 @@ func emit_echo(origin: Vector2, radius: float, exclude: Array = [], show_wave: b
 				var col_obj: Object = hit.get("collider")
 				if col_obj != null and col_obj.has_meta("echo_color"):
 					pt_col = col_obj.get_meta("echo_color")
+				elif bounce > 0:
+					pt_col = wave_color.lerp(Color(0.18, 0.62, 0.98), 0.42)
+				var arc_spacing: float = clampf(cum_dist * TAU / float(ray_count) * 0.58, 3.0, 6.8)
 				points.append({
 					"pos": hit_pos,
 					"tan": tan_vec,
 					"norm": normal,
+					"hlen": arc_spacing,
 					"age": -cum_dist / WAVE_SPEED,
 					"strength": hit_strength,
 					"col": pt_col,
@@ -128,6 +131,15 @@ func emit_echo(origin: Vector2, radius: float, exclude: Array = [], show_wave: b
 			cur_dir = cur_dir.bounce(normal).normalized()
 			cur_origin = hit_pos + normal * 0.75
 			cur_energy *= BOUNCE_ATTENUATION
+
+	if show_wave:
+		waves.append({
+			"pos": origin,
+			"max_radius": radius,
+			"age": 0.0,
+			"col": wave_color,
+			"clip": wave_clip_dists
+		})
 
 	if points.size() > MAX_POINTS:
 		points = points.slice(points.size() - MAX_POINTS)
@@ -213,13 +225,29 @@ func _reveal_features(space: PhysicsDirectSpaceState2D, origin: Vector2, max_dis
 		if ok:
 			var f_type: String = String(f["type"])
 			var s: float = (1.0 if f_type == "exit" else clampf(1.0 - path_len / max_dist, 0.38, 1.0)) * s_mult
-			marks.append({
-				"type": f_type,
-				"pos": f_pos,
-				"age": -path_len / WAVE_SPEED,
-				"strength": s,
-				"pressed": bool(f.get("pressed", false))
-			})
+			var new_age: float = -path_len / WAVE_SPEED
+			var is_pressed: bool = bool(f.get("pressed", false))
+			var updated := false
+			for existing in marks:
+				if Vector2(existing["pos"]).distance_squared_to(f_pos) < 4.0:
+					if existing["age"] >= 0.0:
+						existing["age"] = minf(existing["age"], 0.08)
+					else:
+						existing["age"] = minf(existing["age"], new_age)
+					existing["strength"] = maxf(float(existing["strength"]), s)
+					existing["pressed"] = is_pressed
+					updated = true
+					break
+			if not updated:
+				marks.append({
+					"type": f_type,
+					"pos": f_pos,
+					"age": new_age,
+					"strength": s,
+					"pressed": is_pressed
+				})
+	if marks.size() > MAX_MARKS:
+		marks = marks.slice(marks.size() - MAX_MARKS)
 
 
 # Update the age of each point and remove old points
@@ -266,33 +294,34 @@ func _draw():
 			continue
 		var strength: float = float(p.get("strength", 1.0))
 		var t_norm: float = clampf(age / LIFETIME, 0.0, 1.0)
-		var decay: float = (exp(-t_norm * 2.5) - exp(-2.5)) / (1.0 - exp(-2.5))
+		var decay: float = (exp(-t_norm * 2.6) - exp(-2.6)) / (1.0 - exp(-2.6))
 		var alpha: float = clampf(decay, 0.0, 1.0) * strength
 		var base_col: Color = p.get("col", Color(0.3, 1.0, 1.0))
-		var lp: Vector2 = to_local(Vector2(p["pos"]))
+		var lp: Vector2 = to_local(pos_v)
 		var tan_vec: Vector2 = p.get("tan", Vector2.UP)
 		var norm_vec: Vector2 = p.get("norm", Vector2.ZERO)
-		var half_len: float = MARK_HALF_LENGTH * clampf(0.7 + 0.3 * strength, 0.6, 1.0)
+		var half_len: float = float(p.get("hlen", MARK_HALF_LENGTH))
 		var p1: Vector2 = lp - tan_vec * half_len
 		var p2: Vector2 = lp + tan_vec * half_len
 
-		# Crisp impact flash when the sound wave first strikes the wall
-		var impact: float = clampf(1.0 - age / 0.18, 0.0, 1.0) * strength
+		# Crisp impact pulse when the wavefront first strikes the wall
+		var impact: float = clampf(1.0 - age / 0.24, 0.0, 1.0)
 
-		# 1. Directional light wash facing the sound source (zero-allocation hardware-batched strokes)
+		# 1. Soft inner/outer sonar rim glow (controlled alpha so adjacent segments never blob)
 		if norm_vec != Vector2.ZERO:
-			# Outer soft ambient light wash facing the player
-			draw_line(p1 + norm_vec * 5.0, p2 + norm_vec * 5.0, Color(base_col.r, base_col.g, base_col.b, alpha * 0.16), 8.0)
-			# Mid vibrant illuminated glow
-			draw_line(p1 + norm_vec * 2.2, p2 + norm_vec * 2.2, Color(base_col.r * 0.85 + 0.15, base_col.g * 0.95 + 0.05, base_col.b, alpha * 0.38), 4.5)
-			# Solid wall depth (subtle dark backing into wall along -norm_vec)
-			draw_line(p1 - norm_vec * 2.0, p2 - norm_vec * 2.0, Color(base_col.r * 0.4, base_col.g * 0.5, base_col.b * 0.65, alpha * 0.22), 3.5)
+			draw_line(p1 + norm_vec * 1.2, p2 + norm_vec * 1.2, Color(base_col.r, base_col.g, base_col.b, alpha * 0.24), 4.0)
+			# Subtle rebound ripple line lifting off the wall during initial impact
+			if impact > 0.04:
+				var reb_dist: float = (1.0 - impact) * 9.0 + 1.5
+				var reb_half: float = half_len * (0.55 + 0.35 * impact)
+				var rp: Vector2 = lp + norm_vec * reb_dist
+				draw_line(rp - tan_vec * reb_half, rp + tan_vec * reb_half, Color(0.75, 0.98, 1.0, alpha * impact * 0.52), 1.4)
 
-		# 2. Razor-sharp physical surface contact line (bright illuminated barrier core)
-		var line_col: Color = base_col.lerp(Color.WHITE, 0.35 + impact * 0.65)
-		if impact > 0.05:
-			draw_line(p1, p2, Color(1.0, 1.0, 1.0, alpha * impact * 0.6), MARK_WIDTH + 1.8)
-		draw_line(p1, p2, Color(line_col.r, line_col.g, line_col.b, alpha), MARK_WIDTH + impact * 0.4)
+		# 2. Razor-sharp surface contour line + hot white-cyan contact core on arrival
+		var line_col: Color = base_col.lerp(Color.WHITE, 0.25 + impact * 0.7)
+		draw_line(p1, p2, Color(line_col.r, line_col.g, line_col.b, alpha * 0.95), MARK_WIDTH + impact * 0.8)
+		if impact > 0.08:
+			draw_circle(lp, 1.6 + impact * 1.2, Color(1.0, 1.0, 1.0, alpha * impact * 0.75))
 
 	for w in waves:
 		var radius: float = float(w["age"]) * WAVE_SPEED
@@ -302,9 +331,24 @@ func _draw():
 		var fade: float = clampf(1.0 - radius / float(w["max_radius"]), 0.0, 1.0)
 		var w_col: Color = w.get("col", Color(0.3, 1.0, 1.0))
 		var lw: Vector2 = to_local(w_pos)
-		draw_arc(lw, radius, 0.0, TAU, 48, Color(w_col.r, w_col.g, w_col.b, fade * 0.9), 2.2)
-		if radius > 8.0:
-			draw_arc(lw, radius - 5.0, 0.0, TAU, 48, Color(w_col.r, w_col.g, w_col.b, fade * 0.25), 4.0)
+		var clip_arr: PackedFloat32Array = w.get("clip", PackedFloat32Array())
+		var n_seg: int = clip_arr.size()
+		if n_seg > 0 and radius > 2.0:
+			var main_c := Color(w_col.r, w_col.g, w_col.b, fade * 0.85)
+			var trail_c := Color(w_col.r, w_col.g, w_col.b, fade * 0.22)
+			var draw_trail: bool = radius > 7.0
+			var step_ang: float = TAU / float(n_seg)
+			for i in n_seg:
+				if radius <= clip_arr[i] + 2.0:
+					var a0: float = i * step_ang
+					var a1: float = (i + 1) * step_ang
+					var d0 := Vector2.from_angle(a0)
+					var d1 := Vector2.from_angle(a1)
+					draw_line(lw + d0 * radius, lw + d1 * radius, main_c, 2.0)
+					if draw_trail:
+						draw_line(lw + d0 * (radius - 4.5), lw + d1 * (radius - 4.5), trail_c, 3.2)
+		else:
+			draw_arc(lw, radius, 0.0, TAU, 48, Color(w_col.r, w_col.g, w_col.b, fade * 0.85), 2.0)
 
 	for m in marks:
 		var m_pos := Vector2(m["pos"])
@@ -324,13 +368,16 @@ func _draw_mark(m: Dictionary, a: float) -> void:
 	var m_type: String = String(m["type"])
 	match m_type:
 		"water":
-			var c := Color(WATER_COLOR.r, WATER_COLOR.g, WATER_COLOR.b, a * 0.9)
-			for oy: float in [-6.0, 0.0, 6.0]:
-				var pts := PackedVector2Array()
-				for i in range(0, 25, 3):
-					var x: float = float(i) - 12.0
-					pts.append(p + Vector2(x, oy + sin(x * 0.5 + oy) * 2.0))
-				draw_polyline(pts, c, 1.5)
+			var c := Color(WATER_COLOR.r, WATER_COLOR.g, WATER_COLOR.b, a * 0.85)
+			draw_line(p + Vector2(-10.0, -5.0), p + Vector2(-3.0, -6.5), c, 1.5)
+			draw_line(p + Vector2(-3.0, -6.5), p + Vector2(4.0, -3.5), c, 1.5)
+			draw_line(p + Vector2(4.0, -3.5), p + Vector2(10.0, -5.0), c, 1.5)
+			draw_line(p + Vector2(-11.0, 0.5), p + Vector2(-4.0, -1.2), c, 1.5)
+			draw_line(p + Vector2(-4.0, -1.2), p + Vector2(4.0, 1.8), c, 1.5)
+			draw_line(p + Vector2(4.0, 1.8), p + Vector2(11.0, 0.0), c, 1.5)
+			draw_line(p + Vector2(-9.0, 6.0), p + Vector2(-2.0, 4.5), c, 1.5)
+			draw_line(p + Vector2(-2.0, 4.5), p + Vector2(5.0, 7.2), c, 1.5)
+			draw_line(p + Vector2(5.0, 7.2), p + Vector2(9.5, 5.5), c, 1.5)
 		"switch":
 			var is_pressed: bool = bool(m.get("pressed", false))
 			var c := Color(SWITCH_COLOR.r, SWITCH_COLOR.g, SWITCH_COLOR.b, a * (0.45 if is_pressed else 1.0))

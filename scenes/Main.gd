@@ -25,6 +25,8 @@ var water_cells: Dictionary = {}  # Vector2i -> true
 var switch_cells: Dictionary = {} # Vector2i -> String
 var door_nodes: Dictionary = {}   # String -> Array[StaticBody2D]
 var pressed: Dictionary = {}
+var _echo_features_cache: Array = []
+var _echo_features_dirty := true
 
 
 func _ready() -> void:
@@ -52,7 +54,7 @@ func _play_entry_sequence() -> void:
 		title_text = "DEPTH %02d" % GameState.current_level
 
 	if _level_root != null:
-		if _level_root.level_name != "" and _level_root.level_name != "未命名":
+		if _level_root.level_name != "" and _level_root.level_name != "UNTITLED" and _level_root.level_name != "未命名":
 			title_text = "%s  •  %s" % [title_text, _level_root.level_name]
 		if _level_root.hint != "":
 			subtitle_text = _level_root.hint
@@ -78,6 +80,8 @@ func _load_level(path: String) -> void:
 	switch_cells.clear()
 	door_nodes.clear()
 	pressed.clear()
+	_echo_features_cache.clear()
+	_echo_features_dirty = true
 	has_exit = false
 	_changing = false
 	_level_root = null
@@ -190,6 +194,7 @@ func _physics_process(_delta: float) -> void:
 
 func _press_switch(cell: Vector2i) -> void:
 	pressed[cell] = true
+	_echo_features_dirty = true
 	var id: String = str(switch_cells[cell]).to_upper()
 	for body in door_nodes.get(id, []):
 		if is_instance_valid(body) and not body.has_meta("open"):
@@ -202,20 +207,23 @@ func _press_switch(cell: Vector2i) -> void:
 
 
 func echo_features() -> Array:
-	var out: Array = []
 	if _level_root == null or _level_root.walls == null:
-		return out
+		return []
+	if not _echo_features_dirty:
+		return _echo_features_cache
+	_echo_features_cache.clear()
 	for c in water_cells:
-		out.append({"type": "water", "pos": cell_to_world(c)})
+		_echo_features_cache.append({"type": "water", "pos": cell_to_world(c)})
 	for c in switch_cells:
-		out.append({"type": "switch", "pos": cell_to_world(c), "pressed": pressed.has(c)})
+		_echo_features_cache.append({"type": "switch", "pos": cell_to_world(c), "pressed": pressed.has(c)})
 	for id in door_nodes:
 		for body in door_nodes[id]:
 			if is_instance_valid(body) and not body.has_meta("open"):
-				out.append({"type": "door", "pos": body.global_position, "body": body})
+				_echo_features_cache.append({"type": "door", "pos": body.global_position, "body": body})
 	if has_exit:
-		out.append({"type": "exit", "pos": cell_to_world(exit_cell)})
-	return out
+		_echo_features_cache.append({"type": "exit", "pos": cell_to_world(exit_cell)})
+	_echo_features_dirty = false
+	return _echo_features_cache
 
 
 func cell_to_world(cell: Vector2i) -> Vector2:
