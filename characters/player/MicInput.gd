@@ -127,7 +127,9 @@ func _process(delta: float) -> void:
 		var frames := _capture.get_frames_available()
 		if frames > 0:
 			var buf := _capture.get_buffer(frames)
-			for sample in buf:
+			var stride := 4 if frames > 256 else 1
+			for i in range(0, frames, stride):
+				var sample: Vector2 = buf[i]
 				peak = maxf(peak, maxf(absf(sample.x), absf(sample.y)))
 			level_db = linear_to_db(maxf(peak, 0.00001))
 		else:

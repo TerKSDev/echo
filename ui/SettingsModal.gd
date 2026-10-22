@@ -198,6 +198,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		_player = get_tree().get_first_node_in_group("player")
 	if _player != null and is_instance_valid(_player) and not _player.get("alive"):
 		return
+	var hud := get_parent()
+	if hud != null and hud.has_node("DeathScreen") and hud.get_node("DeathScreen").visible:
+		return
 	if event.is_action_pressed("ui_cancel") or (event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE):
 		if _is_open:
 			close()

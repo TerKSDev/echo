@@ -1,9 +1,9 @@
 [gd_scene format=4]
 
-[ext_resource type="Script" path="res://scripts/level/LevelRoot.gd" id="1_ecwps"]
+[ext_resource type="Script" path="res://systems/level/LevelRoot.gd" id="1_ecwps"]
 [ext_resource type="TileSet" path="res://tilesets/echo_tileset.tres" id="2_7d3dm"]
-[ext_resource type="Script" path="res://scripts/level/LevelMarker.gd" id="3_g3bu7"]
-[ext_resource type="Script" path="res://scripts/level/EnemySpawn.gd" id="4_n8w53"]
+[ext_resource type="Script" path="res://systems/level/LevelMarker.gd" id="3_g3bu7"]
+[ext_resource type="Script" path="res://systems/level/EnemySpawn.gd" id="4_n8w53"]
 
 [node name="Level" type="Node2D" unique_id=1469938229]
 script = ExtResource("1_ecwps")

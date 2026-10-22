@@ -90,6 +90,7 @@ var alarm_wave_radius := 0.0
 # Speed boost buff (from the Listener pulse)
 var speed_boost_timer := 0.0
 var speed_boost_mult := 1.0
+var is_in_water := false
 
 # Data for EnemyVisual & AI steering
 var trail_points: Array[Vector2] = []
@@ -432,7 +433,11 @@ func _physics_process(delta: float) -> void:
 
 	var player := _get_player()
 	if player != null and is_instance_valid(player):
-		is_wall_occluded = _is_blocked_by_wall(global_position, player.global_position)
+		var d_to_player: float = global_position.distance_to(player.global_position)
+		if d_to_player <= 650.0:
+			is_wall_occluded = _is_blocked_by_wall(global_position, player.global_position)
+		else:
+			is_wall_occluded = true
 	else:
 		is_wall_occluded = false
 
@@ -440,7 +445,8 @@ func _physics_process(delta: float) -> void:
 	_tick_timers(delta)
 
 	var boost := speed_boost_mult if speed_boost_timer > 0.0 else 1.0
-	_run_state(delta, patrol_speed * boost, chase_speed * boost)
+	var water_drag := 0.72 if is_in_water else 1.0
+	_run_state(delta, patrol_speed * boost * water_drag, chase_speed * boost * water_drag)
 
 	if not _is_stationary():
 		move_and_slide()
@@ -563,12 +569,14 @@ func _update_trail_and_steps(delta: float) -> void:
 	if velocity.length() > 15.0:
 		_step_echo_timer += delta
 		var chasing := state == State.INVESTIGATE
-		if _step_echo_timer >= (0.42 if chasing else 0.78):
+		var interval := (0.55 if chasing else 0.95) if is_in_water else (0.42 if chasing else 0.78)
+		if _step_echo_timer >= interval:
 			_step_echo_timer = 0.0
 			step_ripples.append({
 				"pos": global_position,
 				"age": 0.0,
-				"max_r": 35.0 if chasing else 22.0,
+				"max_r": (48.0 if chasing else 28.0) if is_in_water else (35.0 if chasing else 22.0),
+				"is_water": is_in_water
 			})
 			step_taken.emit(global_position, chasing, is_wall_occluded)
 

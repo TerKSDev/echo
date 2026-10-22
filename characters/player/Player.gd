@@ -15,8 +15,8 @@ const FRICTION := 1200.0
 # Step Sound
 const STEP_LOUDNESS_WALK := 0.22
 const STEP_LOUDNESS_SNEAK := 0.03
-const STEP_INTERVAL_WALK := 0.62
-const STEP_INTERVAL_SNEAK := 0.98
+const STRIDE_DIST_WALK := 115.0
+const STRIDE_DIST_SNEAK := 96.0
 
 # Voice Sound
 const CHARGE_TIME := 0.8
@@ -42,7 +42,7 @@ var desired := Vector2.ZERO
 var marker := 0.0
 var moving := false
 var sneaking := false
-var step_timer := 0.0
+var _step_dist_accum := 0.0
 var charging := false
 var charge := 0.0
 var pulse_scale := 1.0
@@ -66,6 +66,8 @@ var _tap_flash := 0.0 # Crisp ripple animation at destination marker when tapped
 var _wall_bump_pos := Vector2.ZERO
 var _wall_bump_normal := Vector2.UP
 var _wall_bump_alpha := 0.0
+var _stuck_timer := 0.0
+var _water_splash_timer := 0.0
 
 # Shake Camera
 func camera_shake(duration: float = 0.4, intensity: float = 8.0) -> void:
@@ -95,6 +97,13 @@ func _ready() -> void:
 	trail.clear_points()
 	if camera != null:
 		camera.zoom = Vector2(ENTRY_ZOOM_LEVEL, ENTRY_ZOOM_LEVEL)
+
+	# 2D spatial audio listener: centers binaural headphone panning and distance falloff on the player
+	var listener := AudioListener2D.new()
+	listener.name = "PlayerAudioListener"
+	add_child(listener)
+	listener.make_current()
+
 	mic.voice_detected.connect(make_voice_sound)
 	mic.start()
 
@@ -174,7 +183,7 @@ func _physics_process(delta: float) -> void:
 		queue_redraw()
 		return
 
-	# Handle movement
+	# Handle movement with fluid drag in water
 	var speed: float = SNEAK_SPEED if sneaking else WALK_SPEED
 	if water_count > 0:
 		speed *= 0.55
@@ -191,40 +200,92 @@ func _physics_process(delta: float) -> void:
 		else:
 			var slow_dist: float = (speed * speed) / (2.0 * FRICTION)
 			var target_speed: float = speed * clampf(dist / slow_dist, 0.15, 1.0)
-			desired = to_target.normalized() * target_speed
+			var move_dir: Vector2 = to_target.normalized()
+
+			# Corner-rounding / vertex slip assist in tight corridors (1-tile width):
+			# If the player is slightly clipped on a tile corner, cast orthogonal feelers
+			# to nudge them around the vertex smoothly
+			if dist > 12.0:
+				var perp := move_dir.orthogonal()
+				var space := get_world_2d().direct_space_state
+				var p_rid := get_rid()
+
+				var f_left := PhysicsRayQueryParameters2D.create(global_position + perp * 8.0, global_position + perp * 8.0 + move_dir * 16.0)
+				f_left.collision_mask = 1
+				f_left.exclude = [p_rid]
+				var hit_l := space.intersect_ray(f_left)
+
+				var f_right := PhysicsRayQueryParameters2D.create(global_position - perp * 8.0, global_position - perp * 8.0 + move_dir * 16.0)
+				f_right.collision_mask = 1
+				f_right.exclude = [p_rid]
+				var hit_r := space.intersect_ray(f_right)
+
+				if not hit_l.is_empty() and hit_r.is_empty():
+					move_dir = (move_dir - perp * 0.65).normalized()
+				elif hit_l.is_empty() and not hit_r.is_empty():
+					move_dir = (move_dir + perp * 0.65).normalized()
+
+			desired = move_dir * target_speed
 	else:
 		marker = move_toward(marker, 0.0, delta * 2.0)
 		desired = Vector2.ZERO
 	
-	# Update velocity
-	var rate = ACCEL if desired != Vector2.ZERO else FRICTION
+	# Fluid resistance in water: cushioned acceleration and heavier viscous drag
+	var base_rate: float = ACCEL if desired != Vector2.ZERO else FRICTION
+	var rate: float = (base_rate * 0.72) if (water_count > 0 and desired != Vector2.ZERO) else (base_rate * (1.3 if water_count > 0 else 1.0))
 	velocity = velocity.move_toward(desired, rate * delta)
 	move_and_slide()
 
-	# Stop moving after hitting the wall, and give a tactile wall-contact spark in the dark
+	# Handle wall collision: allow sliding along walls, stop only on head-on obstacle or zero progress
 	if get_slide_collision_count() > 0:
 		var col := get_slide_collision(0)
-		if col != null and _wall_bump_alpha < 0.25 and velocity.length() < 45.0:
-			_wall_bump_pos = col.get_position()
-			_wall_bump_normal = col.get_normal()
-			_wall_bump_alpha = 0.85
-		if moving and velocity.length() < 5.0:
-			moving = false
-			desired = Vector2.ZERO
-			velocity = Vector2.ZERO
-			camera_shake(0.08, 1.2)
+		if col != null:
+			var normal: Vector2 = col.get_normal()
+			if _wall_bump_alpha < 0.25 and velocity.length() < 45.0:
+				_wall_bump_pos = col.get_position()
+				_wall_bump_normal = normal
+				_wall_bump_alpha = 0.85
+
+			var heading_into_wall: float = desired.normalized().dot(normal)
+			if moving and velocity.length() < 6.0 and heading_into_wall < -0.82:
+				_stuck_timer += delta
+				if _stuck_timer > 0.14:
+					moving = false
+					desired = Vector2.ZERO
+					velocity = Vector2.ZERO
+					camera_shake(0.08, 1.2)
+			else:
+				_stuck_timer = 0.0
+	else:
+		_stuck_timer = 0.0
+
+	# Continuous hydrodynamic fluid ripples while wading through water
+	if water_count > 0 and velocity.length() > 14.0:
+		_water_splash_timer -= delta
+		if _water_splash_timer <= 0.0:
+			_water_splash_timer = 0.16
+			_step_ripples.append({
+				"pos": global_position + Vector2(randf_range(-2.5, 2.5), randf_range(-2.5, 2.5)),
+				"age": 0.0,
+				"max_r": 20.0,
+				"alpha": 0.52,
+				"is_water": true
+			})
 	
-	# Step sound (decay smoothly when idle instead of hard-resetting to 0 so micro-taps don't machine-gun steps)
-	if velocity.length() > 1.0:
-		step_timer -= delta
-		if step_timer <= 0.0:
-			step_timer = STEP_INTERVAL_SNEAK if sneaking else STEP_INTERVAL_WALK
+	# Step sound: Kinematically tied to ground displacement distance (stride physics)
+	var speed_now: float = velocity.length()
+	if speed_now > 5.0:
+		_step_dist_accum += speed_now * delta
+		var stride: float = STRIDE_DIST_SNEAK if sneaking else STRIDE_DIST_WALK
+		if _step_dist_accum >= stride:
+			_step_dist_accum = 0.0
 			var step_loud: float = STEP_LOUDNESS_SNEAK if sneaking else STEP_LOUDNESS_WALK
 			if water_count > 0:
 				step_loud *= 2.5
 			make_sound(step_loud)
 	else:
-		step_timer = maxf(step_timer - delta * 0.5, 0.16)
+		# Gradually relax residual stride accumulation when standing still (prevents premature step on next micro-tap)
+		_step_dist_accum = move_toward(_step_dist_accum, 0.0, delta * 35.0)
 	
 	# Voice charging
 	if charging:
@@ -397,6 +458,9 @@ func reset(pos: Vector2) -> void:
 	_sneak_blend = 0.0
 	_tap_flash = 0.0
 	_wall_bump_alpha = 0.0
+	_stuck_timer = 0.0
+	_water_splash_timer = 0.0
+	_step_dist_accum = 0.0
 	water_count = 0
 	_step_ripples.clear()
 	if camera != null:
@@ -416,9 +480,12 @@ func _draw() -> void:
 		var rad: float = lerpf(3.0, float(r["max_r"]), ease_p)
 		var a: float = float(r["alpha"]) * (1.0 - p_ratio)
 		var local_pos: Vector2 = to_local(Vector2(r["pos"]))
-		draw_arc(local_pos, rad, 0.0, TAU, 24, Color(0.32, 0.86, 1.0, a), 1.4)
-		if p_ratio < 0.45:
-			draw_arc(local_pos, rad * 0.55, 0.0, TAU, 18, Color(0.55, 0.95, 1.0, a * 0.55), 1.0)
+		var is_water_ripple: bool = bool(r.get("is_water", false))
+		var ripple_col: Color = Color(0.24, 0.76, 1.0, a) if is_water_ripple else Color(0.32, 0.86, 1.0, a)
+		draw_arc(local_pos, rad, 0.0, TAU, 24, ripple_col, 1.6 if is_water_ripple else 1.4)
+		if p_ratio < 0.45 or is_water_ripple:
+			var inner_r: float = rad * (0.58 if is_water_ripple else 0.55)
+			draw_arc(local_pos, inner_r, 0.0, TAU, 18, Color(0.5, 0.92, 1.0, a * 0.55), 1.0)
 
 	# Ignore drawing if the player is dead, show death collapse effect
 	if not alive:

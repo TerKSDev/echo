@@ -170,11 +170,22 @@ func _physics_process(_delta: float) -> void:
 	var c: Vector2i = _level_root.walls.local_to_map(_level_root.walls.to_local(player.global_position))
 	if "water_count" in player:
 		player.water_count = 1 if water_cells.has(c) else 0
+
+	for enemy in get_tree().get_nodes_in_group("enemy"):
+		if enemy is Enemy and is_instance_valid(enemy):
+			var ec: Vector2i = _level_root.walls.local_to_map(_level_root.walls.to_local(enemy.global_position))
+			enemy.is_in_water = water_cells.has(ec)
+
 	if switch_cells.has(c) and not pressed.has(c):
 		_press_switch(c)
 	if has_exit and c == exit_cell:
 		_changing = true
-		GameState.call_deferred("next_level")
+		if GameState.has_next_level():
+			hud.play_level_exit_transition(func():
+				GameState.next_level()
+			)
+		else:
+			hud.show_victory_screen()
 
 
 func _press_switch(cell: Vector2i) -> void:

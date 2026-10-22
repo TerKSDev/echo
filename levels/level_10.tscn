@@ -1,9 +1,9 @@
 [gd_scene format=4 uid="uid://ptu7ilyxuy5u"]
 
-[ext_resource type="Script" uid="uid://doi52335aclw8" path="res://scripts/level/LevelRoot.gd" id="1_eoivg"]
+[ext_resource type="Script" uid="uid://doi52335aclw8" path="res://systems/level/LevelRoot.gd" id="1_eoivg"]
 [ext_resource type="TileSet" uid="uid://0kitrq7qjdh5" path="res://tilesets/echo_tileset.tres" id="2_tu44s"]
-[ext_resource type="Script" uid="uid://dlpb0h4lai6o0" path="res://scripts/level/LevelMarker.gd" id="3_rj5u4"]
-[ext_resource type="Script" uid="uid://c0m62lnt0ufs8" path="res://scripts/level/EnemySpawn.gd" id="4_x27qk"]
+[ext_resource type="Script" uid="uid://dlpb0h4lai6o0" path="res://systems/level/LevelMarker.gd" id="3_rj5u4"]
+[ext_resource type="Script" uid="uid://c0m62lnt0ufs8" path="res://systems/level/EnemySpawn.gd" id="4_x27qk"]
 
 [node name="Level" type="Node2D" unique_id=903995370]
 script = ExtResource("1_eoivg")
