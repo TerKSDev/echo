@@ -26,14 +26,22 @@ var _menu_mic: MicInput
 var _menu_meter_canvas: Control
 var _menu_calib_btn: Button
 
-# Procedural UI audio
+# Procedural UI & BGM audio
+const BGM_SCALE: Array[float] = [0.75, 1.0, 1.125, 1.2, 1.333, 1.5, 1.6, 1.8, 2.0]
 var _wav_click: AudioStreamWAV
 var _wav_hover: AudioStreamWAV
 var _wav_start: AudioStreamWAV
+var _wav_bgm_note: AudioStreamWAV
+var _wav_bgm_droplet: AudioStreamWAV
+var _bgm_pad_player: AudioStreamPlayer
+var _bgm_note_timer := 1.2
+var _bgm_drop_timer := 2.8
+var _bgm_note_step := 0
 
 
 func _ready() -> void:
 	_build_ui_audio()
+	_setup_menu_bgm()
 	_init_spores()
 	sonar_backdrop.draw.connect(_draw_sonar_backdrop)
 
@@ -56,6 +64,7 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_time += delta
+	_process_menu_bgm(delta)
 
 	# Gentle breathing glow on the main title
 	if title_label != null:
@@ -576,7 +585,59 @@ func _add_guide_row(dot_color: Color, label_text: String, desc_text: String) -> 
 	_modal_body.add_child(row)
 
 
-# --- Procedural UI Audio -----------------------------------------------------
+# --- Procedural UI & BGM Audio -----------------------------------------------
+
+func _setup_menu_bgm() -> void:
+	_wav_bgm_note = SfxManager.get_menu_bgm_note()
+	_wav_bgm_droplet = SfxManager.get_menu_bgm_droplet()
+
+	_bgm_pad_player = AudioStreamPlayer.new()
+	_bgm_pad_player.stream = SfxManager.get_menu_bgm_pad()
+	_bgm_pad_player.bus = &"Master"
+	_bgm_pad_player.volume_db = -28.0
+	add_child(_bgm_pad_player)
+	_bgm_pad_player.play()
+
+	var tw := create_tween()
+	tw.tween_property(_bgm_pad_player, "volume_db", -7.5, 1.8).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+
+
+func _process_menu_bgm(delta: float) -> void:
+	var calibrating_mic: bool = _is_modal_open and _menu_meter_canvas != null and is_instance_valid(_menu_meter_canvas)
+	if _bgm_pad_player != null:
+		var target_db: float = -22.0 if calibrating_mic else -7.5
+		_bgm_pad_player.volume_db = lerpf(_bgm_pad_player.volume_db, target_db, clampf(delta * 4.0, 0.0, 1.0))
+
+	if calibrating_mic:
+		return
+
+	# Generative crystalline echo notes (A minor / Dorian motif)
+	_bgm_note_timer -= delta
+	if _bgm_note_timer <= 0.0:
+		_bgm_note_timer = randf_range(2.8, 4.8)
+		var motif_indices: Array[int] = [1, 4, 3, 1, 5, 3, 2, 0, 1, 6, 4, 3]
+		var idx: int = motif_indices[_bgm_note_step % motif_indices.size()]
+		_bgm_note_step += 1
+		var pitch: float = BGM_SCALE[idx]
+		_play_ui_sound(_wav_bgm_note, randf_range(-11.5, -8.5), pitch)
+
+		# Occasional soft harmonic answer note
+		if randf() < 0.45:
+			var ans_pitch: float = BGM_SCALE[(idx + 2) % BGM_SCALE.size()]
+			get_tree().create_timer(0.44).timeout.connect(func():
+				if is_inside_tree() and not (_is_modal_open and _menu_meter_canvas != null and is_instance_valid(_menu_meter_canvas)):
+					_play_ui_sound(_wav_bgm_note, -13.5, ans_pitch)
+			)
+
+	# Subterranean cavern water droplets
+	_bgm_drop_timer -= delta
+	if _bgm_drop_timer <= 0.0:
+		_bgm_drop_timer = randf_range(4.2, 7.8)
+		_play_ui_sound(_wav_bgm_droplet, randf_range(-13.0, -9.5), randf_range(0.84, 1.26))
+		if size.x > 0.0 and size.y > 0.0:
+			var drop_pos := Vector2(randf_range(size.x * 0.15, size.x * 0.85), randf_range(size.y * 0.2, size.y * 0.85))
+			_ripples.append({"pos": drop_pos, "age": 0.0, "max_r": 120.0, "alpha": 0.26})
+
 
 func _build_ui_audio() -> void:
 	_wav_click = _synth_tone(620.0, 920.0, 0.14)

@@ -355,7 +355,7 @@ func _build_all_streams() -> void:
 	_wav_sneak_toggle = _cache["sneak_toggle"]
 
 
-func _make_wav(samples: PackedFloat32Array, loop: bool = false) -> AudioStreamWAV:
+static func _make_wav(samples: PackedFloat32Array, loop: bool = false) -> AudioStreamWAV:
 	var byte_data := PackedByteArray()
 	byte_data.resize(samples.size() * 2)
 	for i in samples.size():
@@ -691,3 +691,88 @@ func _synth_victory_fanfare() -> AudioStreamWAV:
 				total_sample += s * note_env * 0.2
 		out[i] = clampf(tanh(total_sample * 1.5) * 0.88, -1.0, 1.0)
 	return _make_wav(out)
+
+
+# --- Main Menu Procedural BGM Synthesis --------------------------------------
+
+# Seamless 8-second subterranean ambient pad loop (A minor 9th / Dorian cavern drone).
+# All carrier and LFO frequencies are exact multiples of 0.125 Hz (1 / 8.0s) for zero-click looping.
+static func get_menu_bgm_pad() -> AudioStreamWAV:
+	if _cache.has("menu_bgm_pad"):
+		return _cache["menu_bgm_pad"]
+	var dur := 8.0
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var lfo1: float = 0.55 + 0.45 * sin(TAU * 0.125 * t)
+		var lfo2: float = 0.55 + 0.45 * cos(TAU * 0.125 * t)
+		var lfo3: float = 0.50 + 0.50 * sin(TAU * 0.25 * t - 1.1)
+		var lfo4: float = pow(0.5 + 0.5 * sin(TAU * 0.125 * t + 2.6), 2.0)
+
+		# Deep abyssal sub-bass (A1 = 55 Hz, E2 = 82.5 Hz)
+		var sub: float = sin(TAU * 55.0 * t) * 0.34 * lfo1 + sin(TAU * 82.5 * t) * 0.22 * lfo2
+		# Warm binaural chorus pad (A2 = 110 Hz, C3 = 132 Hz, E3 = 165 Hz)
+		var pad_a: float = (sin(TAU * 110.0 * t) + sin(TAU * 110.125 * t)) * 0.14
+		var pad_c: float = (sin(TAU * 132.0 * t) + sin(TAU * 131.875 * t)) * 0.11 * lfo3
+		var pad_e: float = (sin(TAU * 165.0 * t) + sin(TAU * 165.125 * t)) * 0.10 * lfo2
+		# Ethereal upper harmonic shimmer (G3 = 198 Hz, B3 = 247.5 Hz)
+		var shimmer: float = (sin(TAU * 198.0 * t) * 0.06 + sin(TAU * 247.5 * t) * 0.05) * lfo4
+
+		out[i] = tanh((sub + pad_a + pad_c + pad_e + shimmer) * 1.15) * 0.68
+	var wav: AudioStreamWAV = _make_wav(out, true)
+	_cache["menu_bgm_pad"] = wav
+	return wav
+
+
+# Crystalline acoustic echo note (A3 = 220 Hz base) with built-in 2-tap cavern delay.
+static func get_menu_bgm_note() -> AudioStreamWAV:
+	if _cache.has("menu_bgm_note"):
+		return _cache["menu_bgm_note"]
+	var dur := 2.2
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	var taps: Array[float] = [0.0, 0.38, 0.78]
+	var gains: Array[float] = [1.0, 0.36, 0.15]
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var sample := 0.0
+		for k in taps.size():
+			var dt: float = t - taps[k]
+			if dt >= 0.0:
+				var att: float = minf(dt / 0.018, 1.0)
+				var body: float = sin(TAU * 220.0 * dt) * exp(-dt * 2.3)
+				var oct: float = sin(TAU * 440.0 * dt) * exp(-dt * 4.0) * 0.32
+				var bell: float = sin(TAU * 660.0 * dt) * exp(-dt * 7.2) * 0.11
+				sample += (body + oct + bell) * att * gains[k]
+		out[i] = clampf(sample * 0.58, -1.0, 1.0)
+	var wav: AudioStreamWAV = _make_wav(out)
+	_cache["menu_bgm_note"] = wav
+	return wav
+
+
+# Subterranean water droplet with stalactite cave reflection.
+static func get_menu_bgm_droplet() -> AudioStreamWAV:
+	if _cache.has("menu_bgm_droplet"):
+		return _cache["menu_bgm_droplet"]
+	var dur := 0.65
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	var taps: Array[float] = [0.0, 0.24, 0.46]
+	var gains: Array[float] = [0.75, 0.28, 0.11]
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var sample := 0.0
+		for k in taps.size():
+			var dt: float = t - taps[k]
+			if dt >= 0.0 and dt < 0.18:
+				var env: float = minf(dt / 0.003, 1.0) * exp(-dt * 30.0)
+				var f: float = lerpf(540.0, 1220.0, clampf(dt / 0.045, 0.0, 1.0))
+				sample += sin(TAU * f * dt) * env * gains[k]
+		out[i] = clampf(sample, -1.0, 1.0)
+	var wav: AudioStreamWAV = _make_wav(out)
+	_cache["menu_bgm_droplet"] = wav
+	return wav
