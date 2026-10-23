@@ -36,6 +36,8 @@ var _wav_listener_alarm: AudioStreamWAV
 var _wav_player_stun: AudioStreamWAV
 var _wav_player_death: AudioStreamWAV
 var _wav_level_intro: AudioStreamWAV
+var _wav_level_exit: AudioStreamWAV
+var _wav_victory_fanfare: AudioStreamWAV
 var _wav_sneak_toggle: AudioStreamWAV
 var _wav_charge_loop: AudioStreamWAV
 
@@ -43,11 +45,21 @@ var _charge_player: AudioStreamPlayer
 var _player_ref: Node2D
 static var _cache: Dictionary = {}
 
+const NON_SPATIAL_POOL_SIZE := 6
+const SPATIAL_POOL_SIZE := 8
+
+var _non_spatial_pool: Array[AudioStreamPlayer] = []
+var _non_spatial_idx := 0
+
+var _spatial_pool: Array[AudioStreamPlayer2D] = []
+var _spatial_idx := 0
+
 
 func _ready() -> void:
 	_build_all_streams()
 	_setup_charge_player()
 	_setup_heartbeat_players()
+	_setup_audio_pools()
 
 
 func _process(delta: float) -> void:
@@ -113,6 +125,16 @@ func play_player_death() -> void:
 func play_level_intro() -> void:
 	_suppress_mic(0.55)
 	_play_non_spatial(_wav_level_intro, -3.0, 1.0)
+
+
+func play_level_exit() -> void:
+	_suppress_mic(0.4)
+	_play_non_spatial(_wav_level_exit, -2.0, 1.0)
+
+
+func play_victory_fanfare() -> void:
+	_suppress_mic(1.8)
+	_play_non_spatial(_wav_victory_fanfare, 1.0, 1.0)
 
 
 func play_sneak_toggle(entering_sneak: bool) -> void:
@@ -248,33 +270,43 @@ func _synth_heartbeat() -> AudioStreamWAV:
 	return _make_wav(out)
 
 
+func _setup_audio_pools() -> void:
+	for i in NON_SPATIAL_POOL_SIZE:
+		var p := AudioStreamPlayer.new()
+		p.bus = &"Master"
+		add_child(p)
+		_non_spatial_pool.append(p)
+
+	for i in SPATIAL_POOL_SIZE:
+		var p := AudioStreamPlayer2D.new()
+		p.bus = &"Master"
+		p.attenuation = 1.5
+		p.panning_strength = 1.4
+		add_child(p)
+		_spatial_pool.append(p)
+
+
 func _play_non_spatial(stream: AudioStreamWAV, volume_db: float, pitch: float) -> void:
-	if stream == null:
+	if stream == null or _non_spatial_pool.is_empty():
 		return
-	var p := AudioStreamPlayer.new()
+	var p: AudioStreamPlayer = _non_spatial_pool[_non_spatial_idx]
+	_non_spatial_idx = (_non_spatial_idx + 1) % NON_SPATIAL_POOL_SIZE
 	p.stream = stream
 	p.volume_db = volume_db
 	p.pitch_scale = pitch
-	p.bus = &"Master"
-	add_child(p)
-	p.finished.connect(p.queue_free)
 	p.play()
 
 
 func _play_spatial(stream: AudioStreamWAV, pos: Vector2, volume_db: float, pitch: float, max_dist: float) -> void:
-	if stream == null:
+	if stream == null or _spatial_pool.is_empty():
 		return
-	var p := AudioStreamPlayer2D.new()
+	var p: AudioStreamPlayer2D = _spatial_pool[_spatial_idx]
+	_spatial_idx = (_spatial_idx + 1) % SPATIAL_POOL_SIZE
 	p.stream = stream
 	p.global_position = pos
 	p.volume_db = volume_db
 	p.pitch_scale = pitch
 	p.max_distance = max_dist
-	p.attenuation = 1.5
-	p.panning_strength = 1.4
-	p.bus = &"Master"
-	add_child(p)
-	p.finished.connect(p.queue_free)
 	p.play()
 
 
@@ -298,6 +330,8 @@ func _build_all_streams() -> void:
 		_cache["player_stun"] = _synth_player_stun()
 		_cache["player_death"] = _synth_player_death()
 		_cache["level_intro"] = _synth_level_intro()
+		_cache["level_exit"] = _synth_level_exit()
+		_cache["victory_fanfare"] = _synth_victory_fanfare()
 		_cache["sneak_toggle"] = _synth_sneak_toggle()
 
 	_wav_step_walk = _cache["step_walk"]
@@ -316,10 +350,12 @@ func _build_all_streams() -> void:
 	_wav_player_stun = _cache["player_stun"]
 	_wav_player_death = _cache["player_death"]
 	_wav_level_intro = _cache["level_intro"]
+	_wav_level_exit = _cache["level_exit"]
+	_wav_victory_fanfare = _cache["victory_fanfare"]
 	_wav_sneak_toggle = _cache["sneak_toggle"]
 
 
-func _make_wav(samples: PackedFloat32Array, loop: bool = false) -> AudioStreamWAV:
+static func _make_wav(samples: PackedFloat32Array, loop: bool = false) -> AudioStreamWAV:
 	var byte_data := PackedByteArray()
 	byte_data.resize(samples.size() * 2)
 	for i in samples.size():
@@ -617,3 +653,126 @@ func _synth_sneak_toggle() -> AudioStreamWAV:
 		var breath: float = randf_range(-1.0, 1.0) * 0.25
 		out[i] = (sin(phase) * 0.65 + breath) * env * 0.7
 	return _make_wav(out)
+
+
+# Level exit portal: ascending crystalline resonance
+func _synth_level_exit() -> AudioStreamWAV:
+	var dur := 0.42
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var env: float = minf(t / 0.02, 1.0) * exp(-t * 5.2)
+		var f1: float = lerpf(392.0, 784.0, t / dur)
+		var f2: float = lerpf(587.3, 1174.6, t / dur)
+		var tone: float = (sin(TAU * f1 * t) * 0.55 + sin(TAU * f2 * t) * 0.35) * env * 0.72
+		out[i] = clampf(tone, -1.0, 1.0)
+	return _make_wav(out)
+
+
+# Campaign victory fanfare: triumphant multi-harmonic crystalline ascent
+func _synth_victory_fanfare() -> AudioStreamWAV:
+	var dur := 2.6
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	# Harmonic frequencies: E4, G#4, B4, E5, B5, E6
+	var freqs: Array[float] = [329.63, 415.30, 493.88, 659.25, 987.77, 1318.5]
+	var delays: Array[float] = [0.0, 0.14, 0.28, 0.42, 0.56, 0.70]
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var total_sample := 0.0
+		for k in freqs.size():
+			var note_t: float = t - delays[k]
+			if note_t >= 0.0:
+				var note_env: float = minf(note_t / 0.015, 1.0) * exp(-note_t * 1.85)
+				var s: float = sin(TAU * freqs[k] * note_t) + 0.25 * sin(TAU * freqs[k] * 2.0 * note_t)
+				total_sample += s * note_env * 0.2
+		out[i] = clampf(tanh(total_sample * 1.5) * 0.88, -1.0, 1.0)
+	return _make_wav(out)
+
+
+# --- Main Menu Procedural BGM Synthesis --------------------------------------
+
+# Seamless 8-second subterranean ambient pad loop (A minor 9th / Dorian cavern drone).
+# All carrier and LFO frequencies are exact multiples of 0.125 Hz (1 / 8.0s) for zero-click looping.
+static func get_menu_bgm_pad() -> AudioStreamWAV:
+	if _cache.has("menu_bgm_pad"):
+		return _cache["menu_bgm_pad"]
+	var dur := 8.0
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var lfo1: float = 0.55 + 0.45 * sin(TAU * 0.125 * t)
+		var lfo2: float = 0.55 + 0.45 * cos(TAU * 0.125 * t)
+		var lfo3: float = 0.50 + 0.50 * sin(TAU * 0.25 * t - 1.1)
+		var lfo4: float = pow(0.5 + 0.5 * sin(TAU * 0.125 * t + 2.6), 2.0)
+
+		# Deep abyssal sub-bass (A1 = 55 Hz, E2 = 82.5 Hz)
+		var sub: float = sin(TAU * 55.0 * t) * 0.34 * lfo1 + sin(TAU * 82.5 * t) * 0.22 * lfo2
+		# Warm binaural chorus pad (A2 = 110 Hz, C3 = 132 Hz, E3 = 165 Hz)
+		var pad_a: float = (sin(TAU * 110.0 * t) + sin(TAU * 110.125 * t)) * 0.14
+		var pad_c: float = (sin(TAU * 132.0 * t) + sin(TAU * 131.875 * t)) * 0.11 * lfo3
+		var pad_e: float = (sin(TAU * 165.0 * t) + sin(TAU * 165.125 * t)) * 0.10 * lfo2
+		# Ethereal upper harmonic shimmer (G3 = 198 Hz, B3 = 247.5 Hz)
+		var shimmer: float = (sin(TAU * 198.0 * t) * 0.06 + sin(TAU * 247.5 * t) * 0.05) * lfo4
+
+		out[i] = tanh((sub + pad_a + pad_c + pad_e + shimmer) * 1.15) * 0.68
+	var wav: AudioStreamWAV = _make_wav(out, true)
+	_cache["menu_bgm_pad"] = wav
+	return wav
+
+
+# Crystalline acoustic echo note (A3 = 220 Hz base) with built-in 2-tap cavern delay.
+static func get_menu_bgm_note() -> AudioStreamWAV:
+	if _cache.has("menu_bgm_note"):
+		return _cache["menu_bgm_note"]
+	var dur := 2.2
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	var taps: Array[float] = [0.0, 0.38, 0.78]
+	var gains: Array[float] = [1.0, 0.36, 0.15]
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var sample := 0.0
+		for k in taps.size():
+			var dt: float = t - taps[k]
+			if dt >= 0.0:
+				var att: float = minf(dt / 0.018, 1.0)
+				var body: float = sin(TAU * 220.0 * dt) * exp(-dt * 2.3)
+				var oct: float = sin(TAU * 440.0 * dt) * exp(-dt * 4.0) * 0.32
+				var bell: float = sin(TAU * 660.0 * dt) * exp(-dt * 7.2) * 0.11
+				sample += (body + oct + bell) * att * gains[k]
+		out[i] = clampf(sample * 0.58, -1.0, 1.0)
+	var wav: AudioStreamWAV = _make_wav(out)
+	_cache["menu_bgm_note"] = wav
+	return wav
+
+
+# Subterranean water droplet with stalactite cave reflection.
+static func get_menu_bgm_droplet() -> AudioStreamWAV:
+	if _cache.has("menu_bgm_droplet"):
+		return _cache["menu_bgm_droplet"]
+	var dur := 0.65
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	var taps: Array[float] = [0.0, 0.24, 0.46]
+	var gains: Array[float] = [0.75, 0.28, 0.11]
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var sample := 0.0
+		for k in taps.size():
+			var dt: float = t - taps[k]
+			if dt >= 0.0 and dt < 0.18:
+				var env: float = minf(dt / 0.003, 1.0) * exp(-dt * 30.0)
+				var f: float = lerpf(540.0, 1220.0, clampf(dt / 0.045, 0.0, 1.0))
+				sample += sin(TAU * f * dt) * env * gains[k]
+		out[i] = clampf(sample, -1.0, 1.0)
+	var wav: AudioStreamWAV = _make_wav(out)
+	_cache["menu_bgm_droplet"] = wav
+	return wav

@@ -17,7 +17,11 @@ func _draw() -> void:
 	for r in enemy.step_ripples:
 		var prog: float = float(r["age"])
 		var rad: float = prog * float(r["max_r"])
-		draw_arc(to_local(Vector2(r["pos"])), rad, 0.0, TAU, 20, Color(base, (1.0 - prog) * 0.4), 1.2)
+		var is_water: bool = bool(r.get("is_water", false))
+		var col_r := Color(0.28, 0.75, 1.0, (1.0 - prog) * 0.55) if is_water else Color(base, (1.0 - prog) * 0.4)
+		draw_arc(to_local(Vector2(r["pos"])), rad, 0.0, TAU, 20, col_r, 1.6 if is_water else 1.2)
+		if is_water and prog < 0.55:
+			draw_arc(to_local(Vector2(r["pos"])), rad * 0.55, 0.0, TAU, 16, Color(0.5, 0.9, 1.0, (1.0 - prog) * 0.35), 1.0)
 
 	# 2. Proximity aura and pulse
 	var proximity := enemy.proximity
