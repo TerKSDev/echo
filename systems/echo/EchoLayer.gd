@@ -1,10 +1,15 @@
 extends Node2D
 
-const RAY_COUNT := 180
+const RAY_COUNT := 144
 const LIFETIME := 2.0
 const WAVE_SPEED := 400.0
-const DOT_SIZE := 3.0
-const MAX_POINTS := 900
+const MARK_HALF_LENGTH := 5.5
+const MARK_WIDTH := 2.0
+const MAX_POINTS := 520
+const MAX_MARKS := 120
+const MAX_BOUNCES := 2
+const BOUNCE_ATTENUATION := 0.58
+const MIN_BOUNCE_REMAINING := 20.0
 const WATER_COLOR := Color(0.35, 0.68, 1.0)
 const SWITCH_COLOR := Color(1.0, 0.72, 0.18)
 const DOOR_COLOR := Color(1.0, 0.85, 0.22)
@@ -22,14 +27,6 @@ func clear_all() -> void:
 	queue_redraw()
 
 func emit_echo(origin: Vector2, radius: float, exclude: Array = [], show_wave: bool = true, wave_color: Color = Color(0.3, 1.0, 1.0)) -> void:
-	if show_wave:
-		waves.append({
-			"pos": origin,
-			"max_radius": radius,
-			"age": 0.0,
-			"col": wave_color
-		})
-	
 	var space := get_world_2d().direct_space_state
 	var exclude_rids: Array[RID] = []
 	for item in exclude:
@@ -51,57 +48,146 @@ func emit_echo(origin: Vector2, radius: float, exclude: Array = [], show_wave: b
 			if not wall_exclude_rids.has(e_rid):
 				wall_exclude_rids.append(e_rid)
 
-	# Perform raycasts in a circular pattern to detect obstacles (deduplicating ultra-close hits)
-	var last_hit_pos := Vector2(-99999.0, -99999.0)
-	for i in RAY_COUNT:
-		var dir := Vector2.RIGHT.rotated(TAU * i / RAY_COUNT)
-		var query := PhysicsRayQueryParameters2D.create(origin, origin + dir * radius)
-		
-		query.collision_mask = 1
-		query.exclude = wall_exclude_rids
-		
-		var hit: Dictionary = space.intersect_ray(query)
-		if not hit.is_empty():
+	# Dynamic rays & bounce count by sound loudness to keep physics & drawing silky smooth
+	var is_small_sound: bool = radius < 220.0
+	var ray_count: int = 84 if is_small_sound else RAY_COUNT
+	var max_allowed_bounces: int = 0 if is_small_sound else (MAX_BOUNCES if radius > 360.0 else 1)
+	var wave_clip_dists := PackedFloat32Array()
+	wave_clip_dists.resize(ray_count)
+	var last_primary_hit := Vector2(-99999.0, -99999.0)
+	var last_bounce_hit := Vector2(-99999.0, -99999.0)
+	for i in ray_count:
+		var cur_origin: Vector2 = origin
+		var cur_dir: Vector2 = Vector2.RIGHT.rotated(TAU * i / ray_count)
+		var remaining_dist: float = radius
+		var cum_dist: float = 0.0
+		var cur_energy: float = 1.0
+		wave_clip_dists[i] = radius
+
+		for bounce in range(max_allowed_bounces + 1):
+			if remaining_dist < MIN_BOUNCE_REMAINING or cur_energy < 0.12:
+				break
+
+			var query := PhysicsRayQueryParameters2D.create(cur_origin, cur_origin + cur_dir * remaining_dist)
+			query.collision_mask = 1
+			query.exclude = wall_exclude_rids
+
+			var hit: Dictionary = space.intersect_ray(query)
+			if hit.is_empty():
+				break
+
 			var hit_pos: Vector2 = hit.position
-			if hit_pos.distance_squared_to(last_hit_pos) < 20.0:
-				continue
-			last_hit_pos = hit_pos
-			var dist: float = origin.distance_to(hit_pos)
-			var pt_col: Color = wave_color
-			var col_obj: Object = hit.get("collider")
-			if col_obj != null and col_obj.has_meta("echo_color"):
-				pt_col = col_obj.get_meta("echo_color")
-			points.append({
-				"pos": hit_pos,
-				"age": -dist / WAVE_SPEED,
-				"col": pt_col
-			})
+			var seg_len: float = cur_origin.distance_to(hit_pos)
+			if seg_len < 1.0:
+				break
+
+			if bounce == 0:
+				wave_clip_dists[i] = seg_len
+
+			cum_dist += seg_len
+			remaining_dist -= seg_len
+
+			var normal: Vector2 = hit.get("normal", Vector2.ZERO)
+			var tan_vec: Vector2 = normal.orthogonal().normalized() if normal != Vector2.ZERO else cur_dir.orthogonal().normalized()
+			var d_ratio: float = clampf(cum_dist / radius, 0.0, 1.0)
+			var dist_factor: float = clampf(1.0 - d_ratio * d_ratio, 0.08, 1.0)
+			var hit_strength: float = cur_energy * dist_factor
+
+			var should_record := true
+			if bounce == 0:
+				if hit_pos.distance_squared_to(last_primary_hit) < 36.0:
+					should_record = false
+				else:
+					last_primary_hit = hit_pos
+			else:
+				if hit_pos.distance_squared_to(last_bounce_hit) < 42.0:
+					should_record = false
+				else:
+					last_bounce_hit = hit_pos
+
+			if should_record:
+				var pt_col: Color = wave_color
+				var col_obj: Object = hit.get("collider")
+				if col_obj != null and col_obj.has_meta("echo_color"):
+					pt_col = col_obj.get_meta("echo_color")
+				elif bounce > 0:
+					pt_col = wave_color.lerp(Color(0.18, 0.62, 0.98), 0.42)
+				var arc_spacing: float = clampf(cum_dist * TAU / float(ray_count) * 0.58, 3.0, 6.8)
+				points.append({
+					"pos": hit_pos,
+					"tan": tan_vec,
+					"norm": normal,
+					"hlen": arc_spacing,
+					"age": -cum_dist / WAVE_SPEED,
+					"strength": hit_strength,
+					"col": pt_col,
+					"bounce": bounce
+				})
+
+			if normal == Vector2.ZERO:
+				break
+
+			# Specular reflection: d_bounce = d - 2(d . n)n
+			cur_dir = cur_dir.bounce(normal).normalized()
+			cur_origin = hit_pos + normal * 0.75
+			cur_energy *= BOUNCE_ATTENUATION
+
+	if show_wave:
+		waves.append({
+			"pos": origin,
+			"max_radius": radius,
+			"age": 0.0,
+			"col": wave_color,
+			"clip": wave_clip_dists
+		})
 
 	if points.size() > MAX_POINTS:
 		points = points.slice(points.size() - MAX_POINTS)
 
 	_reveal_features(space, origin, radius, wall_exclude_rids)
-	
+
 	for enemy in get_tree().get_nodes_in_group("enemy"):
 		var enemy_node := enemy as Node2D
 		if enemy_node == null:
 			continue
 		var dist: float = origin.distance_to(enemy_node.global_position)
 		if dist <= radius:
-			# Echoes bounce off walls; cannot reveal an enemy hidden behind a solid wall
+			# Direct line of sight check
 			var occ_query := PhysicsRayQueryParameters2D.create(origin, enemy_node.global_position)
 			occ_query.collision_mask = 1
 			occ_query.exclude = exclude_rids
 			var hit: Dictionary = space.intersect_ray(occ_query)
-			if not hit.is_empty():
-				continue
 
-			get_tree().create_timer(dist / WAVE_SPEED).timeout.connect(
-				func():
-					if is_instance_valid(enemy_node):
-						enemy_node.reveal(1.0)
-			)
-	
+			var is_revealed := false
+			var reveal_delay: float = dist / WAVE_SPEED
+			var reveal_strength: float = 1.0
+
+			if hit.is_empty():
+				is_revealed = true
+			elif radius >= 280.0:
+				# Physical 1-bounce acoustic reflection around corners for loud sounds (voice/shrieks)
+				var wall_pt: Vector2 = hit["position"]
+				var wall_n: Vector2 = hit.get("normal", Vector2.ZERO)
+				if wall_n != Vector2.ZERO:
+					var bounce_start: Vector2 = wall_pt + wall_n * 1.5
+					var bounce_query := PhysicsRayQueryParameters2D.create(bounce_start, enemy_node.global_position)
+					bounce_query.collision_mask = 1
+					bounce_query.exclude = exclude_rids
+					var bounce_hit: Dictionary = space.intersect_ray(bounce_query)
+					if bounce_hit.is_empty():
+						var total_path: float = origin.distance_to(wall_pt) + wall_pt.distance_to(enemy_node.global_position)
+						if total_path <= radius:
+							is_revealed = true
+							reveal_delay = total_path / WAVE_SPEED
+							reveal_strength = 0.65
+
+			if is_revealed:
+				get_tree().create_timer(reveal_delay).timeout.connect(
+					func():
+						if is_instance_valid(enemy_node):
+							enemy_node.reveal(reveal_strength)
+				)
+
 # Reveal interactive map features (water, switches, doors, exit) when swept by a sound wave
 func _reveal_features(space: PhysicsDirectSpaceState2D, origin: Vector2, max_dist: float, exclude: Array[RID]) -> void:
 	var main_node := get_parent()
@@ -119,16 +205,49 @@ func _reveal_features(space: PhysicsDirectSpaceState2D, origin: Vector2, max_dis
 			ok = hit.get("collider") == f["body"]
 		if not ok:
 			ok = Vector2(hit["position"]).distance_to(f_pos) < 14.0
+
+		var path_len := d
+		var s_mult := 1.0
+		if not ok and max_dist >= 280.0 and not hit.is_empty():
+			# 1-bounce acoustic sweep around corner
+			var wall_pt: Vector2 = hit["position"]
+			var wall_n: Vector2 = hit.get("normal", Vector2.ZERO)
+			if wall_n != Vector2.ZERO:
+				var b_query := PhysicsRayQueryParameters2D.create(wall_pt + wall_n * 1.5, f_pos, 1, exclude)
+				var b_hit: Dictionary = space.intersect_ray(b_query)
+				if b_hit.is_empty() or (f.has("body") and b_hit.get("collider") == f["body"]):
+					var total_path: float = origin.distance_to(wall_pt) + wall_pt.distance_to(f_pos)
+					if total_path <= max_dist:
+						ok = true
+						path_len = total_path
+						s_mult = 0.65
+
 		if ok:
 			var f_type: String = String(f["type"])
-			var s: float = 1.0 if f_type == "exit" else clampf(1.0 - d / max_dist, 0.38, 1.0)
-			marks.append({
-				"type": f_type,
-				"pos": f_pos,
-				"age": -d / WAVE_SPEED,
-				"strength": s,
-				"pressed": bool(f.get("pressed", false))
-			})
+			var s: float = (1.0 if f_type == "exit" else clampf(1.0 - path_len / max_dist, 0.38, 1.0)) * s_mult
+			var new_age: float = -path_len / WAVE_SPEED
+			var is_pressed: bool = bool(f.get("pressed", false))
+			var updated := false
+			for existing in marks:
+				if Vector2(existing["pos"]).distance_squared_to(f_pos) < 4.0:
+					if existing["age"] >= 0.0:
+						existing["age"] = minf(existing["age"], 0.08)
+					else:
+						existing["age"] = minf(existing["age"], new_age)
+					existing["strength"] = maxf(float(existing["strength"]), s)
+					existing["pressed"] = is_pressed
+					updated = true
+					break
+			if not updated:
+				marks.append({
+					"type": f_type,
+					"pos": f_pos,
+					"age": new_age,
+					"strength": s,
+					"pressed": is_pressed
+				})
+	if marks.size() > MAX_MARKS:
+		marks = marks.slice(marks.size() - MAX_MARKS)
 
 
 # Update the age of each point and remove old points
@@ -157,34 +276,90 @@ func _process(delta):
 
 # Draw the points with arrival shimmer and fading alpha based on their age
 func _draw():
+	var cam := get_viewport().get_camera_2d()
+	var cull_rect := Rect2()
+	var has_cull := false
+	if cam != null:
+		var cam_pos: Vector2 = cam.global_position
+		var vp_size: Vector2 = get_viewport_rect().size / cam.zoom
+		cull_rect = Rect2(cam_pos - vp_size * 0.58, vp_size * 1.16)
+		has_cull = true
+
 	for p in points:
+		var pos_v := Vector2(p["pos"])
+		if has_cull and not cull_rect.has_point(pos_v):
+			continue
 		var age: float = float(p["age"])
 		if age < 0.0:
 			continue
-		var alpha: float = clampf(1.0 - age / LIFETIME, 0.0, 1.0)
+		var strength: float = float(p.get("strength", 1.0))
+		var t_norm: float = clampf(age / LIFETIME, 0.0, 1.0)
+		var decay: float = (exp(-t_norm * 2.6) - exp(-2.6)) / (1.0 - exp(-2.6))
+		var alpha: float = clampf(decay, 0.0, 1.0) * strength
 		var base_col: Color = p.get("col", Color(0.3, 1.0, 1.0))
-		var lp: Vector2 = to_local(Vector2(p["pos"]))
-		# Crisp impact flash when the sound wave first strikes the wall
-		var impact: float = clampf(1.0 - age / 0.18, 0.0, 1.0)
-		var dot_col: Color = base_col.lerp(Color.WHITE, impact * 0.65)
-		if impact > 0.05:
-			draw_circle(lp, DOT_SIZE * (1.8 + impact * 0.8), Color(base_col.r, base_col.g, base_col.b, alpha * impact * 0.28))
-		draw_circle(lp, DOT_SIZE * (1.0 + impact * 0.35), Color(dot_col.r, dot_col.g, dot_col.b, alpha))
+		var lp: Vector2 = to_local(pos_v)
+		var tan_vec: Vector2 = p.get("tan", Vector2.UP)
+		var norm_vec: Vector2 = p.get("norm", Vector2.ZERO)
+		var half_len: float = float(p.get("hlen", MARK_HALF_LENGTH))
+		var p1: Vector2 = lp - tan_vec * half_len
+		var p2: Vector2 = lp + tan_vec * half_len
+
+		# Crisp impact pulse when the wavefront first strikes the wall
+		var impact: float = clampf(1.0 - age / 0.24, 0.0, 1.0)
+
+		# 1. Soft inner/outer sonar rim glow (controlled alpha so adjacent segments never blob)
+		if norm_vec != Vector2.ZERO:
+			draw_line(p1 + norm_vec * 1.2, p2 + norm_vec * 1.2, Color(base_col.r, base_col.g, base_col.b, alpha * 0.24), 4.0)
+			# Subtle rebound ripple line lifting off the wall during initial impact
+			if impact > 0.04:
+				var reb_dist: float = (1.0 - impact) * 9.0 + 1.5
+				var reb_half: float = half_len * (0.55 + 0.35 * impact)
+				var rp: Vector2 = lp + norm_vec * reb_dist
+				draw_line(rp - tan_vec * reb_half, rp + tan_vec * reb_half, Color(0.75, 0.98, 1.0, alpha * impact * 0.52), 1.4)
+
+		# 2. Razor-sharp surface contour line + hot white-cyan contact core on arrival
+		var line_col: Color = base_col.lerp(Color.WHITE, 0.25 + impact * 0.7)
+		draw_line(p1, p2, Color(line_col.r, line_col.g, line_col.b, alpha * 0.95), MARK_WIDTH + impact * 0.8)
+		if impact > 0.08:
+			draw_circle(lp, 1.6 + impact * 1.2, Color(1.0, 1.0, 1.0, alpha * impact * 0.75))
 
 	for w in waves:
 		var radius: float = float(w["age"]) * WAVE_SPEED
+		var w_pos := Vector2(w["pos"])
+		if has_cull and not cull_rect.grow(radius).has_point(w_pos):
+			continue
 		var fade: float = clampf(1.0 - radius / float(w["max_radius"]), 0.0, 1.0)
 		var w_col: Color = w.get("col", Color(0.3, 1.0, 1.0))
-		var lw: Vector2 = to_local(Vector2(w["pos"]))
-		draw_arc(lw, radius, 0.0, TAU, 64, Color(w_col.r, w_col.g, w_col.b, fade * 0.9), 2.2)
-		if radius > 8.0:
-			draw_arc(lw, radius - 5.0, 0.0, TAU, 64, Color(w_col.r, w_col.g, w_col.b, fade * 0.25), 4.0)
+		var lw: Vector2 = to_local(w_pos)
+		var clip_arr: PackedFloat32Array = w.get("clip", PackedFloat32Array())
+		var n_seg: int = clip_arr.size()
+		if n_seg > 0 and radius > 2.0:
+			var main_c := Color(w_col.r, w_col.g, w_col.b, fade * 0.85)
+			var trail_c := Color(w_col.r, w_col.g, w_col.b, fade * 0.22)
+			var draw_trail: bool = radius > 7.0
+			var step_ang: float = TAU / float(n_seg)
+			for i in n_seg:
+				if radius <= clip_arr[i] + 2.0:
+					var a0: float = i * step_ang
+					var a1: float = (i + 1) * step_ang
+					var d0 := Vector2.from_angle(a0)
+					var d1 := Vector2.from_angle(a1)
+					draw_line(lw + d0 * radius, lw + d1 * radius, main_c, 2.0)
+					if draw_trail:
+						draw_line(lw + d0 * (radius - 4.5), lw + d1 * (radius - 4.5), trail_c, 3.2)
+		else:
+			draw_arc(lw, radius, 0.0, TAU, 48, Color(w_col.r, w_col.g, w_col.b, fade * 0.85), 2.0)
 
 	for m in marks:
+		var m_pos := Vector2(m["pos"])
+		if has_cull and not cull_rect.has_point(m_pos):
+			continue
 		var m_age: float = float(m["age"])
 		if m_age < 0.0:
 			continue
-		var a: float = float(m["strength"]) * clampf(1.0 - m_age / (LIFETIME * 1.35), 0.0, 1.0)
+		var mt_norm: float = clampf(m_age / (LIFETIME * 1.35), 0.0, 1.0)
+		var m_decay: float = (exp(-mt_norm * 2.2) - exp(-2.2)) / (1.0 - exp(-2.2))
+		var a: float = float(m["strength"]) * clampf(m_decay, 0.0, 1.0)
 		_draw_mark(m, a)
 
 
@@ -193,13 +368,16 @@ func _draw_mark(m: Dictionary, a: float) -> void:
 	var m_type: String = String(m["type"])
 	match m_type:
 		"water":
-			var c := Color(WATER_COLOR.r, WATER_COLOR.g, WATER_COLOR.b, a * 0.9)
-			for oy: float in [-6.0, 0.0, 6.0]:
-				var pts := PackedVector2Array()
-				for i in range(0, 25, 3):
-					var x: float = float(i) - 12.0
-					pts.append(p + Vector2(x, oy + sin(x * 0.5 + oy) * 2.0))
-				draw_polyline(pts, c, 1.5)
+			var c := Color(WATER_COLOR.r, WATER_COLOR.g, WATER_COLOR.b, a * 0.85)
+			draw_line(p + Vector2(-10.0, -5.0), p + Vector2(-3.0, -6.5), c, 1.5)
+			draw_line(p + Vector2(-3.0, -6.5), p + Vector2(4.0, -3.5), c, 1.5)
+			draw_line(p + Vector2(4.0, -3.5), p + Vector2(10.0, -5.0), c, 1.5)
+			draw_line(p + Vector2(-11.0, 0.5), p + Vector2(-4.0, -1.2), c, 1.5)
+			draw_line(p + Vector2(-4.0, -1.2), p + Vector2(4.0, 1.8), c, 1.5)
+			draw_line(p + Vector2(4.0, 1.8), p + Vector2(11.0, 0.0), c, 1.5)
+			draw_line(p + Vector2(-9.0, 6.0), p + Vector2(-2.0, 4.5), c, 1.5)
+			draw_line(p + Vector2(-2.0, 4.5), p + Vector2(5.0, 7.2), c, 1.5)
+			draw_line(p + Vector2(5.0, 7.2), p + Vector2(9.5, 5.5), c, 1.5)
 		"switch":
 			var is_pressed: bool = bool(m.get("pressed", false))
 			var c := Color(SWITCH_COLOR.r, SWITCH_COLOR.g, SWITCH_COLOR.b, a * (0.45 if is_pressed else 1.0))

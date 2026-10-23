@@ -66,6 +66,124 @@ func show_death_screen(killer_type: int = -1) -> void:
 		$DeathScreen.open(killer_type)
 
 
+# Smooth level exit dissolve transition before loading next depth
+func play_level_exit_transition(on_complete: Callable) -> void:
+	var sfx_mgr := get_node_or_null("../SfxManager") as SfxManager
+	if sfx_mgr != null:
+		sfx_mgr.play_level_exit()
+	var curtain := ColorRect.new()
+	curtain.set_anchors_preset(Control.PRESET_FULL_RECT)
+	curtain.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	curtain.color = Color(0.0, 0.02, 0.05, 0.0)
+	add_child(curtain)
+
+	var tw := create_tween()
+	tw.tween_property(curtain, "color:a", 1.0, 0.28).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_callback(func():
+		on_complete.call()
+		curtain.queue_free()
+	)
+
+
+# Grand campaign victory celebration when conquering Depth 13
+func show_victory_screen() -> void:
+	if has_node("SettingsModal") and $SettingsModal.visible:
+		$SettingsModal.visible = false
+	if _sector_badge != null:
+		_sector_badge.visible = false
+	if has_node("PauseBtn"):
+		$PauseBtn.visible = false
+	if has_node("SneakBtn"):
+		$SneakBtn.visible = false
+	if has_node("SoundBtn"):
+		$SoundBtn.visible = false
+
+	var sfx_mgr := get_node_or_null("../SfxManager") as SfxManager
+	if sfx_mgr != null:
+		sfx_mgr.play_victory_fanfare()
+
+	get_tree().paused = true
+
+	var victory_root := Control.new()
+	victory_root.process_mode = Node.PROCESS_MODE_ALWAYS
+	victory_root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	victory_root.modulate.a = 0.0
+	add_child(victory_root)
+
+	var bg := ColorRect.new()
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.color = Color(0.02, 0.05, 0.09, 0.94)
+	victory_root.add_child(bg)
+
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	victory_root.add_child(center)
+
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(460.0, 360.0)
+	center.add_child(panel)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 16)
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	panel.add_child(vbox)
+
+	var tag := Label.new()
+	tag.text = "◈   T H E   L I G H T   R E T U R N S   ◈"
+	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tag.add_theme_color_override("font_color", Color(1.0, 0.82, 0.35, 0.9))
+	tag.add_theme_font_size_override("font_size", 12)
+	vbox.add_child(tag)
+
+	var title := Label.new()
+	title.text = "SURFACE REACHED"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_color_override("font_color", Color(1.0, 0.94, 0.8, 1.0))
+	title.add_theme_color_override("font_shadow_color", Color(0.9, 0.55, 0.15, 0.6))
+	title.add_theme_constant_override("shadow_offset_y", 2)
+	title.add_theme_font_size_override("font_size", 34)
+	vbox.add_child(title)
+
+	var sep := ColorRect.new()
+	sep.custom_minimum_size = Vector2(260.0, 2.0)
+	sep.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	sep.color = Color(1.0, 0.78, 0.3, 0.75)
+	vbox.add_child(sep)
+
+	var desc := Label.new()
+	desc.text = "You traversed all 13 depths of the subterranean labyrinth.\nGuided only by acoustic echoes in the pitch-black darkness,\nyou silenced every terror and emerged back into the sun."
+	desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	desc.add_theme_color_override("font_color", Color(0.78, 0.88, 0.98, 0.88))
+	desc.add_theme_font_size_override("font_size", 13)
+	vbox.add_child(desc)
+
+	var actions := HBoxContainer.new()
+	actions.add_theme_constant_override("separation", 16)
+	actions.alignment = BoxContainer.ALIGNMENT_CENTER
+	vbox.add_child(actions)
+
+	var replay_btn := Button.new()
+	replay_btn.custom_minimum_size = Vector2(160.0, 44.0)
+	replay_btn.text = "REPLAY DEPTH 13"
+	replay_btn.focus_mode = Control.FOCUS_NONE
+	replay_btn.pressed.connect(func():
+		GameState.restart_level()
+	)
+	actions.add_child(replay_btn)
+
+	var menu_btn := Button.new()
+	menu_btn.custom_minimum_size = Vector2(160.0, 44.0)
+	menu_btn.text = "RETURN TO MENU"
+	menu_btn.focus_mode = Control.FOCUS_NONE
+	menu_btn.pressed.connect(func():
+		GameState.go_to_menu()
+	)
+	actions.add_child(menu_btn)
+
+	var tw := create_tween()
+	tw.tween_property(victory_root, "modulate:a", 1.0, 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+
 func _build_sector_badge() -> void:
 	_sector_badge = Label.new()
 	_sector_badge.position = Vector2(38.0, 52.0)

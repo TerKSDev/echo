@@ -1,14 +1,14 @@
 [gd_scene format=4 uid="uid://dbt8mwewd4s0j"]
 
-[ext_resource type="Script" uid="uid://doi52335aclw8" path="res://scripts/level/LevelRoot.gd" id="1_p0vsl"]
+[ext_resource type="Script" uid="uid://doi52335aclw8" path="res://systems/level/LevelRoot.gd" id="1_p0vsl"]
 [ext_resource type="TileSet" uid="uid://0kitrq7qjdh5" path="res://tilesets/echo_tileset.tres" id="2_ngl01"]
-[ext_resource type="Script" uid="uid://dlpb0h4lai6o0" path="res://scripts/level/LevelMarker.gd" id="3_wq170"]
+[ext_resource type="Script" uid="uid://dlpb0h4lai6o0" path="res://systems/level/LevelMarker.gd" id="3_wq170"]
 [ext_resource type="PackedScene" path="res://characters/enemy/enemy_chaser.tscn" id="4_ngl01"]
 
 [node name="Level" type="Node2D" unique_id=658734001]
 script = ExtResource("1_p0vsl")
-level_name = "斜面"
-hint = "斜墙会把回声滑向远处。顺着台阶听，出口在最底下。"
+level_name = "BEVELED CHUTE"
+hint = "Angled walls deflect your echo into the deep. Follow the descending steps to the bottom exit."
 
 [node name="EnemyChaser" parent="." unique_id=577495204 instance=ExtResource("4_ngl01")]
 position = Vector2(50, 48)

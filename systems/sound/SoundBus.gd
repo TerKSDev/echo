@@ -55,7 +55,10 @@ func _on_player_sound(pos: Vector2, loudness: float, is_voice: bool) -> void:
 
 	var radius := BASE_RADIUS + loudness * RADIUS_PER_LOUDNESS
 	var exclude: Array[RID] = [_player.get_rid()]
-	_echo.emit_echo(pos, radius, exclude, is_voice)
+	var w_col := Color(0.3, 1.0, 1.0)
+	if is_instance_valid(_player) and _player.get("water_count") != null and _player.water_count > 0 and not is_voice:
+		w_col = Color(0.28, 0.75, 1.0)
+	_echo.emit_echo(pos, radius, exclude, is_voice, w_col)
 	for enemy in _enemies():
 		enemy.on_sound(pos, loudness, radius, is_voice)
 
