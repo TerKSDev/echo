@@ -313,7 +313,7 @@ func _play_spatial(stream: AudioStreamWAV, pos: Vector2, volume_db: float, pitch
 # --- Procedural Waveform Synthesis -------------------------------------------
 
 func _build_all_streams() -> void:
-	if _cache.is_empty():
+	if not _cache.has("step_walk"):
 		_cache["step_walk"] = _synth_step_walk()
 		_cache["step_sneak"] = _synth_step_sneak()
 		_cache["enemy_step"] = _synth_enemy_step()
