@@ -3,6 +3,9 @@
 [ext_resource type="Script" uid="uid://doi52335aclw8" path="res://scripts/level/LevelRoot.gd" id="1_root"]
 [ext_resource type="TileSet" uid="uid://0kitrq7qjdh5" path="res://tilesets/echo_tileset.tres" id="2_ts"]
 [ext_resource type="Script" uid="uid://dlpb0h4lai6o0" path="res://scripts/level/LevelMarker.gd" id="3_mk"]
+[ext_resource type="PackedScene" path="res://characters/enemy/enemy_sleeper.tscn" id="4_0p6yj"]
+[ext_resource type="PackedScene" path="res://characters/enemy/enemy_patroller.tscn" id="5_mb5ji"]
+[ext_resource type="PackedScene" path="res://characters/enemy/enemy_listener.tscn" id="6_igpk3"]
 
 [node name="Level" type="Node2D" unique_id=1095609693]
 script = ExtResource("1_root")
@@ -25,3 +28,13 @@ position = Vector2(1168, 144)
 script = ExtResource("3_mk")
 
 [node name="Enemies" type="Node2D" parent="." unique_id=1260305435]
+
+[node name="EnemySleeper" parent="." unique_id=502404194 instance=ExtResource("4_0p6yj")]
+position = Vector2(656, 112)
+
+[node name="EnemyPatroller" parent="." unique_id=171719280 instance=ExtResource("5_mb5ji")]
+position = Vector2(880, 592)
+patrol_points = Array[Vector2]([Vector2(880, 592), Vector2(1072, 592)])
+
+[node name="EnemyListener" parent="." unique_id=1123400602 instance=ExtResource("6_igpk3")]
+position = Vector2(1136, 176)

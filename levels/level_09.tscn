@@ -1,9 +1,10 @@
-[gd_scene format=4]
+[gd_scene format=4 uid="uid://de4nwrux1wrvs"]
 
-[ext_resource type="Script" path="res://scripts/level/LevelRoot.gd" id="1_hpfrn"]
-[ext_resource type="TileSet" path="res://tilesets/echo_tileset.tres" id="2_voxu1"]
-[ext_resource type="Script" path="res://scripts/level/LevelMarker.gd" id="3_lpedq"]
-[ext_resource type="Script" path="res://scripts/level/EnemySpawn.gd" id="4_sepjv"]
+[ext_resource type="Script" uid="uid://doi52335aclw8" path="res://scripts/level/LevelRoot.gd" id="1_hpfrn"]
+[ext_resource type="TileSet" uid="uid://0kitrq7qjdh5" path="res://tilesets/echo_tileset.tres" id="2_voxu1"]
+[ext_resource type="Script" uid="uid://dlpb0h4lai6o0" path="res://scripts/level/LevelMarker.gd" id="3_lpedq"]
+[ext_resource type="PackedScene" path="res://characters/enemy/enemy_chaser.tscn" id="4_voxu1"]
+[ext_resource type="PackedScene" path="res://characters/enemy/enemy_sleeper.tscn" id="5_lpedq"]
 
 [node name="Level" type="Node2D" unique_id=196393889]
 script = ExtResource("1_hpfrn")
@@ -62,9 +63,20 @@ script = ExtResource("3_lpedq")
 kind = 3
 link_id = "a"
 
-[node name="Enemies" type="Node2D" parent="." unique_id=1515151248]
+[node name="EnemyChaser" parent="." unique_id=860476369 instance=ExtResource("4_voxu1")]
+position = Vector2(77, 849)
 
-[node name="EnemySpawn_Example" type="Marker2D" parent="Enemies" unique_id=1261774725]
-position = Vector2(112, 48)
-script = ExtResource("4_sepjv")
-spawn_on_level_start = false
+[node name="EnemyChaser2" parent="." unique_id=639425774 instance=ExtResource("4_voxu1")]
+position = Vector2(80, 753)
+
+[node name="EnemyChaser3" parent="." unique_id=1441140508 instance=ExtResource("4_voxu1")]
+position = Vector2(656, 720)
+
+[node name="EnemyChaser4" parent="." unique_id=1571393721 instance=ExtResource("4_voxu1")]
+position = Vector2(242, 787)
+
+[node name="EnemySleeper" parent="." unique_id=633746978 instance=ExtResource("5_lpedq")]
+position = Vector2(656, 592)
+
+[node name="EnemySleeper2" parent="." unique_id=286071057 instance=ExtResource("5_lpedq")]
+position = Vector2(753, 593)
