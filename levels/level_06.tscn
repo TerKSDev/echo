@@ -1,9 +1,11 @@
-[gd_scene format=4]
+[gd_scene format=4 uid="uid://dvhtoyfmxhier"]
 
-[ext_resource type="Script" path="res://systems/level/LevelRoot.gd" id="1_up3qn"]
-[ext_resource type="TileSet" path="res://tilesets/echo_tileset.tres" id="2_g8tau"]
-[ext_resource type="Script" path="res://systems/level/LevelMarker.gd" id="3_j8rst"]
-[ext_resource type="Script" path="res://systems/level/EnemySpawn.gd" id="4_ifoay"]
+[ext_resource type="Script" uid="uid://doi52335aclw8" path="res://systems/level/LevelRoot.gd" id="1_up3qn"]
+[ext_resource type="TileSet" uid="uid://0kitrq7qjdh5" path="res://tilesets/echo_tileset.tres" id="2_g8tau"]
+[ext_resource type="Script" uid="uid://dlpb0h4lai6o0" path="res://systems/level/LevelMarker.gd" id="3_j8rst"]
+[ext_resource type="PackedScene" path="res://characters/enemy/enemy_patroller.tscn" id="5_ifoay"]
+[ext_resource type="PackedScene" path="res://characters/enemy/enemy_listener.tscn" id="6_nox4o"]
+[ext_resource type="PackedScene" path="res://characters/enemy/enemy_sleeper.tscn" id="7_qadnc"]
 
 [node name="Level" type="Node2D" unique_id=840278840]
 script = ExtResource("1_up3qn")
@@ -37,9 +39,12 @@ script = ExtResource("3_j8rst")
 kind = 3
 link_id = "a"
 
-[node name="Enemies" type="Node2D" parent="." unique_id=205334694]
+[node name="EnemyPatroller" parent="." unique_id=1741222963 instance=ExtResource("5_ifoay")]
+position = Vector2(464, 176)
+patrol_points = Array[Vector2]([Vector2(464, 176), Vector2(464, 640)])
 
-[node name="EnemySpawn_Example" type="Marker2D" parent="Enemies" unique_id=1004813542]
-position = Vector2(240, 144)
-script = ExtResource("4_ifoay")
-spawn_on_level_start = false
+[node name="EnemyListener" parent="." unique_id=326411710 instance=ExtResource("6_nox4o")]
+position = Vector2(656, 656)
+
+[node name="EnemySleeper" parent="." unique_id=1654690842 instance=ExtResource("7_qadnc")]
+position = Vector2(848, 464)
