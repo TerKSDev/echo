@@ -13,10 +13,12 @@ const MIN_BOUNCE_REMAINING := 20.0
 const WATER_COLOR := Color(0.35, 0.68, 1.0)
 const SWITCH_COLOR := Color(1.0, 0.72, 0.18)
 const DOOR_COLOR := Color(1.0, 0.85, 0.22)
+const MAX_MOTE_PARTICLES := 180
 
 var points: Array = []
 var waves: Array = []
 var marks: Array = []
+var motes: Array = []
 var _was_active := false
 
 
@@ -24,6 +26,7 @@ func clear_all() -> void:
 	points.clear()
 	waves.clear()
 	marks.clear()
+	motes.clear()
 	queue_redraw()
 
 func emit_echo(origin: Vector2, radius: float, exclude: Array = [], show_wave: bool = true, wave_color: Color = Color(0.3, 1.0, 1.0)) -> void:
@@ -113,15 +116,18 @@ func emit_echo(origin: Vector2, radius: float, exclude: Array = [], show_wave: b
 				elif bounce > 0:
 					pt_col = wave_color.lerp(Color(0.18, 0.62, 0.98), 0.42)
 				var arc_spacing: float = clampf(cum_dist * TAU / float(ray_count) * 0.58, 3.0, 6.8)
+				var rock_angle_jitter: float = randf_range(-0.16, 0.16)
+				var rock_tan: Vector2 = tan_vec.rotated(rock_angle_jitter)
 				points.append({
 					"pos": hit_pos,
-					"tan": tan_vec,
+					"tan": rock_tan,
 					"norm": normal,
-					"hlen": arc_spacing,
+					"hlen": arc_spacing * randf_range(0.85, 1.15),
 					"age": -cum_dist / WAVE_SPEED,
 					"strength": hit_strength,
 					"col": pt_col,
-					"bounce": bounce
+					"bounce": bounce,
+					"crag": randf() # Natural rock fissure variation
 				})
 
 			if normal == Vector2.ZERO:
@@ -140,6 +146,26 @@ func emit_echo(origin: Vector2, radius: float, exclude: Array = [], show_wave: b
 			"col": wave_color,
 			"clip": wave_clip_dists
 		})
+
+		# Spawn airborne cavern dust motes and moisture droplets along unblocked sound paths
+		var mote_count := int(clampf(radius * 0.08, 6.0, 32.0))
+		for _m in mote_count:
+			var rand_angle := randf() * TAU
+			var ray_idx: int = clampi(int(rand_angle / TAU * float(ray_count)), 0, ray_count - 1)
+			var max_unblocked: float = wave_clip_dists[ray_idx]
+			if max_unblocked > 20.0:
+				var dist_along := randf_range(16.0, max_unblocked * 0.95)
+				var mote_pos := origin + Vector2.from_angle(rand_angle) * dist_along
+				motes.append({
+					"pos": mote_pos,
+					"vel": Vector2.from_angle(rand_angle) * randf_range(6.0, 22.0) + Vector2(randf_range(-4.0, 4.0), randf_range(-12.0, -3.0)),
+					"age": -dist_along / WAVE_SPEED, # awakens right when the sound wave sweeps through
+					"life": randf_range(0.9, 1.8),
+					"size": randf_range(1.0, 2.2),
+					"col": wave_color.lerp(Color(0.7, 0.92, 1.0), randf_range(0.2, 0.7))
+				})
+		if motes.size() > MAX_MOTE_PARTICLES:
+			motes = motes.slice(motes.size() - MAX_MOTE_PARTICLES)
 
 	if points.size() > MAX_POINTS:
 		points = points.slice(points.size() - MAX_POINTS)
@@ -252,7 +278,7 @@ func _reveal_features(space: PhysicsDirectSpaceState2D, origin: Vector2, max_dis
 
 # Update the age of each point and remove old points
 func _process(delta):
-	var is_active: bool = not points.is_empty() or not waves.is_empty() or not marks.is_empty()
+	var is_active: bool = not points.is_empty() or not waves.is_empty() or not marks.is_empty() or not motes.is_empty()
 	if not is_active:
 		if _was_active:
 			_was_active = false
@@ -271,7 +297,14 @@ func _process(delta):
 	for w in waves:
 		w["age"] += delta
 	waves = waves.filter(func(w): return w["age"] * WAVE_SPEED < w["max_radius"])
-	
+
+	for mt in motes:
+		mt["age"] += delta
+		if mt["age"] > 0.0:
+			mt["pos"] = Vector2(mt["pos"]) + Vector2(mt["vel"]) * delta
+			mt["vel"] = Vector2(mt["vel"]).move_toward(Vector2(0.0, -4.0), delta * 12.0)
+	motes = motes.filter(func(mt): return mt["age"] < float(mt["life"]))
+
 	queue_redraw()
 
 # Draw the points with arrival shimmer and fading alpha based on their age
@@ -322,6 +355,30 @@ func _draw():
 		draw_line(p1, p2, Color(line_col.r, line_col.g, line_col.b, alpha * 0.95), MARK_WIDTH + impact * 0.8)
 		if impact > 0.08:
 			draw_circle(lp, 1.6 + impact * 1.2, Color(1.0, 1.0, 1.0, alpha * impact * 0.75))
+
+		# 3. Natural cavern cliff fracture: tiny rock crevices & mineral speckle
+		var crag_val: float = float(p.get("crag", 0.0))
+		if crag_val > 0.45 and norm_vec != Vector2.ZERO:
+			var crack_len: float = (crag_val - 0.45) * 8.0
+			var crack_tip: Vector2 = lp - norm_vec * crack_len + tan_vec * ((crag_val - 0.7) * 6.0)
+			draw_line(lp, crack_tip, Color(line_col.r, line_col.g, line_col.b, alpha * 0.45), 1.0)
+
+	# 3. Airborne cavern moisture motes and bio-dust awakened in unblocked areas
+	for mt in motes:
+		var mt_age: float = float(mt["age"])
+		if mt_age <= 0.0:
+			continue
+		var mt_pos := Vector2(mt["pos"])
+		if has_cull and not cull_rect.has_point(mt_pos):
+			continue
+		var life: float = float(mt["life"])
+		var progress: float = clampf(mt_age / life, 0.0, 1.0)
+		var mote_alpha: float = sin(progress * PI) * 0.75
+		var m_lp: Vector2 = to_local(mt_pos)
+		var m_sz: float = float(mt["size"])
+		var m_col: Color = mt.get("col", Color(0.6, 0.9, 1.0))
+		draw_circle(m_lp, m_sz * 1.8, Color(m_col.r, m_col.g, m_col.b, mote_alpha * 0.22))
+		draw_circle(m_lp, m_sz, Color(m_col.r, m_col.g, m_col.b, mote_alpha * 0.9))
 
 	for w in waves:
 		var radius: float = float(w["age"]) * WAVE_SPEED
