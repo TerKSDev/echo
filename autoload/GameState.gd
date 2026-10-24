@@ -6,6 +6,7 @@ extends Node
 const MENU_SCENE := "res://ui/menu.tscn"
 const MAIN_SCENE := "res://scenes/main.tscn"
 const SETTINGS_PATH := "user://settings.cfg"
+const PROGRESS_PATH := "user://level_progress.cfg"
 
 const LEVELS: Array[String] = [
 	"res://levels/level_test.tscn",
@@ -25,6 +26,7 @@ const LEVELS: Array[String] = [
 ]
 
 var current_level := 0
+var highest_unlocked_level := 1
 var master_volume := 1.0
 var mic_enabled := true
 var mic_sensitivity := 0.5        # 0.0 (low/strict) .. 1.0 (high/sensitive)
@@ -34,6 +36,7 @@ var mic_calibrated := false
 
 func _ready() -> void:
 	load_settings()
+	load_progress()
 
 
 # Effective dB threshold required to trigger a voice echo
@@ -104,3 +107,40 @@ func restart_level() -> void:
 func go_to_menu() -> void:
 	get_tree().paused = false
 	get_tree().change_scene_to_file(MENU_SCENE)
+
+func load_progress() -> void:
+	var cfg := ConfigFile.new()
+	
+	if cfg.load(PROGRESS_PATH) != OK:
+		highest_unlocked_level = 1
+		return
+
+	highest_unlocked_level = clampi(
+		int(cfg.get_value("progress", "highest_unlocked_level", 1)),
+		1,
+		13
+	)
+
+
+func complete_level(level_number: int) -> void:
+	# 只接受正式关卡 1 到 13。
+	if level_number < 1 or level_number > 13:
+		return
+
+	# 完成当前关卡后开放下一关。
+	# 完成第 13 关时，仍然记录最高解锁关卡为 13。
+	var next_unlocked := mini(level_number + 1, 13)
+
+	if next_unlocked > highest_unlocked_level:
+		highest_unlocked_level = next_unlocked
+
+	var cfg := ConfigFile.new()
+	cfg.set_value(
+		"progress",
+		"highest_unlocked_level",
+		highest_unlocked_level
+	)
+	var error := cfg.save(PROGRESS_PATH)
+
+	if error != OK:
+		push_error("Failed to save level progress: %s" % error)

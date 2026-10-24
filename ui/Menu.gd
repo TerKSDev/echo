@@ -151,6 +151,7 @@ func _wire_button_Juice(btn: Button) -> void:
 # --- Button Actions ----------------------------------------------------------
 
 func _on_start_pressed() -> void:
+	get_tree().change_scene_to_file("res://ui/level_select.tscn")
 	_open_modal("SELECT DEPTH", "CHOOSE CAVERN SECTOR")
 
 	# Test arena button at top
@@ -377,7 +378,7 @@ func _on_how_to_play_pressed() -> void:
 
 
 func _on_credits_pressed() -> void:
-	_open_modal("CREDITS", "ECHO: SOUND IN THE DARKNESS")
+	_open_modal("CREDITS", "ECHO: STAY SILENT")
 
 	var desc := Label.new()
 	desc.text = "An atmospheric acoustic stealth survival experience.\nNavigate the abyss using only sound waves—where every echo illuminates the path, yet beckons what lurks in the dark."

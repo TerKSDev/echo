@@ -1,0 +1,120 @@
+[gd_scene format=3 uid="uid://dy5ppbyg3rm3n"]
+
+[ext_resource type="Theme" uid="uid://c6y7u4n8raw2e" path="res://ui/echo_theme.tres" id="1_o7pgs"]
+[ext_resource type="Script" uid="uid://b60g1gqwrcui4" path="res://ui/LevelSelect.gd" id="2_2cjkr"]
+[ext_resource type="Texture2D" uid="uid://cuprl0tej7njc" path="res://assets/cave_background.png" id="3_4dsvd"]
+
+[node name="LevelSelect" type="Control" unique_id=992780845]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("1_o7pgs")
+script = ExtResource("2_2cjkr")
+
+[node name="Background" type="TextureRect" parent="." unique_id=1035382875]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("3_4dsvd")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="ShadeOverlay" type="ColorRect" parent="." unique_id=361162402]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.01, 0.04, 0.09, 0.42)
+
+[node name="SonarBackdrop" type="Control" parent="." unique_id=88210119]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="TopBar" type="HBoxContainer" parent="." unique_id=336351312]
+layout_mode = 0
+offset_left = 25.0
+offset_top = 50.0
+offset_right = 695.0
+offset_bottom = 110.0
+offset_transform_enabled = true
+theme_override_constants/separation = 500
+
+[node name="BackButton" type="Button" parent="TopBar" unique_id=1501365221]
+custom_minimum_size = Vector2(60, 60)
+layout_mode = 2
+size_flags_horizontal = 4
+focus_mode = 0
+theme_override_font_sizes/font_size = 24
+text = "🢀"
+
+[node name="TestArenaButton" type="Button" parent="TopBar" unique_id=558461408]
+custom_minimum_size = Vector2(110, 60)
+layout_mode = 2
+size_flags_horizontal = 4
+focus_mode = 0
+theme_override_font_sizes/font_size = 24
+text = "🎯 TEST"
+
+[node name="CenterContainer" type="CenterContainer" parent="." unique_id=2067062267]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -320.0
+offset_top = -490.0
+offset_right = 320.0
+offset_bottom = 448.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Content" type="VBoxContainer" parent="CenterContainer" unique_id=310439246]
+custom_minimum_size = Vector2(640, 0)
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Title" type="Label" parent="CenterContainer/Content" unique_id=858087850]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.72, 0.94, 1, 1)
+theme_override_colors/font_shadow_color = Color(0.05, 0.35, 0.68, 0.65)
+theme_override_colors/font_outline_color = Color(0.18, 0.62, 0.92, 0.45)
+theme_override_constants/shadow_offset_x = 0
+theme_override_constants/shadow_offset_y = 4
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 30
+text = "SELECT YOUR DEPTH"
+horizontal_alignment = 1
+
+[node name="Subtitle" type="Label" parent="CenterContainer/Content" unique_id=848432811]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.68, 0.84, 0.96, 0.85)
+theme_override_font_sizes/font_size = 24
+text = "CHOOSE YOUR CAVERN SECTOR"
+horizontal_alignment = 1
+
+[node name="ScrollContainer" type="ScrollContainer" parent="CenterContainer/Content" unique_id=894529486]
+custom_minimum_size = Vector2(0, 830)
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="LevelGrid" type="GridContainer" parent="CenterContainer/Content/ScrollContainer" unique_id=560705883]
+layout_mode = 2
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 12
+columns = 2
