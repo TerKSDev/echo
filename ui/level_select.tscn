@@ -33,7 +33,7 @@ fill_to = Vector2(0.5, 0.76)
 
 [sub_resource type="Gradient" id="Gradient_shade"]
 offsets = PackedFloat32Array(0, 0.1, 0.25, 0.82, 1)
-colors = PackedColorArray(0.01, 0.03, 0.07, 0.32, 0.01, 0.03, 0.07, 0.46, 0.01, 0.03, 0.07, 0.72, 0.01, 0.03, 0.07, 0.72, 0.01, 0.03, 0.07, 0.45)
+colors = PackedColorArray(0.01, 0.03, 0.07, 0.22, 0.01, 0.03, 0.07, 0.35, 0.01, 0.03, 0.07, 0.48, 0.01, 0.03, 0.07, 0.48, 0.01, 0.03, 0.07, 0.32)
 
 [sub_resource type="GradientTexture2D" id="GradientTexture2D_shade"]
 gradient = SubResource("Gradient_shade")
