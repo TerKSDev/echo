@@ -215,15 +215,40 @@ func echo_features() -> Array:
 	for c in water_cells:
 		_echo_features_cache.append({"type": "water", "pos": cell_to_world(c)})
 	for c in switch_cells:
-		_echo_features_cache.append({"type": "switch", "pos": cell_to_world(c), "pressed": pressed.has(c)})
+		var sid: String = str(switch_cells[c]).to_upper()
+		_echo_features_cache.append({"type": "switch", "pos": cell_to_world(c), "pressed": pressed.has(c), "id": sid, "color": link_color(sid)})
 	for id in door_nodes:
 		for body in door_nodes[id]:
-			if is_instance_valid(body) and not body.has_meta("open"):
-				_echo_features_cache.append({"type": "door", "pos": body.global_position, "body": body})
+			if not is_instance_valid(body):
+				continue
+			if body.has_meta("open"):
+				_echo_features_cache.append({"type": "door", "pos": body.global_position, "open": true, "id": id, "color": link_color(id)})
+			else:
+				_echo_features_cache.append({"type": "door", "pos": body.global_position, "body": body, "open": false, "id": id, "color": link_color(id)})
 	if has_exit:
 		_echo_features_cache.append({"type": "exit", "pos": cell_to_world(exit_cell)})
 	_echo_features_dirty = false
 	return _echo_features_cache
+
+
+# Door and key with the same link id share one colour.
+const LINK_COLORS := {
+	"A": Color(1.0, 0.82, 0.2),
+	"B": Color(0.3, 0.9, 1.0),
+	"C": Color(1.0, 0.4, 0.85),
+	"D": Color(0.45, 1.0, 0.4),
+	"E": Color(1.0, 0.35, 0.3),
+	"F": Color(0.7, 0.5, 1.0),
+	"G": Color(1.0, 0.6, 0.2),
+	"H": Color(0.95, 0.95, 0.95),
+}
+
+
+func link_color(id: String) -> Color:
+	var key: String = id.strip_edges().to_upper()
+	if LINK_COLORS.has(key):
+		return LINK_COLORS[key]
+	return Color.from_hsv(fmod(float(absi(key.hash()) % 360) / 360.0, 1.0), 0.6, 1.0)
 
 
 func cell_to_world(cell: Vector2i) -> Vector2:
