@@ -169,58 +169,7 @@ func _on_start_pressed() -> void:
 		return
 	_play_ui_sound(_wav_start, -4.0, 1.0)
 	Input.vibrate_handheld(35)
-
-	if start_button != null:
-		var spawn_pos: Vector2 = start_button.global_position + start_button.size * 0.5
-		_ripples.append({"pos": spawn_pos, "age": 0.0, "max_r": 520.0, "alpha": 0.85})
-
-	_open_modal("SELECT DEPTH", "CHOOSE CAVERN SECTOR")
-
-	# Test arena button at top
-	var test_btn := Button.new()
-	test_btn.custom_minimum_size = Vector2(0, 42)
-	test_btn.focus_mode = Control.FOCUS_NONE
-	test_btn.text = "TEST ARENA (ALL MONSTERS SANDBOX)"
-	test_btn.add_theme_font_size_override("font_size", 13)
-	test_btn.pressed.connect(func():
-		GameState.start_game(0)
-	)
-	_wire_button_Juice(test_btn)
-	_modal_body.add_child(test_btn)
-
-	# 13-Level Grid
-	var grid := GridContainer.new()
-	grid.columns = 2
-	grid.add_theme_constant_override("h_separation", 10)
-	grid.add_theme_constant_override("v_separation", 10)
-	_modal_body.add_child(grid)
-
-	for i in range(1, TOTAL_LEVEL_COUNT + 1):
-		var lvl_path: String = "res://levels/level_%02d.tscn" % i
-		var exists: bool = ResourceLoader.exists(lvl_path)
-		var btn := Button.new()
-		btn.custom_minimum_size = Vector2(195, 42)
-		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		btn.focus_mode = Control.FOCUS_NONE
-		btn.add_theme_font_size_override("font_size", 14)
-		btn.text = "DEPTH %02d" % i
-		if not exists:
-			btn.modulate = Color(0.65, 0.75, 0.88, 0.7)
-		btn.pressed.connect(func():
-			_launch_level_by_number(i, lvl_path)
-		)
-		_wire_button_Juice(btn)
-		grid.add_child(btn)
-
-
-func _launch_level_by_number(level_num: int, lvl_path: String) -> void:
-	var idx: int = GameState.LEVELS.find(lvl_path)
-	if idx != -1:
-		GameState.start_game(idx)
-	elif level_num < GameState.LEVELS.size():
-		GameState.start_game(level_num)
-	else:
-		GameState.start_game(0)
+	get_tree().change_scene_to_file("res://ui/level_select.tscn")
 
 
 func _on_settings_pressed() -> void:
@@ -400,7 +349,7 @@ func _on_how_to_play_pressed() -> void:
 
 
 func _on_credits_pressed() -> void:
-	_open_modal("CREDITS", "ECHO: SOUND IN THE DARKNESS")
+	_open_modal("CREDITS", "ECHO: STAY SILENT")
 
 	var desc := Label.new()
 	desc.text = "An atmospheric acoustic stealth survival experience.\nNavigate the abyss using only sound waves—where every echo illuminates the path, yet beckons what lurks in the dark."

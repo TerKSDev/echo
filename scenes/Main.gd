@@ -184,13 +184,16 @@ func _physics_process(_delta: float) -> void:
 		_press_switch(c)
 	if has_exit and c == exit_cell:
 		_changing = true
+		# Record progress for campaign depths (1..13)
+		if GameState.current_level >= 1 and GameState.current_level <= 13:
+			GameState.complete_level(GameState.current_level)
+
 		if GameState.has_next_level():
 			hud.play_level_exit_transition(func():
 				GameState.next_level()
 			)
 		else:
 			hud.show_victory_screen()
-
 
 func _press_switch(cell: Vector2i) -> void:
 	pressed[cell] = true
