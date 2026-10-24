@@ -9,7 +9,7 @@
 
 [node name="Level" type="Node2D" unique_id=1815838834]
 script = ExtResource("1_v8g0a")
-level_name = "MIRRORED HALLS"
+level_name = "SCREAMER NEST"
 hint = "Left and right look nearly identical, yet their openings differ. Two switches, two sealed gates."
 
 [node name="Walls" type="TileMapLayer" parent="." unique_id=624193526]

@@ -1,0 +1,215 @@
+[gd_scene format=3 uid="uid://qatana21f57u"]
+
+[ext_resource type="Theme" uid="uid://c6y7u4n8raw2e" path="res://ui/echo_theme.tres" id="1_theme"]
+[ext_resource type="Script" path="res://ui/SettingsScene.gd" id="2_script"]
+[ext_resource type="Texture2D" uid="uid://cuprl0tej7njc" path="res://assets/cave_background.png" id="3_bg"]
+
+[sub_resource type="CanvasItemMaterial" id="CanvasItemMaterial_top_light"]
+blend_mode = 1
+
+[sub_resource type="Gradient" id="Gradient_top_light"]
+offsets = PackedFloat32Array(0, 0.4, 0.8, 1)
+colors = PackedColorArray(0.18, 0.35, 0.48, 0.22, 0.08, 0.2, 0.32, 0.12, 0.02, 0.08, 0.15, 0.04, 0, 0, 0, 0)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_top_light"]
+gradient = SubResource("Gradient_top_light")
+width = 256
+height = 256
+fill = 1
+fill_from = Vector2(0.51, 0)
+fill_to = Vector2(0.51, 0.45)
+
+[sub_resource type="Gradient" id="Gradient_bottom_light"]
+offsets = PackedFloat32Array(0, 0.55, 1)
+colors = PackedColorArray(0.12, 0.42, 0.65, 0.22, 0.04, 0.2, 0.36, 0.08, 0, 0, 0, 0)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_bottom_light"]
+gradient = SubResource("Gradient_bottom_light")
+width = 256
+height = 256
+fill = 1
+fill_from = Vector2(0.5, 1)
+fill_to = Vector2(0.5, 0.76)
+
+[sub_resource type="Gradient" id="Gradient_shade"]
+offsets = PackedFloat32Array(0, 0.1, 0.25, 0.82, 1)
+colors = PackedColorArray(0.01, 0.025, 0.05, 0.46, 0.01, 0.025, 0.05, 0.56, 0.01, 0.025, 0.05, 0.62, 0.01, 0.025, 0.05, 0.58, 0.01, 0.025, 0.05, 0.46)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_shade"]
+gradient = SubResource("Gradient_shade")
+width = 32
+height = 256
+fill_from = Vector2(0.5, 0)
+fill_to = Vector2(0.5, 1)
+
+[node name="SettingsScene" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("1_theme")
+script = ExtResource("2_script")
+
+[node name="Background" type="TextureRect" parent="."]
+modulate = Color(0.68, 0.74, 0.80, 0.95)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("3_bg")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="TopLight" type="TextureRect" parent="."]
+material = SubResource("CanvasItemMaterial_top_light")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = SubResource("GradientTexture2D_top_light")
+expand_mode = 1
+
+[node name="BottomLight" type="TextureRect" parent="."]
+material = SubResource("CanvasItemMaterial_top_light")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = SubResource("GradientTexture2D_bottom_light")
+expand_mode = 1
+
+[node name="ShadeOverlay" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = SubResource("GradientTexture2D_shade")
+expand_mode = 1
+
+[node name="SonarBackdrop" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="TopBar" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 24.0
+offset_top = 34.0
+offset_right = -24.0
+offset_bottom = 90.0
+grow_horizontal = 2
+theme_override_constants/separation = 14
+
+[node name="BackButton" type="Button" parent="TopBar"]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+size_flags_vertical = 4
+focus_mode = 0
+flat = true
+
+[node name="TitleBox" type="VBoxContainer" parent="TopBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 2
+alignment = 1
+
+[node name="Title" type="Label" parent="TopBar/TitleBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.96, 1, 1)
+theme_override_font_sizes/font_size = 20
+text = "SYSTEM SETTINGS"
+
+[node name="Subtitle" type="Label" parent="TopBar/TitleBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.45, 0.76, 1, 0.78)
+theme_override_font_sizes/font_size = 11
+text = "EXPEDITION SUIT & ACOUSTIC SENSORS"
+
+[node name="TabBar" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 24.0
+offset_top = 118.0
+offset_right = -24.0
+offset_bottom = 162.0
+grow_horizontal = 2
+theme_override_constants/separation = 8
+
+[node name="TabGeneral" type="Button" parent="TabBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+focus_mode = 0
+theme_override_font_sizes/font_size = 12
+text = "GENERAL"
+
+[node name="TabControls" type="Button" parent="TabBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+focus_mode = 0
+theme_override_font_sizes/font_size = 12
+text = "CONTROLS"
+
+[node name="TabDisplay" type="Button" parent="TabBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+focus_mode = 0
+theme_override_font_sizes/font_size = 12
+text = "DISPLAY"
+
+[node name="TabAdvanced" type="Button" parent="TabBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+focus_mode = 0
+theme_override_font_sizes/font_size = 12
+text = "ADVANCED"
+
+[node name="MainArea" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 186.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ScrollContainer" type="ScrollContainer" parent="MainArea"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ContentMargin" type="MarginContainer" parent="MainArea/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 28
+theme_override_constants/margin_bottom = 40
+
+[node name="ContentBox" type="VBoxContainer" parent="MainArea/ScrollContainer/ContentMargin"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 20

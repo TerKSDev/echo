@@ -9,7 +9,7 @@
 
 [node name="Level" type="Node2D" unique_id=1469938229]
 script = ExtResource("1_ecwps")
-level_name = "CROSSROADS"
+level_name = "OBSIDIAN LABYRINTH"
 hint = "Four branches, only one leads out. Project a loud pulse and follow the deepest echo."
 
 [node name="Walls" type="TileMapLayer" parent="." unique_id=1628782678]

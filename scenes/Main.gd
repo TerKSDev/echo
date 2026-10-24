@@ -28,6 +28,10 @@ var pressed: Dictionary = {}
 var _echo_features_cache: Array = []
 var _echo_features_dirty := true
 
+var _level_time := 0.0
+var _sonar_pings := 0
+var _enemies_alerted := 0
+
 
 func _ready() -> void:
 	_load_level(GameState.current_level_path())
@@ -37,25 +41,46 @@ func _ready() -> void:
 	sound_bus.connect_enemies()
 	sfx.beat.connect(hud.pulse_vignette)
 	player.died.connect(_on_player_died)
+	player.sound_emitted.connect(_on_player_sound_emitted)
+	_connect_enemies_telemetry()
 	_play_entry_sequence()
+
+
+func _on_player_sound_emitted(_pos: Vector2, _loudness: float, is_voice: bool, _is_sneak: bool = false) -> void:
+	if is_voice and not _changing:
+		_sonar_pings += 1
+
+
+func _connect_enemies_telemetry() -> void:
+	for node in get_tree().get_nodes_in_group("enemy"):
+		var enemy := node as Enemy
+		if enemy != null and is_instance_valid(enemy):
+			if not enemy.alert_triggered.is_connected(_on_enemy_alert):
+				enemy.alert_triggered.connect(_on_enemy_alert)
+			if not enemy.woke_up.is_connected(_on_enemy_alert):
+				enemy.woke_up.connect(func(_p): _on_enemy_alert(enemy))
+			if not enemy.screamed.is_connected(_on_enemy_alert):
+				enemy.screamed.connect(func(_p, _r): _on_enemy_alert(enemy))
+			if not enemy.alarmed.is_connected(_on_enemy_alert):
+				enemy.alarmed.connect(func(_p, _t): _on_enemy_alert(enemy))
+
+
+func _on_enemy_alert(_enemy: Enemy) -> void:
+	if not _changing:
+		_enemies_alerted += 1
 
 
 func _play_entry_sequence() -> void:
 	sfx.play_level_intro()
 
-	# Format level title & subtitle banner
-	var path: String = GameState.current_level_path()
-	var title_text := "TEST ARENA"
-	var subtitle_text := "Listen closely. Stay unseen."
-	if path.find("level_") != -1 and path.find("test") == -1:
-		var num_str: String = path.get_file().get_basename().replace("level_", "")
-		title_text = "DEPTH %s" % num_str.to_upper()
-	elif GameState.current_level > 0:
-		title_text = "DEPTH %02d" % GameState.current_level
+	# Format level title & subtitle banner (uses sector name directly)
+	var cur_lvl := GameState.current_level
+	var title_text: String = GameState.get_level_name(cur_lvl)
+	var subtitle_text := "Stay calm. Stay silent."
 
 	if _level_root != null:
 		if _level_root.level_name != "" and _level_root.level_name != "UNTITLED" and _level_root.level_name != "未命名":
-			title_text = "%s  •  %s" % [title_text, _level_root.level_name]
+			title_text = _level_root.level_name
 		if _level_root.hint != "":
 			subtitle_text = _level_root.hint
 
@@ -106,13 +131,17 @@ func _load_level(path: String) -> void:
 		_ingest_markers()
 		_spawn_enemies()
 		player.global_position = cell_to_world(player_start_cell)
-		if "water_count" in player:
+		if player.has_method("reset_for_level"):
+			player.reset_for_level()
+		elif "water_count" in player:
 			player.water_count = 0
 	else:
 		# Optional spawn point: a Marker2D named "PlayerStart" inside the level
 		var start := level.get_node_or_null("PlayerStart") as Marker2D
 		if start != null:
 			player.global_position = start.global_position
+		if player.has_method("reset_for_level"):
+			player.reset_for_level()
 
 
 func _ingest_markers() -> void:
@@ -166,11 +195,14 @@ func _spawn_enemies() -> void:
 		spawn.spawn_enemy(_enemies)
 
 
-func _physics_process(_delta: float) -> void:
+func _physics_process(delta: float) -> void:
 	if _changing or _level_root == null or _level_root.walls == null or player == null or not is_instance_valid(player):
 		return
 	if "alive" in player and not bool(player.get("alive")):
 		return
+
+	_level_time += delta
+
 	var c: Vector2i = _level_root.walls.local_to_map(_level_root.walls.to_local(player.global_position))
 	if "water_count" in player:
 		player.water_count = 1 if water_cells.has(c) else 0
@@ -184,16 +216,26 @@ func _physics_process(_delta: float) -> void:
 		_press_switch(c)
 	if has_exit and c == exit_cell:
 		_changing = true
-		# Record progress for campaign depths (1..13)
-		if GameState.current_level >= 1 and GameState.current_level <= 13:
-			GameState.complete_level(GameState.current_level)
-
-		if GameState.has_next_level():
-			hud.play_level_exit_transition(func():
-				GameState.next_level()
-			)
-		else:
-			hud.show_victory_screen()
+		var debrief_data := GameState.record_level_clear(
+			GameState.current_level,
+			_level_time,
+			_sonar_pings,
+			_enemies_alerted
+		)
+		hud.show_debrief(
+			debrief_data,
+			func(): # On Next
+				if GameState.has_next_level():
+					hud.play_level_exit_transition(func():
+						GameState.next_level()
+					)
+				else:
+					hud.show_victory_screen(),
+			func(): # On Retry
+				GameState.restart_level(),
+			func(): # On Level Select
+				GameState.go_to_level_select()
+		)
 
 func _press_switch(cell: Vector2i) -> void:
 	pressed[cell] = true

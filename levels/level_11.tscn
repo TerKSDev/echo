@@ -9,7 +9,7 @@
 
 [node name="Level" type="Node2D" unique_id=605806960]
 script = ExtResource("1_rp27l")
-level_name = "KEYCHAIN"
+level_name = "BONE HOLLOW"
 hint = "Three gates, three switches. Each unlocked gate opens the path to the next chamber."
 
 [node name="Walls" type="TileMapLayer" parent="." unique_id=2030126939]

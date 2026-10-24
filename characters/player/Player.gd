@@ -1,9 +1,21 @@
 extends CharacterBody2D
+class_name Player
 
 # Signals
-signal sound_emitted(pos: Vector2, loudness: float, is_voice: bool)
+signal sound_emitted(pos: Vector2, loudness: float, is_voice: bool, is_sneak: bool)
 signal died
 signal sneak_toggled(sneaking: bool)
+signal pebble_thrown(pos: Vector2)
+signal pebble_count_changed(count: int)
+
+# Decoy Pebble System
+const MAX_PEBBLE_DIST := 340.0
+const MAX_PEBBLES := 3
+
+var pebbles: int = 3
+var is_aiming_pebble := false
+var pebble_aim_raw_pos := Vector2.ZERO
+var pebble_aim_target := Vector2.ZERO
 
 # Movement
 const WALK_SPEED := 190.0
@@ -71,8 +83,11 @@ var _water_splash_timer := 0.0
 
 # Shake Camera
 func camera_shake(duration: float = 0.4, intensity: float = 8.0) -> void:
+	var mult: float = GameState.screen_shake_intensity
+	if mult <= 0.001:
+		return
 	_shake_timer = maxf(_shake_timer, duration)
-	_shake_intensity = maxf(_shake_intensity, intensity)
+	_shake_intensity = maxf(_shake_intensity, intensity * mult)
 
 # Immobilize / Stun player (e.g. hit by Screamer sonic shriek)
 func immobilize(duration: float = 1.6) -> void:
@@ -106,13 +121,69 @@ func _ready() -> void:
 
 	mic.voice_detected.connect(make_voice_sound)
 	mic.start()
+	reset_for_level()
+
+
+func reset_for_level() -> void:
+	pebbles = MAX_PEBBLES
+	pebble_count_changed.emit(pebbles)
+	is_aiming_pebble = false
+	moving = false
+	charging = false
+	charge = 0.0
+	was_full = false
+	_stun_timer = 0.0
+	water_count = 0
+	alive = true
+	queue_redraw()
 
 # Handle Player Input
 func _unhandled_input(event: InputEvent) -> void:
 	# Ignore input if the player is dead or immobilized
 	if not alive or _stun_timer > 0.0:
 		return
-	
+
+	# Handle Pebble Aiming inputs (Key E, Right Mouse)
+	if event is InputEventKey and event.keycode == KEY_E:
+		if event.pressed and not event.echo:
+			if not is_aiming_pebble:
+				start_aim_pebble()
+				update_aim_pebble(get_global_mouse_position())
+			else:
+				finish_aim_pebble()
+		return
+
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT:
+		if event.pressed:
+			start_aim_pebble()
+			update_aim_pebble(get_global_mouse_position())
+		else:
+			finish_aim_pebble()
+		return
+
+	if is_aiming_pebble:
+		if event is InputEventKey and event.keycode == KEY_ESCAPE and event.pressed:
+			cancel_aim_pebble()
+			return
+		if event is InputEventMouseMotion:
+			update_aim_pebble(get_global_mouse_position())
+			return
+		elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			finish_aim_pebble()
+			get_viewport().set_input_as_handled()
+			return
+		elif event is InputEventScreenDrag:
+			var world_pos: Vector2 = get_canvas_transform().affine_inverse() * event.position
+			update_aim_pebble(world_pos)
+			get_viewport().set_input_as_handled()
+			return
+		elif event is InputEventScreenTouch and event.pressed:
+			var world_pos: Vector2 = get_canvas_transform().affine_inverse() * event.position
+			update_aim_pebble(world_pos)
+			finish_aim_pebble()
+			get_viewport().set_input_as_handled()
+			return
+
 	# Handle touch / mouse tap & drag steering
 	var pressed_pos = null
 	var is_new_tap := false
@@ -142,9 +213,29 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_released("ui_accept"):
 		release_charge()
 	
-	# Handle sneaking toggle with Shift key
-	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_SHIFT:
-		toggle_sneak()
+	# Fast Pulse: double tap / double click triggers an instant burst of sonar sound
+	if GameState.fast_pulse_mode and is_new_tap and event is InputEventMouseButton and event.double_click:
+		make_sound(160.0, true)
+
+	# Handle sneaking with Shift key (supports Toggle or Hold mode)
+	if event is InputEventKey and event.keycode == KEY_SHIFT:
+		if GameState.sneak_hold_mode:
+			if event.pressed and not event.echo:
+				sneaking = true
+				queue_redraw()
+			elif not event.pressed:
+				sneaking = false
+				queue_redraw()
+		else:
+			if event.pressed and not event.echo:
+				toggle_sneak()
+
+	# Quick Mic Mute hotkey [M]
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_M:
+		GameState.mic_enabled = not GameState.mic_enabled
+		GameState.save_settings()
+		if mic != null:
+			mic.enabled = GameState.mic_enabled
 
 # Handle Logic for Each Physics Frame
 func _physics_process(delta: float) -> void:
@@ -279,10 +370,11 @@ func _physics_process(delta: float) -> void:
 		var stride: float = STRIDE_DIST_SNEAK if sneaking else STRIDE_DIST_WALK
 		if _step_dist_accum >= stride:
 			_step_dist_accum = 0.0
-			var step_loud: float = STEP_LOUDNESS_SNEAK if sneaking else STEP_LOUDNESS_WALK
+			var is_sneak := sneaking
+			var step_loud: float = STEP_LOUDNESS_SNEAK if is_sneak else STEP_LOUDNESS_WALK
 			if water_count > 0:
-				step_loud *= 2.5
-			make_sound(step_loud)
+				step_loud *= 1.6 if is_sneak else 2.5
+			make_sound(step_loud, false, is_sneak)
 	else:
 		# Gradually relax residual stride accumulation when standing still (prevents premature step on next micro-tap)
 		_step_dist_accum = move_toward(_step_dist_accum, 0.0, delta * 35.0)
@@ -344,13 +436,14 @@ func make_voice_sound(k: float):
 	make_sound(lerpf(MIN_LOUDNESS, MAX_LOUDNESS, k), true)
 
 # Handle Vocalize
-func make_sound(loudness: float, is_voice := false) -> void:
+func make_sound(loudness: float, is_voice := false, force_sneak := false) -> void:
 	# Ignore sound if the player is dead
 	if not alive:
 		return
 
-	# Emit the sound signal
-	sound_emitted.emit(global_position, loudness, is_voice)
+	# Emit the sound signal with explicit sneaking state
+	var is_sneak: bool = force_sneak or (sneaking and not is_voice)
+	sound_emitted.emit(global_position, loudness, is_voice, is_sneak)
 
 	# Trigger acoustic burst ring on the player core
 	_burst_radius = 8.0
@@ -581,3 +674,171 @@ func _draw() -> void:
 			var ang := i * PI * 0.5 + t * 6.0
 			var spark := Vector2.from_angle(ang) * (stun_pulse + 4.0)
 			draw_circle(spark, 2.0, Color(1.0, 0.85, 0.9, 0.9))
+
+	# Pebble Aiming trajectory arc & noise landing reticle
+	if is_aiming_pebble:
+		_draw_pebble_aim_trajectory(t)
+
+
+# --- Decoy Pebble System -----------------------------------------------------
+
+func get_pebble_trajectory(target_world_pos: Vector2) -> Array[Vector2]:
+	var result: Array[Vector2] = [global_position]
+	var offset := target_world_pos - global_position
+	var total_len := clampf(offset.length(), 24.0, MAX_PEBBLE_DIST)
+	var dir := offset.normalized() if not offset.is_zero_approx() else Vector2.RIGHT
+
+	var space := get_world_2d().direct_space_state
+	var p_rid := get_rid()
+
+	# First segment: from player toward target or wall
+	var q1 := PhysicsRayQueryParameters2D.create(global_position, global_position + dir * total_len)
+	q1.collision_mask = 1
+	q1.exclude = [p_rid]
+	var hit1 := space.intersect_ray(q1)
+
+	if hit1.is_empty():
+		result.append(global_position + dir * total_len)
+		return result
+
+	# Hit Wall 1: Ricochet bounce calculation
+	var hit1_pos: Vector2 = hit1.position
+	var n1: Vector2 = hit1.get("normal", -dir)
+	var d1: float = global_position.distance_to(hit1_pos)
+	result.append(hit1_pos)
+
+	var remaining := (total_len - d1) * 0.72 # Friction/energy loss on impact
+	if remaining < 18.0 or n1 == Vector2.ZERO:
+		result.append(hit1_pos + n1 * 10.0)
+		return result
+
+	# Specular reflection: d_bounce = d - 2(d . n)n
+	var bounce_dir: Vector2 = dir.bounce(n1).normalized()
+	var bounce_start: Vector2 = hit1_pos + n1 * 2.0
+
+	var q2 := PhysicsRayQueryParameters2D.create(bounce_start, bounce_start + bounce_dir * remaining)
+	q2.collision_mask = 1
+	q2.exclude = [p_rid]
+	var hit2 := space.intersect_ray(q2)
+
+	if hit2.is_empty():
+		result.append(bounce_start + bounce_dir * remaining)
+	else:
+		var hit2_pos: Vector2 = hit2.position
+		var n2: Vector2 = hit2.get("normal", -bounce_dir)
+		result.append(hit2_pos + n2 * 8.0)
+
+	return result
+
+
+func get_clamped_pebble_target(target_world_pos: Vector2) -> Vector2:
+	var traj := get_pebble_trajectory(target_world_pos)
+	return traj.back()
+
+
+func start_aim_pebble() -> void:
+	if pebbles <= 0 or not alive or _stun_timer > 0.0:
+		return
+	is_aiming_pebble = true
+	var dir := velocity.normalized() if velocity.length() > 10.0 else Vector2.RIGHT
+	pebble_aim_raw_pos = global_position + dir * 180.0
+	pebble_aim_target = get_clamped_pebble_target(pebble_aim_raw_pos)
+	queue_redraw()
+
+
+func update_aim_pebble(target_world_pos: Vector2) -> void:
+	if not is_aiming_pebble:
+		return
+	pebble_aim_raw_pos = target_world_pos
+	pebble_aim_target = get_clamped_pebble_target(pebble_aim_raw_pos)
+	queue_redraw()
+
+
+func cancel_aim_pebble() -> void:
+	if not is_aiming_pebble:
+		return
+	is_aiming_pebble = false
+	queue_redraw()
+
+
+func finish_aim_pebble() -> bool:
+	if not is_aiming_pebble:
+		return false
+	var target_to_throw := pebble_aim_raw_pos
+	is_aiming_pebble = false
+	queue_redraw()
+	return throw_pebble(target_to_throw)
+
+
+func throw_pebble(target_world_pos: Vector2) -> bool:
+	if pebbles <= 0 or not alive or _stun_timer > 0.0:
+		return false
+	pebbles -= 1
+	pebble_count_changed.emit(pebbles)
+
+	var trajectory := get_pebble_trajectory(target_world_pos)
+	var final_target: Vector2 = trajectory.back()
+
+	var proj := PebbleProjectile.new()
+	proj.setup(trajectory)
+	get_parent().add_child(proj)
+	pebble_thrown.emit(final_target)
+
+	Input.vibrate_handheld(40)
+	return true
+
+
+func _draw_pebble_aim_trajectory(t: float) -> void:
+	var trajectory := get_pebble_trajectory(pebble_aim_raw_pos)
+	if trajectory.size() < 2:
+		return
+
+	var final_world: Vector2 = trajectory.back()
+	var final_local := to_local(final_world)
+	var amber := Color(1.0, 0.78, 0.28)
+
+	# 1. Acoustic distraction estimation ring at final target landing spot (~240px radius)
+	var noise_rad := 240.0
+	var pulse := 0.5 + 0.5 * sin(t * 5.0)
+	draw_arc(final_local, noise_rad, 0.0, TAU, 48, Color(1.0, 0.78, 0.28, 0.12 + 0.06 * pulse), 1.2)
+	for k in 12:
+		var ang := k * TAU / 12.0 + t * 0.5
+		var tick_p := final_local + Vector2.from_angle(ang) * noise_rad
+		draw_circle(tick_p, 1.8, Color(1.0, 0.85, 0.4, 0.35))
+
+	# 2. Draw each flight segment (parabolic arc)
+	for s_idx in range(trajectory.size() - 1):
+		var p0_local := to_local(trajectory[s_idx])
+		var p1_local := to_local(trajectory[s_idx + 1])
+		var seg_len := p0_local.distance_to(p1_local)
+		var seg_segs := clampi(int(seg_len / 16.0), 6, 16)
+		var h_max := clampf(seg_len * 0.16, 12.0, 44.0) * (0.65 if s_idx > 0 else 1.0)
+
+		for i in range(1, seg_segs):
+			var frac := float(i) / float(seg_segs)
+			var h := sin(frac * PI) * h_max
+			var ground_pt := p0_local.lerp(p1_local, frac)
+			var arc_pt := ground_pt - Vector2(0.0, h)
+
+			draw_circle(ground_pt, 1.4, Color(0.0, 0.0, 0.0, 0.25))
+
+			var is_pulse := absf(fposmod(frac * 3.0 - t * 3.5, 1.0)) < 0.22
+			var dot_col := Color.WHITE if is_pulse else Color(amber, 0.75 + 0.25 * sin(frac * PI))
+			draw_circle(arc_pt, lerpf(1.8, 3.0, sin(frac * PI)), dot_col)
+
+		# If this segment hits a wall (i.e. ricochet bounce node), draw a gleaming wall impact diamond!
+		if s_idx < trajectory.size() - 2:
+			var d_pulse := 1.0 + 0.2 * sin(t * 10.0)
+			draw_arc(p1_local, 7.0 * d_pulse, 0.0, TAU, 16, Color(1.0, 0.9, 0.5, 0.9), 1.8)
+			draw_circle(p1_local, 3.0, Color.WHITE)
+
+	# 3. Final Landing Target Reticle
+	draw_circle(final_local, 7.0, Color(amber, 0.25))
+	var reticle_r := 12.0 + 2.0 * sin(t * 8.0)
+	draw_arc(final_local, reticle_r, 0.0, TAU, 24, Color(amber, 0.85), 1.8)
+	draw_circle(final_local, 2.5, Color.WHITE)
+	var ch_len := 5.0
+	draw_line(final_local + Vector2(-reticle_r - ch_len, 0), final_local + Vector2(-reticle_r + 2, 0), amber, 1.5)
+	draw_line(final_local + Vector2(reticle_r - 2, 0), final_local + Vector2(reticle_r + ch_len, 0), amber, 1.5)
+	draw_line(final_local + Vector2(0, -reticle_r - ch_len), final_local + Vector2(0, -reticle_r + 2), amber, 1.5)
+	draw_line(final_local + Vector2(0, reticle_r - 2), final_local + Vector2(0, reticle_r + ch_len), amber, 1.5)

@@ -9,7 +9,7 @@
 
 [node name="Level" type="Node2D" unique_id=903995370]
 script = ExtResource("1_eoivg")
-level_name = "SUBTERRANEAN GORGE"
+level_name = "CRYSTAL DRIFT"
 hint = "A dark river splits the cavern in two. Call out loudly to map the far bank before crossing."
 
 [node name="Walls" type="TileMapLayer" parent="." unique_id=1592377391]

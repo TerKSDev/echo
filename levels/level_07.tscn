@@ -9,7 +9,7 @@
 
 [node name="Level" type="Node2D" unique_id=1659383998]
 script = ExtResource("1_f006g")
-level_name = "LIMESTONE GROTTO"
+level_name = "BASALT TUNNELS"
 hint = "No straight walls here. Use the subterranean pools as acoustic landmarks to navigate north."
 
 [node name="Walls" type="TileMapLayer" parent="." unique_id=530402253]

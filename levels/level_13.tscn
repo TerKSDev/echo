@@ -9,7 +9,7 @@
 
 [node name="Level" type="Node2D" unique_id=1095609693]
 script = ExtResource("1_root")
-level_name = "HIDDEN SEAM"
+level_name = "SURFACE BREACH"
 hint = "Two forks in the dark. The northern chamber looks like a dead end, but a narrow seam hides along its wall."
 
 [node name="Walls" type="TileMapLayer" parent="." unique_id=950262310]

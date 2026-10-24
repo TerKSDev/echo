@@ -1,7 +1,7 @@
 extends Node2D
 
 const RAY_COUNT := 144
-const LIFETIME := 2.0
+const LIFETIME := 2.4
 const WAVE_SPEED := 400.0
 const MARK_HALF_LENGTH := 5.5
 const MARK_WIDTH := 2.0
@@ -318,6 +318,8 @@ func _draw():
 		cull_rect = Rect2(cam_pos - vp_size * 0.58, vp_size * 1.16)
 		has_cull = true
 
+	var glow_boost: float = GameState.sonar_glow_boost
+
 	for p in points:
 		var pos_v := Vector2(p["pos"])
 		if has_cull and not cull_rect.has_point(pos_v):
@@ -327,8 +329,19 @@ func _draw():
 			continue
 		var strength: float = float(p.get("strength", 1.0))
 		var t_norm: float = clampf(age / LIFETIME, 0.0, 1.0)
-		var decay: float = (exp(-t_norm * 2.6) - exp(-2.6)) / (1.0 - exp(-2.6))
-		var alpha: float = clampf(decay, 0.0, 1.0) * strength
+
+		# Primary acoustic strike decay (rapid attenuation over initial ~0.9s)
+		var primary_decay: float = (exp(-t_norm * 3.4) - exp(-3.4)) / (1.0 - exp(-3.4))
+		var primary_alpha: float = clampf(primary_decay, 0.0, 1.0) * strength
+
+		# Phosphor persistence: faint, soft bioluminescent afterglow lingering up to ~2.4s then dissolving
+		var phosphor_factor: float = clampf(1.0 - t_norm, 0.0, 1.0)
+		var phosphor_alpha: float = pow(phosphor_factor, 1.9) * 0.19 * glow_boost * strength
+
+		var total_alpha: float = clampf(primary_alpha * glow_boost + phosphor_alpha, 0.0, 1.0)
+		if total_alpha <= 0.005:
+			continue
+
 		var base_col: Color = p.get("col", Color(0.3, 1.0, 1.0))
 		var lp: Vector2 = to_local(pos_v)
 		var tan_vec: Vector2 = p.get("tan", Vector2.UP)
@@ -340,28 +353,34 @@ func _draw():
 		# Crisp impact pulse when the wavefront first strikes the wall
 		var impact: float = clampf(1.0 - age / 0.24, 0.0, 1.0)
 
-		# 1. Soft inner/outer sonar rim glow (controlled alpha so adjacent segments never blob)
+		# 1. Soft inner/outer sonar rim glow + Phosphor halo
 		if norm_vec != Vector2.ZERO:
-			draw_line(p1 + norm_vec * 1.2, p2 + norm_vec * 1.2, Color(base_col.r, base_col.g, base_col.b, alpha * 0.24), 4.0)
+			var rim_a: float = primary_alpha * 0.24 + phosphor_alpha * 0.45
+			draw_line(p1 + norm_vec * 1.2, p2 + norm_vec * 1.2, Color(base_col.r, base_col.g, base_col.b, rim_a), 3.8)
 			# Subtle rebound ripple line lifting off the wall during initial impact
 			if impact > 0.04:
 				var reb_dist: float = (1.0 - impact) * 9.0 + 1.5
 				var reb_half: float = half_len * (0.55 + 0.35 * impact)
 				var rp: Vector2 = lp + norm_vec * reb_dist
-				draw_line(rp - tan_vec * reb_half, rp + tan_vec * reb_half, Color(0.75, 0.98, 1.0, alpha * impact * 0.52), 1.4)
+				draw_line(rp - tan_vec * reb_half, rp + tan_vec * reb_half, Color(0.75, 0.98, 1.0, total_alpha * impact * 0.52), 1.4)
 
-		# 2. Razor-sharp surface contour line + hot white-cyan contact core on arrival
-		var line_col: Color = base_col.lerp(Color.WHITE, 0.25 + impact * 0.7)
-		draw_line(p1, p2, Color(line_col.r, line_col.g, line_col.b, alpha * 0.95), MARK_WIDTH + impact * 0.8)
+		# 2. Surface contour line + hot white-cyan contact core on arrival
+		var line_col: Color = base_col.lerp(Color.WHITE, 0.20 + impact * 0.75)
+		draw_line(p1, p2, Color(line_col.r, line_col.g, line_col.b, total_alpha * 0.95), MARK_WIDTH + impact * 0.8)
 		if impact > 0.08:
-			draw_circle(lp, 1.6 + impact * 1.2, Color(1.0, 1.0, 1.0, alpha * impact * 0.75))
+			draw_circle(lp, 1.6 + impact * 1.2, Color(1.0, 1.0, 1.0, total_alpha * impact * 0.75))
+
+		# Faint phosphor mineral glitter along segment tips during afterglow phase
+		if phosphor_alpha > 0.04 and norm_vec != Vector2.ZERO:
+			draw_circle(p1, 0.85, Color(base_col.r, base_col.g, base_col.b, phosphor_alpha * 0.9))
+			draw_circle(p2, 0.85, Color(base_col.r, base_col.g, base_col.b, phosphor_alpha * 0.9))
 
 		# 3. Natural cavern cliff fracture: tiny rock crevices & mineral speckle
 		var crag_val: float = float(p.get("crag", 0.0))
 		if crag_val > 0.45 and norm_vec != Vector2.ZERO:
 			var crack_len: float = (crag_val - 0.45) * 8.0
 			var crack_tip: Vector2 = lp - norm_vec * crack_len + tan_vec * ((crag_val - 0.7) * 6.0)
-			draw_line(lp, crack_tip, Color(line_col.r, line_col.g, line_col.b, alpha * 0.45), 1.0)
+			draw_line(lp, crack_tip, Color(line_col.r, line_col.g, line_col.b, total_alpha * 0.45), 1.0)
 
 	# 3. Airborne cavern moisture motes and bio-dust awakened in unblocked areas
 	for mt in motes:

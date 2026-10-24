@@ -86,6 +86,21 @@ func _draw() -> void:
 		draw_arc(Vector2.ZERO, 22.0, sweep_ang - 0.5, sweep_ang + 0.5, 14, Color(base, 0.55 * alpha), 2.0)
 		draw_arc(Vector2.ZERO, 30.0, sweep_ang - 0.35, sweep_ang + 0.35, 12, Color(base, 0.3 * alpha), 1.4)
 
+	# 7. Decoy Pebble curiosity indicator ("?" floating above head in warm amber)
+	if enemy.is_investigating_decoy and alpha > 0.12:
+		_draw_decoy_curiosity(t, alpha)
+
+
+func _draw_decoy_curiosity(t: float, alpha: float) -> void:
+	var bob := sin(t * 6.0) * 2.5
+	var pos := Vector2(0.0, -26.0 + bob)
+	var q_col := Color(1.0, 0.78, 0.28, alpha * 0.95)
+	var glow_col := Color(1.0, 0.65, 0.15, alpha * 0.25)
+	draw_circle(pos + Vector2(0, -3), 7.0, glow_col)
+	draw_arc(pos + Vector2(0, -5), 3.8, -PI * 0.8, PI * 0.35, 12, q_col, 2.0)
+	draw_line(pos + Vector2(2.5, -4.0), pos + Vector2(0.0, -1.0), q_col, 1.8)
+	draw_circle(pos + Vector2(0.0, 3.2), 1.5, q_col)
+
 
 # Sleeper: violet orb, closed eye slit while asleep
 func _draw_sleeper(t: float, col: Color, alpha: float) -> void:

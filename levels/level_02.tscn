@@ -9,7 +9,7 @@
 
 [node name="Level" type="Node2D" unique_id=78377983]
 script = ExtResource("1_h518d")
-level_name = "THE GALLERY"
+level_name = "VOID CAVITY"
 hint = "Sound travels far down straight halls, while side alcoves swallow and scatter the echo."
 
 [node name="Walls" type="TileMapLayer" parent="." unique_id=2012489652]

@@ -10,7 +10,7 @@ config_version=5
 
 [application]
 
-config/name="Echo"
+config/name="Echo: Stay Silent"
 run/main_scene="uid://dmknrgc8haiw1"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 boot_splash/bg_color=Color(0, 0, 0, 1)

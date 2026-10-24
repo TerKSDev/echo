@@ -7,9 +7,15 @@ const BASE_RADIUS := 40.0           # Range of a near-silent sound
 const RADIUS_PER_LOUDNESS := 660.0  # Extra range per 1.0 of loudness
 const WAVE_SPEED := 400.0           # Matches EchoLayer.WAVE_SPEED
 
+signal offscreen_sound_emitted(pos: Vector2, color: Color)
+
 var _player: Node2D
 var _echo: Node2D
 var _sfx: SfxManager
+
+
+func _ready() -> void:
+	add_to_group("sound_bus")
 
 
 func setup(player: Node2D, echo_layer: Node2D, sfx: SfxManager = null) -> void:
@@ -44,28 +50,44 @@ func _enemies() -> Array[Enemy]:
 	return result
 
 
-func _on_player_sound(pos: Vector2, loudness: float, is_voice: bool) -> void:
+func _on_player_sound(pos: Vector2, loudness: float, is_voice: bool, is_sneak: bool = false) -> void:
 	if _sfx != null:
 		if is_voice:
 			_sfx.play_echo_ping(loudness)
-		elif loudness <= 0.05:
+		elif is_sneak or loudness <= 0.05:
 			_sfx.play_step_sneak()
 		else:
 			_sfx.play_step_walk()
 
 	var radius := BASE_RADIUS + loudness * RADIUS_PER_LOUDNESS
 	var exclude: Array[RID] = [_player.get_rid()]
-	var w_col := Color(0.3, 1.0, 1.0)
+	var w_col: Color = GameState.get_sonar_color()
 	if is_instance_valid(_player) and _player.get("water_count") != null and _player.water_count > 0 and not is_voice:
-		w_col = Color(0.28, 0.75, 1.0)
+		w_col = w_col.lerp(Color(0.28, 0.75, 1.0), 0.45)
 	_echo.emit_echo(pos, radius, exclude, is_voice, w_col)
 	for enemy in _enemies():
-		enemy.on_sound(pos, loudness, radius, is_voice)
+		enemy.on_sound(pos, loudness, radius, is_voice, is_sneak)
+
+
+# Decoy Pebble clatter: emits an amber acoustic ripple that bounces off walls,
+# reveals the area, and distracts nearby enemies toward the impact point without ruining ghost rating.
+func emit_decoy_sound(pos: Vector2, loudness: float = 0.38, radius: float = 260.0) -> void:
+	if _sfx != null:
+		_sfx.play_pebble_clatter(pos)
+	var exclude: Array[RID] = []
+	if is_instance_valid(_player):
+		exclude.append(_player.get_rid())
+	var pebble_color := Color(1.0, 0.78, 0.28) # Warm golden amber ripple
+	_echo.emit_echo(pos, radius, exclude, true, pebble_color)
+	offscreen_sound_emitted.emit(pos, pebble_color)
+	for enemy in _enemies():
+		enemy.on_decoy_sound(pos, loudness, radius)
 
 
 func _on_enemy_woke_up(pos: Vector2, enemy: Enemy) -> void:
 	if _sfx == null or not is_instance_valid(enemy):
 		return
+	offscreen_sound_emitted.emit(pos, Color(1.0, 0.55, 0.25))
 	match enemy.enemy_type:
 		Enemy.EnemyType.SCREAMER:
 			_sfx.play_screamer_crack(pos, enemy.is_wall_occluded)
@@ -82,6 +104,7 @@ func _on_enemy_step(pos: Vector2, is_chasing: bool, occluded: bool) -> void:
 
 # Screamer: big wave, attracts nearby monsters, immobilizes the player if hit
 func _on_enemy_screamed(pos: Vector2, radius: float) -> void:
+	offscreen_sound_emitted.emit(pos, Color(1.0, 0.25, 0.52))
 	if _sfx != null:
 		_sfx.play_screamer_shriek(pos)
 	var no_exclude: Array[RID] = []
@@ -115,6 +138,7 @@ func _on_enemy_screamed(pos: Vector2, radius: float) -> void:
 
 # Listener: map-wide pulse, every monster rushes to the Listener and gets faster
 func _on_enemy_alarmed(pos: Vector2, _target_pos: Vector2) -> void:
+	offscreen_sound_emitted.emit(pos, Color(1.0, 0.75, 0.2))
 	if _sfx != null:
 		_sfx.play_listener_alarm(pos)
 	var no_exclude: Array[RID] = []

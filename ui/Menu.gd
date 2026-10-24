@@ -317,18 +317,18 @@ func _build_modal_shell() -> void:
 	close_btn.focus_mode = Control.FOCUS_NONE
 	close_btn.text = "✕"
 	var close_normal := StyleBoxFlat.new()
-	close_normal.bg_color = Color(0.05, 0.14, 0.24, 0.8)
-	close_normal.set_border_width_all(1)
-	close_normal.border_color = Color(0.28, 0.56, 0.82, 0.75)
+	close_normal.bg_color = Color(0.05, 0.14, 0.24, 0.45)
 	close_normal.set_corner_radius_all(19)
 	var close_hover := StyleBoxFlat.new()
-	close_hover.bg_color = Color(0.12, 0.28, 0.44, 0.95)
-	close_hover.set_border_width_all(1)
-	close_hover.border_color = Color(0.48, 0.82, 1.0, 1.0)
+	close_hover.bg_color = Color(0.14, 0.32, 0.50, 0.7)
 	close_hover.set_corner_radius_all(19)
 	close_btn.add_theme_stylebox_override("normal", close_normal)
 	close_btn.add_theme_stylebox_override("hover", close_hover)
 	close_btn.add_theme_stylebox_override("pressed", close_hover)
+	close_btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	close_btn.add_theme_color_override("font_color", Color(0.70, 0.85, 0.98, 0.85))
+	close_btn.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 1.0, 1.0))
+	close_btn.add_theme_color_override("font_pressed_color", Color(0.4, 0.95, 1.0, 1.0))
 	close_btn.pressed.connect(_close_modal)
 	header.add_child(close_btn)
 
@@ -420,7 +420,7 @@ func _setup_menu_bgm() -> void:
 
 	_bgm_pad_player = AudioStreamPlayer.new()
 	_bgm_pad_player.stream = SfxManager.get_menu_bgm_pad()
-	_bgm_pad_player.bus = &"Master"
+	_bgm_pad_player.bus = &"BGM"
 	_bgm_pad_player.volume_db = -28.0
 	add_child(_bgm_pad_player)
 	_bgm_pad_player.play()
@@ -441,21 +441,21 @@ func _process_menu_bgm(delta: float) -> void:
 		var idx: int = motif_indices[_bgm_note_step % motif_indices.size()]
 		_bgm_note_step += 1
 		var pitch: float = BGM_SCALE[idx]
-		_play_ui_sound(_wav_bgm_note, randf_range(-11.5, -8.5), pitch)
+		_play_ui_sound(_wav_bgm_note, randf_range(-11.5, -8.5), pitch, &"BGM")
 
 		# Occasional soft harmonic answer note
 		if randf() < 0.45:
 			var ans_pitch: float = BGM_SCALE[(idx + 2) % BGM_SCALE.size()]
 			get_tree().create_timer(0.44).timeout.connect(func():
 				if is_inside_tree():
-					_play_ui_sound(_wav_bgm_note, -13.5, ans_pitch)
+					_play_ui_sound(_wav_bgm_note, -13.5, ans_pitch, &"BGM")
 			)
 
 	# Subterranean cavern water droplets
 	_bgm_drop_timer -= delta
 	if _bgm_drop_timer <= 0.0:
 		_bgm_drop_timer = randf_range(4.2, 7.8)
-		_play_ui_sound(_wav_bgm_droplet, randf_range(-13.0, -9.5), randf_range(0.84, 1.26))
+		_play_ui_sound(_wav_bgm_droplet, randf_range(-13.0, -9.5), randf_range(0.84, 1.26), &"BGM")
 		if size.x > 0.0 and size.y > 0.0:
 			var drop_pos := Vector2(randf_range(size.x * 0.15, size.x * 0.85), randf_range(size.y * 0.2, size.y * 0.85))
 			_ripples.append({"pos": drop_pos, "age": 0.0, "max_r": 120.0, "alpha": 0.26})
@@ -509,14 +509,14 @@ func _synth_tone(f_start: float, f_end: float, dur: float) -> AudioStreamWAV:
 	return wav
 
 
-func _play_ui_sound(stream: AudioStreamWAV, vol_db: float, pitch: float) -> void:
+func _play_ui_sound(stream: AudioStreamWAV, vol_db: float, pitch: float, bus: StringName = &"SFX") -> void:
 	if stream == null:
 		return
 	var p := AudioStreamPlayer.new()
 	p.stream = stream
 	p.volume_db = vol_db
 	p.pitch_scale = pitch
-	p.bus = &"Master"
+	p.bus = bus
 	add_child(p)
 	p.finished.connect(p.queue_free)
 	p.play()

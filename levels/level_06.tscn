@@ -9,7 +9,7 @@
 
 [node name="Level" type="Node2D" unique_id=840278840]
 script = ExtResource("1_up3qn")
-level_name = "THRESHOLD"
+level_name = "ECHO CHAMBER"
 hint = "The exit is sealed behind a gate. Step on the floor switch in the southern alcove to unlock it."
 
 [node name="Walls" type="TileMapLayer" parent="." unique_id=166528079]

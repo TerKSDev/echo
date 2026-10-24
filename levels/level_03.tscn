@@ -7,7 +7,7 @@
 
 [node name="Level" type="Node2D" unique_id=658734001]
 script = ExtResource("1_p0vsl")
-level_name = "BEVELED CHUTE"
+level_name = "SUB-CRUST TRENCH"
 hint = "Angled walls deflect your echo into the deep. Follow the descending steps to the bottom exit."
 
 [node name="EnemyChaser" parent="." unique_id=577495204 instance=ExtResource("4_ngl01")]

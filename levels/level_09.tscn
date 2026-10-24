@@ -8,7 +8,7 @@
 
 [node name="Level" type="Node2D" unique_id=196393889]
 script = ExtResource("1_hpfrn")
-level_name = "THE SPIRAL"
+level_name = "THE SILENT POOL"
 hint = "Follow the outer coil through the water to trigger the switch, then spiral inward to the core."
 
 [node name="Walls" type="TileMapLayer" parent="." unique_id=556262854]

@@ -9,7 +9,7 @@
 
 [node name="Level" type="Node2D" unique_id=1789349003]
 script = ExtResource("1_ypm7u")
-level_name = "THE ABYSS"
+level_name = "WHISPER CHASM"
 hint = "Halls, river, and labyrinth combined. Unlock all three gates to reach the final ascent."
 
 [node name="Walls" type="TileMapLayer" parent="." unique_id=174976855]

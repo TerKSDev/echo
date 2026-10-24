@@ -146,4 +146,4 @@ func _on_retry_pressed() -> void:
 
 
 func _on_menu_pressed() -> void:
-	GameState.go_to_menu()
+	GameState.go_to_level_select()

@@ -4,6 +4,7 @@ class_name Enemy
 ## enemy_*.tscn presets). Stats live in EnemyPresets.gd, drawing in EnemyVisual.gd.
 
 signal woke_up(pos: Vector2)
+signal alert_triggered(enemy: Enemy)
 signal step_taken(pos: Vector2, is_chasing: bool, occluded: bool)
 signal screamed(pos: Vector2, radius: float)   # Screamer shriek
 signal alarmed(pos: Vector2, target_pos: Vector2)   # Listener map-wide pulse
@@ -30,9 +31,9 @@ enum State { SLEEP, PATROL, ALERT, INVESTIGATE, SEARCH, RETURN, SCREAM, ALARM }
 
 @export_group("Sensory & Proximity")
 @export var sense_radius := 90.0
-@export var sneak_sense_radius := 60.0
+@export var sneak_sense_radius := 26.0
 @export var sleep_wake_radius := 75.0
-@export var sneak_wake_radius := 40.0 # Wake distance while the player sneaks
+@export var sneak_wake_radius := 28.0 # Wake distance while the player sneaks
 
 @export_group("Reaction Times")
 @export var alert_time := 0.4          # Frozen "!" time before chasing (player's head start)
@@ -91,6 +92,7 @@ var alarm_wave_radius := 0.0
 var speed_boost_timer := 0.0
 var speed_boost_mult := 1.0
 var is_in_water := false
+var is_investigating_decoy := false
 
 # Data for EnemyVisual & AI steering
 var trail_points: Array[Vector2] = []
@@ -149,9 +151,9 @@ func _collect_patrol_points() -> void:
 
 # --- Sound detection ---------------------------------------------------------
 
-func on_sound(pos: Vector2, loudness: float, radius: float, is_voice: bool = false) -> void:
-	var is_sneak_step := (not is_voice and loudness <= 0.05)
-	var is_walk_step := (not is_voice and loudness > 0.05)
+func on_sound(pos: Vector2, loudness: float, radius: float, is_voice: bool = false, is_sneak: bool = false) -> void:
+	var is_sneak_step := (not is_voice and (is_sneak or loudness <= 0.05))
+	var is_walk_step := (not is_voice and not is_sneak and loudness > 0.05)
 
 	if enemy_type == EnemyType.LISTENER:
 		# Deaf to all footsteps (walking and sneaking): only shouts count
@@ -190,6 +192,7 @@ func on_sound(pos: Vector2, loudness: float, radius: float, is_voice: bool = fal
 
 
 func _notice(pos: Vector2) -> void:
+	is_investigating_decoy = false
 	target = pos
 	_stuck_timer = 0.0
 	match state:
@@ -204,6 +207,54 @@ func _notice(pos: Vector2) -> void:
 			# While already chasing, update destination toward latest sound,
 			# but do not reset chase timer so chase timeout lets the player escape.
 			pass
+
+
+# Decoy stone sound reaction: luring/distraction behavior
+func on_decoy_sound(pos: Vector2, loudness: float, radius: float) -> void:
+	if enemy_type == EnemyType.LISTENER:
+		return
+
+	var dist: float = global_position.distance_to(pos)
+	var effective_max := minf(radius, hearing_range * 1.1)
+	if dist > effective_max:
+		return
+
+	if _is_blocked_by_wall(pos, global_position):
+		loudness *= 0.35
+
+	var heard := loudness * (1.0 - dist / effective_max)
+	if heard < hearing_threshold * 0.8:
+		return
+
+	if enemy_type == EnemyType.SCREAMER:
+		var dir := (pos - global_position).normalized()
+		if not dir.is_zero_approx():
+			facing_dir = dir
+		reveal(0.7)
+		return
+
+	# Mobile enemies (SLEEPER, PATROLLER, CHASER)
+	target = pos
+	is_investigating_decoy = true
+	_stuck_timer = 0.0
+	var to_sound := (pos - global_position).normalized()
+	if not to_sound.is_zero_approx():
+		facing_dir = to_sound
+
+	match state:
+		State.SLEEP, State.PATROL, State.RETURN, State.SEARCH:
+			_enter_decoy_investigate()
+		State.ALERT, State.INVESTIGATE:
+			timer = 0.0
+			reveal(0.85)
+
+
+func _enter_decoy_investigate() -> void:
+	state = State.INVESTIGATE
+	timer = 0.0
+	_stuck_timer = 0.0
+	_last_progress_pos = global_position
+	reveal(float(STATE_FLASH.get(State.INVESTIGATE, 0.7)))
 
 
 # Used by map-wide alarms: ignores hearing range
@@ -286,6 +337,8 @@ func _trigger_listener_alarm() -> void:
 
 func _enter(s: State) -> void:
 	var changed := s != state
+	if s != State.INVESTIGATE and s != State.SEARCH:
+		is_investigating_decoy = false
 	state = s
 	timer = 0.0
 	_stuck_timer = 0.0
@@ -299,6 +352,8 @@ func _enter(s: State) -> void:
 			facing_dir = to_t.normalized()
 	if changed:
 		reveal(float(STATE_FLASH.get(s, 0.5)))
+		if s == State.ALERT:
+			alert_triggered.emit(self)
 		# Survival-horror discovery shudder / camera jolt when a monster spots the player
 		if s == State.ALERT and not _is_stationary():
 			var player := _get_player()
@@ -397,33 +452,40 @@ func _update_proximity() -> void:
 	proximity = clampf(1.0 - dist / WARN_RADIUS, 0.0, 1.0)
 
 
-# How scary this enemy is right now (drives the heartbeat)
+# How scary this enemy is right now (drives the player's dynamic heartbeat)
 func get_threat_level(player_pos: Vector2) -> float:
 	var dist: float = global_position.distance_to(player_pos)
-	# Active enemies far away are less scary: full threat within 300px, half beyond 600px
-	var active_threat := clampf(1.0 - maxf(dist - 300.0, 0.0) / 600.0, 0.5, 1.0)
+
+	# Baseline proximity fear: scales smoothly as the player draws closer within 340px (~10 tiles)
+	var prox: float = clampf(1.0 - dist / 340.0, 0.0, 1.0)
 	var raw_threat := 0.0
 
 	match state:
 		State.ALERT, State.INVESTIGATE, State.SCREAM, State.ALARM:
-			raw_threat = active_threat
+			# Active hunting or shrieking: high alert panic surge
+			var active_urgency := clampf(1.0 - maxf(dist - 240.0, 0.0) / 480.0, 0.65, 1.0)
+			raw_threat = maxf(prox, active_urgency)
 		State.SEARCH:
-			raw_threat = clampf(maxf(0.5, 1.0 - dist / 250.0), 0.0, 1.0)
+			raw_threat = clampf(maxf(prox * 1.1, 0.4), 0.0, 1.0)
 		State.PATROL, State.RETURN:
-			raw_threat = clampf(1.0 - dist / 220.0, 0.0, 1.0)
+			# Patroller / wandering monster proximity
+			raw_threat = prox * 0.9
 		State.SLEEP:
 			if enemy_type == EnemyType.SCREAMER and screamer_count > 0:
-				raw_threat = clampf(1.0 - dist / 280.0, 0.4, 0.95)
+				raw_threat = clampf(1.0 - dist / 320.0, 0.45, 0.98)
 			elif enemy_type == EnemyType.LISTENER and listener_count > 0:
-				raw_threat = clampf(0.2 * listener_count + (1.0 - dist / 260.0) * 0.4, 0.0, 0.9)
+				raw_threat = clampf(0.25 * listener_count + (1.0 - dist / 300.0) * 0.45, 0.0, 0.95)
 			else:
-				raw_threat = clampf(inverse_lerp(180.0, sleep_wake_radius, dist), 0.0, 0.9)
+				# Sleeper proximity: heart quickens steadily as you approach its slumber radius
+				raw_threat = prox * 0.85
 
-	# Walls muffle threat: idle monsters behind a wall don't cause false heartbeat panic
+	# Wall occlusion muffles threat, but does not completely extinguish intuition of nearby predators behind thin walls
 	if is_wall_occluded:
-		if state == State.SLEEP or state == State.PATROL or state == State.RETURN:
-			return 0.0
-		return raw_threat * 0.35
+		if state == State.ALERT or state == State.INVESTIGATE or state == State.SCREAM or state == State.ALARM:
+			return raw_threat * 0.45
+		# Faint muffled intuition for sleeping/patrolling monsters right behind a wall (dist < 200px)
+		return clampf(raw_threat * 0.38, 0.0, 0.35) if dist < 200.0 else 0.0
+
 	return raw_threat
 
 
@@ -516,6 +578,7 @@ func _run_state(delta: float, cur_patrol: float, cur_chase: float) -> void:
 				_search_wait_timer = 0.35
 				search_point = _random_search_point()
 			if timer >= SEARCH_TIME:
+				is_investigating_decoy = false
 				_enter(State.RETURN)
 		State.RETURN:
 			var dest := patrol_points[patrol_idx] if patrol_points.size() > 0 else home

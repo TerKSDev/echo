@@ -7,7 +7,7 @@
 
 [node name="Level" type="Node2D" unique_id=1570962017]
 script = ExtResource("1_gg43x")
-level_name = "FIRST PULSE"
+level_name = "ABYSS ORIGIN"
 hint = "Speak or press [SPACE] to send an echo. Listen to the walls; the exit glows when swept by sound."
 
 [node name="Walls" type="TileMapLayer" parent="." unique_id=904755801]

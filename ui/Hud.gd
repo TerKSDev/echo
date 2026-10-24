@@ -1,6 +1,6 @@
 extends CanvasLayer
 
-@onready var player = get_node_or_null("../Player")
+@onready var player: Node2D = get_node_or_null("../Player")
 
 var _base_inner_radius := 0.42
 var _sector_badge: Label = null
@@ -8,6 +8,8 @@ var _sector_badge: Label = null
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_build_sector_badge()
+	if has_node("Vignette"):
+		$Vignette.visible = GameState.vignette_enabled
 	var mat := _vignette_material()
 	if mat != null:
 		mat.set_shader_parameter("vignette_color", Color(0.01, 0.035, 0.07, 0.7))
@@ -17,7 +19,17 @@ func _ready() -> void:
 	if player != null:
 		$SoundBtn.button_down.connect(player.start_charge)
 		$SoundBtn.button_up.connect(player.release_charge)
-		$SneakBtn.pressed.connect(player.toggle_sneak)
+		if GameState.sneak_hold_mode:
+			$SneakBtn.button_down.connect(func():
+				player.sneaking = true
+				player.queue_redraw()
+			)
+			$SneakBtn.button_up.connect(func():
+				player.sneaking = false
+				player.queue_redraw()
+			)
+		else:
+			$SneakBtn.pressed.connect(player.toggle_sneak)
 		if player.has_node("MicInput"):
 			var mic = player.get_node("MicInput")
 			if mic != null and mic.has_signal("voice_detected"):
@@ -25,6 +37,8 @@ func _ready() -> void:
 
 	if has_node("PauseBtn") and has_node("SettingsModal"):
 		$PauseBtn.pressed.connect($SettingsModal.open)
+
+	_setup_sound_indicator_canvas()
 
 func _on_voice_detected(_loudness: float) -> void:
 	if has_node("MicIndicator"):
@@ -51,17 +65,25 @@ func flash_death() -> void:
 	tw.tween_property(mat, "shader_parameter/vignette_color", Color(0.65, 0.05, 0.08, 0.95), 0.08)
 	tw.tween_property(mat, "shader_parameter/vignette_color", Color(0.28, 0.02, 0.04, 0.85), 0.6)
 
+func set_gameplay_buttons_visible(show: bool) -> void:
+	if has_node("PauseBtn"):
+		$PauseBtn.visible = show
+	if has_node("SneakBtn"):
+		$SneakBtn.visible = show
+	if has_node("SoundBtn"):
+		$SoundBtn.visible = show
+	if has_node("PebbleBtn"):
+		$PebbleBtn.visible = show
+	if has_node("MicIndicator"):
+		$MicIndicator.visible = show
+	if _sector_badge != null:
+		_sector_badge.visible = show
+
+
 func show_death_screen(killer_type: int = -1) -> void:
 	if has_node("SettingsModal") and $SettingsModal.visible:
 		$SettingsModal.visible = false
-	if _sector_badge != null:
-		_sector_badge.visible = false
-	if has_node("PauseBtn"):
-		$PauseBtn.visible = false
-	if has_node("SneakBtn"):
-		$SneakBtn.visible = false
-	if has_node("SoundBtn"):
-		$SoundBtn.visible = false
+	set_gameplay_buttons_visible(false)
 	if has_node("DeathScreen"):
 		$DeathScreen.open(killer_type)
 
@@ -71,32 +93,44 @@ func play_level_exit_transition(on_complete: Callable) -> void:
 	var sfx_mgr := get_node_or_null("../SfxManager") as SfxManager
 	if sfx_mgr != null:
 		sfx_mgr.play_level_exit()
-	var curtain := ColorRect.new()
-	curtain.set_anchors_preset(Control.PRESET_FULL_RECT)
-	curtain.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	curtain.color = Color(0.0, 0.02, 0.05, 0.0)
-	add_child(curtain)
+	on_complete.call()
 
-	var tw := create_tween()
-	tw.tween_property(curtain, "color:a", 1.0, 0.28).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw.tween_callback(func():
-		on_complete.call()
-		curtain.queue_free()
-	)
+
+var _debrief_modal: DebriefModal = null
+
+func _get_or_create_debrief() -> DebriefModal:
+	if _debrief_modal == null or not is_instance_valid(_debrief_modal):
+		_debrief_modal = DebriefModal.new()
+		add_child(_debrief_modal)
+	return _debrief_modal
+
+
+func show_debrief(data: Dictionary, on_next: Callable, on_retry: Callable, on_select: Callable) -> void:
+	if has_node("SettingsModal") and $SettingsModal.visible:
+		$SettingsModal.visible = false
+	set_gameplay_buttons_visible(false)
+	var dm := _get_or_create_debrief()
+	# Disconnect any prior connections to avoid stacking callbacks
+	for c: Dictionary in dm.next_pressed.get_connections():
+		dm.next_pressed.disconnect(c.callable)
+	for c: Dictionary in dm.retry_pressed.get_connections():
+		dm.retry_pressed.disconnect(c.callable)
+	for c: Dictionary in dm.select_pressed.get_connections():
+		dm.select_pressed.disconnect(c.callable)
+
+	dm.next_pressed.connect(on_next)
+	dm.retry_pressed.connect(on_retry)
+	dm.select_pressed.connect(on_select)
+
+	var sfx_mgr := get_node_or_null("../SfxManager") as SfxManager
+	dm.show_debrief(data, sfx_mgr)
 
 
 # Grand campaign victory celebration when conquering Depth 13
 func show_victory_screen() -> void:
 	if has_node("SettingsModal") and $SettingsModal.visible:
 		$SettingsModal.visible = false
-	if _sector_badge != null:
-		_sector_badge.visible = false
-	if has_node("PauseBtn"):
-		$PauseBtn.visible = false
-	if has_node("SneakBtn"):
-		$SneakBtn.visible = false
-	if has_node("SoundBtn"):
-		$SoundBtn.visible = false
+	set_gameplay_buttons_visible(false)
 
 	var sfx_mgr := get_node_or_null("../SfxManager") as SfxManager
 	if sfx_mgr != null:
@@ -151,7 +185,7 @@ func show_victory_screen() -> void:
 	vbox.add_child(sep)
 
 	var desc := Label.new()
-	desc.text = "You traversed all 13 depths of the subterranean labyrinth.\nGuided only by acoustic echoes in the pitch-black darkness,\nyou silenced every terror and emerged back into the sun."
+	desc.text = "You kept your calm and stayed silent in the pitch-black abyss.\nGuided only by acoustic echoes across 13 subterranean sectors,\nyou silenced every terror and emerged back into the sun."
 	desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	desc.add_theme_color_override("font_color", Color(0.78, 0.88, 0.98, 0.88))
 	desc.add_theme_font_size_override("font_size", 13)
@@ -164,7 +198,7 @@ func show_victory_screen() -> void:
 
 	var replay_btn := Button.new()
 	replay_btn.custom_minimum_size = Vector2(160.0, 44.0)
-	replay_btn.text = "REPLAY DEPTH 13"
+	replay_btn.text = "REPLAY %s" % GameState.get_level_name(13)
 	replay_btn.focus_mode = Control.FOCUS_NONE
 	replay_btn.pressed.connect(func():
 		GameState.restart_level()
@@ -173,10 +207,10 @@ func show_victory_screen() -> void:
 
 	var menu_btn := Button.new()
 	menu_btn.custom_minimum_size = Vector2(160.0, 44.0)
-	menu_btn.text = "RETURN TO MENU"
+	menu_btn.text = "LEVEL SELECT"
 	menu_btn.focus_mode = Control.FOCUS_NONE
 	menu_btn.pressed.connect(func():
-		GameState.go_to_menu()
+		GameState.go_to_level_select()
 	)
 	actions.add_child(menu_btn)
 
@@ -196,6 +230,7 @@ func _build_sector_badge() -> void:
 
 # Atmospheric fade-from-black + sonar title banner on level entry
 func play_level_intro(title_text: String, subtitle_text: String = "Listen closely. Stay unseen.") -> void:
+	set_gameplay_buttons_visible(true)
 	if _sector_badge != null:
 		_sector_badge.text = "◈  " + title_text
 	# 1. Fullscreen abyss curtain fading out smoothly
@@ -273,3 +308,72 @@ func _vignette_material() -> ShaderMaterial:
 	if vig == null:
 		return null
 	return vig.material as ShaderMaterial
+
+
+# --- Off-screen Sound Direction Compass ---
+var _indicator_canvas: Control
+var _sound_indicators: Array[Dictionary] = []
+
+
+func _setup_sound_indicator_canvas() -> void:
+	_indicator_canvas = Control.new()
+	_indicator_canvas.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_indicator_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_indicator_canvas.draw.connect(_draw_sound_indicators)
+	add_child(_indicator_canvas)
+
+	var sound_bus = get_node_or_null("../SoundBus")
+	if sound_bus != null and sound_bus.has_signal("offscreen_sound_emitted"):
+		sound_bus.offscreen_sound_emitted.connect(_on_offscreen_sound_emitted)
+
+
+func _on_offscreen_sound_emitted(origin_pos: Vector2, color: Color) -> void:
+	if not GameState.sound_indicator_enabled or player == null or not is_instance_valid(player) or not player.alive:
+		return
+	var diff: Vector2 = origin_pos - player.global_position
+	if diff.length() < 160.0:
+		return # Already on-screen / close
+	var dir: Vector2 = diff.normalized()
+	_sound_indicators.append({
+		"dir": dir,
+		"alpha": 1.0,
+		"color": color
+	})
+
+
+func _process(delta: float) -> void:
+	if not _sound_indicators.is_empty():
+		for ind in _sound_indicators:
+			ind["alpha"] = float(ind["alpha"]) - delta * 1.6
+		_sound_indicators = _sound_indicators.filter(func(ind: Dictionary) -> bool:
+			return float(ind["alpha"]) > 0.0
+		)
+		if _indicator_canvas != null and is_instance_valid(_indicator_canvas):
+			_indicator_canvas.queue_redraw()
+
+
+func _draw_sound_indicators() -> void:
+	if _indicator_canvas == null or _sound_indicators.is_empty():
+		return
+	var vp_size := _indicator_canvas.size
+	if vp_size.x <= 10.0 or vp_size.y <= 10.0:
+		return
+	var center := vp_size * 0.5
+	var edge_r := minf(center.x, center.y) - 34.0
+
+	for ind in _sound_indicators:
+		var dir: Vector2 = ind["dir"]
+		var alpha: float = float(ind["alpha"])
+		var col: Color = ind["color"]
+		var marker_pos := center + dir * edge_r
+		var ang := dir.angle()
+
+		# Outer glowing arc on edge
+		var arc_col := Color(col.r, col.g, col.b, alpha * 0.85)
+		_indicator_canvas.draw_arc(marker_pos, 18.0, ang - 0.75, ang + 0.75, 14, arc_col, 2.5)
+
+		# Tip chevron triangle pointing outward
+		var tip := marker_pos + dir * 6.0
+		var p1 := marker_pos + dir.rotated(2.2) * 8.0
+		var p2 := marker_pos + dir.rotated(-2.2) * 8.0
+		_indicator_canvas.draw_colored_polygon(PackedVector2Array([tip, p1, p2]), Color(col.r, col.g, col.b, alpha * 0.95))

@@ -116,34 +116,42 @@ offset_right = 695.0
 offset_bottom = 105.0
 theme_override_constants/separation = 14
 
-[node name="BackButton" type="Button" parent="TopBar" unique_id=1501365221]
-custom_minimum_size = Vector2(56, 56)
+[node name="StatusPill" type="PanelContainer" parent="TopBar" unique_id=1501365221]
+custom_minimum_size = Vector2(175, 56)
 layout_mode = 2
 size_flags_horizontal = 4
-focus_mode = 0
-theme_override_font_sizes/font_size = 22
-text = "🢀"
+mouse_filter = 2
+
+[node name="StatusBox" type="VBoxContainer" parent="TopBar/StatusPill"]
+layout_mode = 2
+theme_override_constants/separation = 2
+alignment = 1
+
+[node name="SectorLabel" type="Label" parent="TopBar/StatusPill/StatusBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.78, 0.92, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "ESCAPE DIRECTORY"
+horizontal_alignment = 1
+
+[node name="ProgressLabel" type="Label" parent="TopBar/StatusPill/StatusBox" unique_id=998877665]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.45, 0.78, 0.95, 0.85)
+theme_override_font_sizes/font_size = 10
+text = "UNLOCKED: 01 / 13"
+horizontal_alignment = 1
 
 [node name="Spacer" type="Control" parent="TopBar"]
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
 
-[node name="TestArenaButton" type="Button" parent="TopBar" unique_id=558461408]
-custom_minimum_size = Vector2(88, 56)
-layout_mode = 2
-size_flags_horizontal = 4
-focus_mode = 0
-theme_override_font_sizes/font_size = 15
-text = "🎯 SANDBOX"
-
 [node name="IntelButton" type="Button" parent="TopBar" unique_id=987123456]
-custom_minimum_size = Vector2(88, 56)
+custom_minimum_size = Vector2(56, 56)
 layout_mode = 2
 size_flags_horizontal = 4
 focus_mode = 0
 theme_override_font_sizes/font_size = 15
-text = "📖 INTEL"
 
 [node name="SettingsButton" type="Button" parent="TopBar" unique_id=654321987]
 custom_minimum_size = Vector2(56, 56)
@@ -151,54 +159,80 @@ layout_mode = 2
 size_flags_horizontal = 4
 focus_mode = 0
 theme_override_font_sizes/font_size = 20
-text = "⚙"
 
-[node name="CenterContainer" type="CenterContainer" parent="." unique_id=2067062267]
+[node name="MainArea" type="VBoxContainer" parent="." unique_id=2067062267]
 layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -320.0
-offset_top = -490.0
-offset_right = 320.0
-offset_bottom = 448.0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 26.0
+offset_top = 118.0
+offset_right = -48.0
+offset_bottom = -22.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_constants/separation = 12
 
-[node name="Content" type="VBoxContainer" parent="CenterContainer" unique_id=310439246]
-custom_minimum_size = Vector2(640, 0)
+[node name="HeaderBox" type="VBoxContainer" parent="MainArea"]
 layout_mode = 2
-theme_override_constants/separation = 16
+theme_override_constants/separation = 2
 
-[node name="Title" type="Label" parent="CenterContainer/Content" unique_id=858087850]
+[node name="TrackerLabel" type="Label" parent="MainArea/HeaderBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.72, 0.94, 1, 1)
-theme_override_colors/font_shadow_color = Color(0.05, 0.35, 0.68, 0.65)
-theme_override_colors/font_outline_color = Color(0.18, 0.62, 0.92, 0.45)
-theme_override_constants/shadow_offset_x = 0
-theme_override_constants/shadow_offset_y = 4
-theme_override_constants/outline_size = 4
-theme_override_font_sizes/font_size = 30
-text = "SELECT YOUR DEPTH"
+theme_override_colors/font_color = Color(0.38, 0.75, 1, 0.85)
+theme_override_font_sizes/font_size = 11
+text = "((   E S C A P E   T H E   A B Y S S   ))"
 horizontal_alignment = 1
 
-[node name="Subtitle" type="Label" parent="CenterContainer/Content" unique_id=848432811]
+[node name="Title" type="Label" parent="MainArea/HeaderBox" unique_id=858087850]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.68, 0.84, 0.96, 0.85)
-theme_override_font_sizes/font_size = 24
-text = "CHOOSE YOUR CAVERN SECTOR"
+theme_override_colors/font_color = Color(0.88, 0.96, 1, 1)
+theme_override_colors/font_shadow_color = Color(0.04, 0.22, 0.48, 0.85)
+theme_override_colors/font_outline_color = Color(0.25, 0.68, 0.95, 0.55)
+theme_override_constants/shadow_offset_y = 3
+theme_override_constants/outline_size = 2
+theme_override_font_sizes/font_size = 28
+text = "ESCAPE THE ABYSS"
 horizontal_alignment = 1
 
-[node name="ScrollContainer" type="ScrollContainer" parent="CenterContainer/Content" unique_id=894529486]
-custom_minimum_size = Vector2(0, 830)
+[node name="Subtitle" type="Label" parent="MainArea/HeaderBox" unique_id=848432811]
 layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.76, 0.92, 0.8)
+theme_override_font_sizes/font_size = 13
+text = "Stay calm. Stay silent. Find the way out."
+horizontal_alignment = 1
+
+[node name="ScrollContainer" type="ScrollContainer" parent="MainArea" unique_id=894529486]
+layout_mode = 2
+size_flags_horizontal = 3
 size_flags_vertical = 3
 horizontal_scroll_mode = 0
 
-[node name="LevelGrid" type="GridContainer" parent="CenterContainer/Content/ScrollContainer" unique_id=560705883]
+[node name="GridMargin" type="MarginContainer" parent="MainArea/ScrollContainer"]
 layout_mode = 2
-theme_override_constants/h_separation = 12
-theme_override_constants/v_separation = 12
+size_flags_horizontal = 3
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 4
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 4
+
+[node name="LevelGrid" type="GridContainer" parent="MainArea/ScrollContainer/GridMargin" unique_id=560705883]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/h_separation = 16
+theme_override_constants/v_separation = 30
 columns = 2
+
+[node name="DepthGauge" type="Control" parent="." unique_id=443322110]
+layout_mode = 1
+anchors_preset = 11
+anchor_left = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -44.0
+offset_top = 125.0
+offset_right = -6.0
+offset_bottom = -25.0
+grow_horizontal = 0
+grow_vertical = 2
+mouse_filter = 1

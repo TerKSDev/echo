@@ -8,7 +8,7 @@
 
 [node name="Level" type="Node2D" unique_id=66708177]
 script = ExtResource("1_5p57d")
-level_name = "STILL WATER"
+level_name = "LURKING VAULT"
 hint = "Water slows your stride and amplifies every step. Cut through the pool or take the dry outer bypass."
 
 [node name="Walls" type="TileMapLayer" parent="." unique_id=1533495858]

@@ -9,12 +9,12 @@ signal beat(threat: float)
 const MIX_RATE := 22050
 
 # Heartbeat parameters
-@export var interval_calm := 1.25   # Seconds between beats when safe
-@export var interval_panic := 0.42  # Seconds between beats when hunted
-@export var vol_calm := -12.0       # Quiet subtle pulse when safe
-@export var vol_panic := 2.0        # Pounding chest thump when hunted
-@export var pitch_calm := 0.92
-@export var pitch_panic := 1.18
+@export var interval_calm := 1.30   # Seconds between beats when safe (~46 BPM)
+@export var interval_panic := 0.35  # Seconds between beats when hunted (~170 BPM)
+@export var vol_calm := -11.0       # Quiet subtle pulse when safe
+@export var vol_panic := 3.2        # Pounding chest thump when hunted
+@export var pitch_calm := 0.88
+@export var pitch_panic := 1.22
 
 var _hb_players: Array[AudioStreamPlayer] = []
 var _hb_idx := 0
@@ -40,6 +40,8 @@ var _wav_level_exit: AudioStreamWAV
 var _wav_victory_fanfare: AudioStreamWAV
 var _wav_sneak_toggle: AudioStreamWAV
 var _wav_charge_loop: AudioStreamWAV
+var _wav_star_chimes: Array[AudioStreamWAV] = []
+var _wav_pebble_clatter: AudioStreamWAV
 
 var _charge_player: AudioStreamPlayer
 var _player_ref: Node2D
@@ -137,6 +139,18 @@ func play_victory_fanfare() -> void:
 	_play_non_spatial(_wav_victory_fanfare, 1.0, 1.0)
 
 
+func play_star_chime(index: int) -> void:
+	if _wav_star_chimes.is_empty():
+		return
+	var idx := clampi(index, 0, _wav_star_chimes.size() - 1)
+	_play_non_spatial(_wav_star_chimes[idx], -2.5, 1.0)
+
+
+func play_pebble_clatter(pos: Vector2) -> void:
+	_suppress_mic(0.3)
+	_play_spatial(_wav_pebble_clatter, pos, 2.0, randf_range(0.95, 1.08), 650.0)
+
+
 func play_sneak_toggle(entering_sneak: bool) -> void:
 	var pitch: float = 0.82 if entering_sneak else 1.18
 	_play_non_spatial(_wav_sneak_toggle, -10.0, pitch)
@@ -197,7 +211,7 @@ func play_enemy_step(pos: Vector2, is_chasing: bool, occluded: bool) -> void:
 func _setup_charge_player() -> void:
 	_charge_player = AudioStreamPlayer.new()
 	_charge_player.stream = _wav_charge_loop
-	_charge_player.bus = &"Master"
+	_charge_player.bus = &"SFX"
 	add_child(_charge_player)
 
 
@@ -208,7 +222,7 @@ func _setup_heartbeat_players() -> void:
 	for i in 2:
 		var p := AudioStreamPlayer.new()
 		p.stream = hb_stream
-		p.bus = &"Master"
+		p.bus = &"SFX"
 		add_child(p)
 		_hb_players.append(p)
 
@@ -216,6 +230,8 @@ func _setup_heartbeat_players() -> void:
 func _process_heartbeat(delta: float) -> void:
 	if _hb_players.is_empty():
 		return
+	if _player_ref == null or not is_instance_valid(_player_ref):
+		_player_ref = get_tree().get_first_node_in_group("player")
 	if _player_ref == null or not is_instance_valid(_player_ref) or not _player_ref.get("alive"):
 		for p in _hb_players:
 			if p.playing:
@@ -229,7 +245,7 @@ func _process_heartbeat(delta: float) -> void:
 		if enemy != null and is_instance_valid(enemy):
 			max_threat = maxf(max_threat, enemy.get_threat_level(player_pos))
 
-	var rate := 3.5 if max_threat > _threat else 1.0
+	var rate := 4.2 if max_threat > _threat else 1.2
 	_threat = move_toward(_threat, max_threat, delta * rate)
 
 	_hb_timer += delta
@@ -253,33 +269,35 @@ func _synth_heartbeat() -> AudioStreamWAV:
 	var dub_start := 0.17
 	for i in count:
 		var t: float = float(i) / MIX_RATE
-		var env1: float = minf(t / 0.008, 1.0) * exp(-t * 24.0)
-		var f1: float = lerpf(92.0, 38.0, clampf(t / 0.11, 0.0, 1.0))
+		var env1: float = minf(t / 0.008, 1.0) * exp(-t * 22.0)
+		var f1: float = lerpf(98.0, 42.0, clampf(t / 0.11, 0.0, 1.0))
 		phase1 += TAU * f1 / MIX_RATE
-		var lub: float = (sin(phase1) + 0.35 * sin(phase1 * 2.0)) * env1 * 0.9
+		# Lub: AV valves snap shut - deep resonant body + palpable 90-180Hz chest thump
+		var lub: float = (sin(phase1) * 0.65 + sin(phase1 * 1.8) * 0.32 + sin(phase1 * 2.6) * 0.14) * env1 * 0.95
 
 		var dub := 0.0
 		if t >= dub_start:
 			var td: float = t - dub_start
-			var env2: float = minf(td / 0.006, 1.0) * exp(-td * 30.0)
-			var f2: float = lerpf(108.0, 44.0, clampf(td / 0.09, 0.0, 1.0))
+			var env2: float = minf(td / 0.006, 1.0) * exp(-td * 24.0)
+			var f2: float = lerpf(118.0, 48.0, clampf(td / 0.09, 0.0, 1.0))
 			phase2 += TAU * f2 / MIX_RATE
-			dub = (sin(phase2) + 0.3 * sin(phase2 * 2.0)) * env2 * 0.72
+			# Dub: semilunar valves snap shut - punchy secondary impact
+			dub = (sin(phase2) * 0.65 + sin(phase2 * 1.7) * 0.30 + sin(phase2 * 2.5) * 0.12) * env2 * 0.82
 
-		out[i] = tanh((lub + dub) * 1.35) * 0.88
+		out[i] = tanh((lub + dub) * 1.45) * 0.92
 	return _make_wav(out)
 
 
 func _setup_audio_pools() -> void:
 	for i in NON_SPATIAL_POOL_SIZE:
 		var p := AudioStreamPlayer.new()
-		p.bus = &"Master"
+		p.bus = &"SFX"
 		add_child(p)
 		_non_spatial_pool.append(p)
 
 	for i in SPATIAL_POOL_SIZE:
 		var p := AudioStreamPlayer2D.new()
-		p.bus = &"Master"
+		p.bus = &"SFX"
 		p.attenuation = 1.5
 		p.panning_strength = 1.4
 		add_child(p)
@@ -334,25 +352,39 @@ func _build_all_streams() -> void:
 		_cache["victory_fanfare"] = _synth_victory_fanfare()
 		_cache["sneak_toggle"] = _synth_sneak_toggle()
 
-	_wav_step_walk = _cache["step_walk"]
-	_wav_step_sneak = _cache["step_sneak"]
-	_wav_enemy_step = _cache["enemy_step"]
-	_wav_echo_ping = _cache["echo_ping"]
-	_wav_charge_full = _cache["charge_full"]
-	_wav_charge_loop = _cache["charge_loop"]
-	_wav_roar_sleeper = _cache["roar_sleeper"]
-	_wav_roar_patroller = _cache["roar_patroller"]
-	_wav_roar_chaser = _cache["roar_chaser"]
-	_wav_screamer_crack = _cache["screamer_crack"]
-	_wav_screamer_shriek = _cache["screamer_shriek"]
-	_wav_listener_pip = _cache["listener_pip"]
-	_wav_listener_alarm = _cache["listener_alarm"]
-	_wav_player_stun = _cache["player_stun"]
-	_wav_player_death = _cache["player_death"]
-	_wav_level_intro = _cache["level_intro"]
-	_wav_level_exit = _cache["level_exit"]
-	_wav_victory_fanfare = _cache["victory_fanfare"]
-	_wav_sneak_toggle = _cache["sneak_toggle"]
+	if not _cache.has("star_chime_0"):
+		_cache["star_chime_0"] = _synth_star_chime(523.25)
+		_cache["star_chime_1"] = _synth_star_chime(659.25)
+		_cache["star_chime_2"] = _synth_star_chime(783.99)
+
+	if not _cache.has("pebble_clatter"):
+		_cache["pebble_clatter"] = _synth_pebble_clatter()
+
+	_wav_step_walk = _cache.get("step_walk", null)
+	_wav_step_sneak = _cache.get("step_sneak", null)
+	_wav_enemy_step = _cache.get("enemy_step", null)
+	_wav_echo_ping = _cache.get("echo_ping", null)
+	_wav_charge_full = _cache.get("charge_full", null)
+	_wav_charge_loop = _cache.get("charge_loop", null)
+	_wav_roar_sleeper = _cache.get("roar_sleeper", null)
+	_wav_roar_patroller = _cache.get("roar_patroller", null)
+	_wav_roar_chaser = _cache.get("roar_chaser", null)
+	_wav_screamer_crack = _cache.get("screamer_crack", null)
+	_wav_screamer_shriek = _cache.get("screamer_shriek", null)
+	_wav_listener_pip = _cache.get("listener_pip", null)
+	_wav_listener_alarm = _cache.get("listener_alarm", null)
+	_wav_player_stun = _cache.get("player_stun", null)
+	_wav_player_death = _cache.get("player_death", null)
+	_wav_level_intro = _cache.get("level_intro", null)
+	_wav_level_exit = _cache.get("level_exit", null)
+	_wav_victory_fanfare = _cache.get("victory_fanfare", null)
+	_wav_sneak_toggle = _cache.get("sneak_toggle", null)
+	_wav_pebble_clatter = _cache.get("pebble_clatter", null)
+	_wav_star_chimes = [
+		_cache.get("star_chime_0", null),
+		_cache.get("star_chime_1", null),
+		_cache.get("star_chime_2", null)
+	]
 
 
 static func _make_wav(samples: PackedFloat32Array, loop: bool = false) -> AudioStreamWAV:
@@ -690,6 +722,44 @@ func _synth_victory_fanfare() -> AudioStreamWAV:
 				var s: float = sin(TAU * freqs[k] * note_t) + 0.25 * sin(TAU * freqs[k] * 2.0 * note_t)
 				total_sample += s * note_env * 0.2
 		out[i] = clampf(tanh(total_sample * 1.5) * 0.88, -1.0, 1.0)
+	return _make_wav(out)
+
+
+# Procedural crystalline bell chime for debrief star reveals
+func _synth_star_chime(freq: float) -> AudioStreamWAV:
+	var dur := 0.72
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var env: float = minf(t / 0.006, 1.0) * exp(-t * 5.4)
+		var body: float = sin(TAU * freq * t) + 0.38 * sin(TAU * freq * 2.0 * t) + 0.15 * sin(TAU * freq * 3.0 * t)
+		out[i] = clampf(body * env * 0.82, -1.0, 1.0)
+	return _make_wav(out)
+
+
+# Organic stone skipping/clattering on cavern rock: sharp primary impact, high clack, secondary bounces and small roll
+func _synth_pebble_clatter() -> AudioStreamWAV:
+	var dur := 0.42
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	var hits: Array[float] = [0.0, 0.11, 0.20, 0.27, 0.33]
+	var amps: Array[float] = [1.0, 0.52, 0.26, 0.14, 0.08]
+	var freqs: Array[float] = [620.0, 780.0, 890.0, 1020.0, 1150.0]
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var sample := 0.0
+		for k in hits.size():
+			var dt: float = t - hits[k]
+			if dt >= 0.0 and dt < 0.12:
+				var att: float = minf(dt / 0.0018, 1.0)
+				var env: float = att * exp(-dt * 48.0)
+				var ping: float = sin(TAU * freqs[k] * dt) * exp(-dt * 32.0)
+				var clack: float = randf_range(-1.0, 1.0) * exp(-dt * 85.0)
+				sample += (ping * 0.72 + clack * 0.48) * env * amps[k]
+		out[i] = clampf(tanh(sample * 1.35) * 0.88, -1.0, 1.0)
 	return _make_wav(out)
 
 

@@ -8,6 +8,7 @@
 [ext_resource type="Script" path="res://ui/PauseButton.gd" id="6_pause"]
 [ext_resource type="PackedScene" path="res://ui/settings_modal.tscn" id="7_modal"]
 [ext_resource type="PackedScene" path="res://ui/death_screen.tscn" id="8_death"]
+[ext_resource type="Script" path="res://ui/PebbleButton.gd" id="9_pebble"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_vignette"]
 shader = ExtResource("2_shader")
@@ -80,6 +81,22 @@ grow_vertical = 0
 focus_mode = 0
 flat = true
 script = ExtResource("5_sound")
+
+[node name="PebbleBtn" type="Button" parent="." unique_id=982347101]
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -139.0
+offset_top = -300.0
+offset_right = -51.0
+offset_bottom = -196.0
+grow_horizontal = 0
+grow_vertical = 0
+focus_mode = 0
+flat = true
+script = ExtResource("9_pebble")
 
 [node name="SettingsModal" parent="." instance=ExtResource("7_modal")]
 visible = false
