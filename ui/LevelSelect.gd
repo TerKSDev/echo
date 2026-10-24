@@ -290,14 +290,6 @@ func _on_test_arena_pressed() -> void:
 
 func _on_back_pressed() -> void:
 	GameState.go_to_menu()
-	var mouse_pos := get_global_mouse_position()
-
-	var map_rect := Rect2(
-		scroll_container.global_position,
-		scroll_container.size
-	)
-
-	return map_rect.has_point(mouse_pos)
 
 
 # --------------------------------------------------

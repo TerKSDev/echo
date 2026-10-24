@@ -174,12 +174,12 @@ func _physics_process(_delta: float) -> void:
 		_press_switch(c)
 	if has_exit and c == exit_cell:
 		_changing = true
-
-	# 正式关卡才记录通关进度。
-	# GameState.LEVELS 的第 0 项是 TEST ARENA。
+		
+		# 正式关卡才记录通关进度。
+		# GameState.LEVELS 的第 0 项是 TEST ARENA。
 		if GameState.current_level >= 1 and GameState.current_level <= 13:
 			GameState.complete_level(GameState.current_level)
-
+		
 		GameState.call_deferred("next_level")
 
 func _press_switch(cell: Vector2i) -> void:
