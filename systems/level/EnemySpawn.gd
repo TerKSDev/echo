@@ -1,6 +1,5 @@
 extends Marker2D
 class_name EnemySpawn
-## 敌人出生点：你朋友把敌人场景拖到 enemy_scene，再把本节点放到关卡里即可。
 ## 运行时 LevelController 会实例化敌人并加入 group "enemies"。
 
 @export var enemy_scene: PackedScene

@@ -1,0 +1,434 @@
+[gd_scene format=4 uid="uid://b07vvdlq8qlli"]
+
+[ext_resource type="Script" uid="uid://doi52335aclw8" path="res://systems/level/LevelRoot.gd" id="1_f5mw6"]
+[ext_resource type="TileSet" uid="uid://0kitrq7qjdh5" path="res://tilesets/echo_tileset.tres" id="2_3wmpd"]
+[ext_resource type="Script" uid="uid://dlpb0h4lai6o0" path="res://systems/level/LevelMarker.gd" id="4_rayyb"]
+[ext_resource type="PackedScene" path="res://characters/enemy/enemy_chaser.tscn" id="5_5xg7u"]
+[ext_resource type="PackedScene" path="res://characters/enemy/enemy_sleeper.tscn" id="5_hmv7y"]
+[ext_resource type="PackedScene" path="res://characters/enemy/enemy_screamer.tscn" id="7_oolj0"]
+[ext_resource type="PackedScene" path="res://characters/enemy/enemy_patroller.tscn" id="7_s5b7g"]
+[ext_resource type="PackedScene" path="res://characters/enemy/enemy_listener.tscn" id="10_rbabb"]
+
+[node name="Level" type="Node2D" unique_id=1177565450]
+script = ExtResource("1_f5mw6")
+level_name = "THREE CROSSINGS "
+hint = "A spiral on the left, vaults on the right, and two guarded passages between. One crossing will never be enough. Four switches, four sealed gates."
+
+[node name="Walls" type="TileMapLayer" parent="." unique_id=619472795]
+tile_map_data = PackedByteArray("AAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAACAAAAAAAAAAAAAAADAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAFAAAAAAAAAAAAAAAGAAAAAAAAAAAAAAAHAAAAAAAAAAAAAAAIAAAAAAAAAAAAAAAJAAAAAAAAAAAAAAAKAAAAAAAAAAAAAAALAAAAAAAAAAAAAAAMAAAAAAAAAAAAAAANAAAAAAAAAAAAAAAOAAAAAAAAAAAAAAAPAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAARAAAAAAAAAAAAAAASAAAAAAAAAAAAAAATAAAAAAAAAAAAAAAUAAAAAAAAAAAAAAAVAAAAAAAAAAAAAAAWAAAAAAAAAAAAAAAXAAAAAAAAAAAAAAAYAAAAAAAAAAAAAAAZAAAAAAAAAAAAAAAaAAAAAAAAAAAAAAAbAAAAAAAAAAAAAAAcAAAAAAAAAAAAAAAdAAAAAAAAAAAAAAAeAAAAAAAAAAAAAAAfAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAhAAAAAAAAAAAAAAAiAAAAAAAAAAAAAAAjAAAAAAAAAAAAAAAkAAAAAAAAAAAAAAAlAAAAAAAAAAAAAAAmAAAAAAAAAAAAAAAnAAAAAAAAAAAAAAAoAAAAAAAAAAAAAAApAAAAAAAAAAAAAAAqAAAAAAAAAAAAAAArAAAAAAAAAAAAAAAsAAAAAAAAAAAAAAAtAAAAAAAAAAAAAAAuAAAAAAAAAAAAAAAvAAAAAAAAAAAAAAAwAAAAAAAAAAAAAAAxAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAIAAAAAAAAAAAAAAAMAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAUAAAAAAAAAAAAAAAYAAAAAAAAAAAAAAAcAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAkAAAAAAAAAAAAAAAoAAAAAAAAAAAAAAAsAAAAAAAAAAAAAAAwAAAAAAAAAAAAAAA0AAAAAAAAAAAAAAA4AAAAAAAAAAAAAAA8AAAAAAAAAAAAAABAAAAAAAAAAAAAXAAIAAAAAAAAAAAAZAAIAAAAAAAAAAAAbAAIAAAAAAAAAAAAcAAIAAAAAAAAAAAAdAAIAAAAAAAAAAAAeAAIAAAAAAAAAAAAgAAIAAAAAAAAAAAAiAAIAAAAAAAAAAAAtAAIAAAAAAAAAAAAuAAIAAAAAAAAAAAAvAAIAAAAAAAAAAAAjAAIAAAAAAAAAAAAxAAIAAAAAAAAAAAAeAAQAAAAAAAAAAAAgAAQAAAAAAAAAAAANAAYAAAAAAAAAAAAQAAYAAAAAAAAAAAATAAYAAAAAAAAAAAAbAAYAAAAAAAAAAAAdAAYAAAAAAAAAAAAQAAgAAAAAAAAAAAATAAgAAAAAAAAAAAAXAAgAAAAAAAAAAAAdAAgAAAAAAAAAAAAQAAoAAAAAAAAAAAATAAoAAAAAAAAAAAAWAAoAAAAAAAAAAAAXAAoAAAAAAAAAAAAYAAoAAAAAAAAAAAAZAAoAAAAAAAAAAAAaAAoAAAAAAAAAAAAcAAoAAAAAAAAAAAAfAAoAAAAAAAAAAAAgAAoAAAAAAAAAAAAiAAoAAAAAAAAAAAAgAAwAAAAAAAAAAAAiAAwAAAAAAAAAAAAmAAwAAAAAAAAAAAAxAAwAAAAAAAAAAAATAA4AAAAAAAAAAAAiAA4AAAAAAAAAAAAmAA4AAAAAAAAAAAATABAAAAAAAAAAAAAWABAAAAAAAAAAAAAXABAAAAAAAAAAAAAYABAAAAAAAAAAAAAZABAAAAAAAAAAAAAaABAAAAAAAAAAAAAbABAAAAAAAAAAAAAcABAAAAAAAAAAAAAdABAAAAAAAAAAAAAeABAAAAAAAAAAAAAfABAAAAAAAAAAAAAgABAAAAAAAAAAAAAhABAAAAAAAAAAAAAiABAAAAAAAAAAAAAjABAAAAAAAAAAAAAmABAAAAAAAAAAAAAjAAYAAAAAAAAAAAAgAA4AAAAAAAAAAAAyAAAAAAAAAAAAAAAzAAAAAAAAAAAAAAAWAAIAAAAAAAAAAAAfAAIAAAAAAAAAAAAhAAIAAAAAAAAAAAAwAAIAAAAAAAAAAAATAAQAAAAAAAAAAAAZAAQAAAAAAAAAAAAbAAQAAAAAAAAAAAAdAAQAAAAAAAAAAAAfAAQAAAAAAAAAAAAjAAQAAAAAAAAAAAAhAAYAAAAAAAAAAAAzAAcAAAAAAAAAAAAzAAoAAAAAAAAAAAAfAAwAAAAAAAAAAAAzAAwAAAAAAAAAAAAPAA4AAAAAAAAAAAAQAA4AAAAAAAAAAAAWAA4AAAAAAAAAAAAXAA4AAAAAAAAAAAAYAA4AAAAAAAAAAAAZAA4AAAAAAAAAAAAaAA4AAAAAAAAAAAAbAA4AAAAAAAAAAAAdAA4AAAAAAAAAAAAeAA4AAAAAAAAAAAAfAA4AAAAAAAAAAAAhAA4AAAAAAAAAAAAAABEAAAAAAAAAAAA0AAAAAAAAAAAAAAA1AAAAAAAAAAAAAAAZAAEAAAAAAAAAAAASAAMAAAAAAAAAAAAXAAMAAAAAAAAAAAAZAAMAAAAAAAAAAAAbAAMAAAAAAAAAAAAjAAMAAAAAAAAAAAAXAAQAAAAAAAAAAAAXAAYAAAAAAAAAAAAZAAYAAAAAAAAAAAATAAcAAAAAAAAAAAAXAAcAAAAAAAAAAAAZAAcAAAAAAAAAAAAbAAcAAAAAAAAAAAAdAAcAAAAAAAAAAAAfAAcAAAAAAAAAAAAhAAcAAAAAAAAAAAAjAAcAAAAAAAAAAAAnAAcAAAAAAAAAAAApAAcAAAAAAAAAAAA1AAcAAAAAAAAAAAAZAAgAAAAAAAAAAAAbAAgAAAAAAAAAAAATAAkAAAAAAAAAAAAZAAkAAAAAAAAAAAAdAAkAAAAAAAAAAAAhAAkAAAAAAAAAAAAbAAoAAAAAAAAAAAAdAAoAAAAAAAAAAAAhAAoAAAAAAAAAAAAjAAoAAAAAAAAAAAAnAAoAAAAAAAAAAAApAAoAAAAAAAAAAAA1AAoAAAAAAAAAAAAhAAwAAAAAAAAAAAAjAAwAAAAAAAAAAAAnAAwAAAAAAAAAAAApAAwAAAAAAAAAAAA1AAwAAAAAAAAAAAAjAA4AAAAAAAAAAAA1ABEAAAAAAAAAAAA2AAAAAAAAAAAAAAA3AAAAAAAAAAAAAAA4AAAAAAAAAAAAAAA5AAAAAAAAAAAAAAAWAAEAAAAAAAAAAAAXAAEAAAAAAAAAAAAYAAEAAAAAAAAAAAAaAAEAAAAAAAAAAAAbAAEAAAAAAAAAAAAcAAEAAAAAAAAAAAAdAAEAAAAAAAAAAAAeAAEAAAAAAAAAAAAfAAEAAAAAAAAAAAAgAAEAAAAAAAAAAAAhAAEAAAAAAAAAAAAiAAEAAAAAAAAAAAAjAAEAAAAAAAAAAAAmAAEAAAAAAAAAAAAtAAEAAAAAAAAAAAAuAAEAAAAAAAAAAAAvAAEAAAAAAAAAAAAwAAEAAAAAAAAAAAAxAAEAAAAAAAAAAAA5AAEAAAAAAAAAAAATAAIAAAAAAAAAAAAYAAIAAAAAAAAAAAAaAAIAAAAAAAAAAAAmAAIAAAAAAAAAAAA5AAIAAAAAAAAAAAAPAAMAAAAAAAAAAAAQAAMAAAAAAAAAAAARAAMAAAAAAAAAAAATAAMAAAAAAAAAAAAWAAMAAAAAAAAAAAAYAAMAAAAAAAAAAAAaAAMAAAAAAAAAAAAcAAMAAAAAAAAAAAAdAAMAAAAAAAAAAAAeAAMAAAAAAAAAAAAfAAMAAAAAAAAAAAAgAAMAAAAAAAAAAAAhAAMAAAAAAAAAAAAiAAMAAAAAAAAAAAA5AAMAAAAAAAAAAAAWAAQAAAAAAAAAAAAYAAQAAAAAAAAAAAAcAAQAAAAAAAAAAAAiAAQAAAAAAAAAAAAmAAQAAAAAAAAAAAA5AAQAAAAAAAAAAAA5AAUAAAAAAAAAAAADAAYAAAAAAAAAAAALAAYAAAAAAAAAAAAPAAYAAAAAAAAAAAAWAAYAAAAAAAAAAAAYAAYAAAAAAAAAAAAaAAYAAAAAAAAAAAAcAAYAAAAAAAAAAAAgAAYAAAAAAAAAAAAiAAYAAAAAAAAAAAAmAAYAAAAAAAAAAAA5AAYAAAAAAAAAAAADAAcAAAAAAAAAAAANAAcAAAAAAAAAAAAPAAcAAAAAAAAAAAAQAAcAAAAAAAAAAAAWAAcAAAAAAAAAAAAYAAcAAAAAAAAAAAAaAAcAAAAAAAAAAAAcAAcAAAAAAAAAAAAgAAcAAAAAAAAAAAAiAAcAAAAAAAAAAAAmAAcAAAAAAAAAAAAoAAcAAAAAAAAAAAAqAAcAAAAAAAAAAAAyAAcAAAAAAAAAAAA0AAcAAAAAAAAAAAA2AAcAAAAAAAAAAAA3AAcAAAAAAAAAAAA4AAcAAAAAAAAAAAA5AAcAAAAAAAAAAAAWAAgAAAAAAAAAAAAYAAgAAAAAAAAAAAAaAAgAAAAAAAAAAAAcAAgAAAAAAAAAAAA5AAgAAAAAAAAAAAAQAAkAAAAAAAAAAAAWAAkAAAAAAAAAAAAXAAkAAAAAAAAAAAAYAAkAAAAAAAAAAAAaAAkAAAAAAAAAAAAbAAkAAAAAAAAAAAAcAAkAAAAAAAAAAAAfAAkAAAAAAAAAAAAgAAkAAAAAAAAAAAAiAAkAAAAAAAAAAAAjAAkAAAAAAAAAAAA5AAkAAAAAAAAAAAAmAAoAAAAAAAAAAAAoAAoAAAAAAAAAAAAqAAoAAAAAAAAAAAAyAAoAAAAAAAAA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AAAtAAUAAAAAAAAAAAAuAAUAAAAAAAAAAAAvAAUAAAAAAAAAAAAwAAUAAAAAAAAAAAAxAAUAAAAAAAAAAAAtAAYAAAAAAAAAAAAuAAYAAAAAAAAAAAAvAAYAAAAAAAAAAAAwAAYAAAAAAAAAAAAxAAYAAAAAAAAAAAArAAcAAAAAAAAAAAAsAAcAAAAAAAAAAAAtAAcAAAAAAAAAAAAuAAcAAAAAAAAAAAAvAAcAAAAAAAAAAAAwAAcAAAAAAAAAAAAxAAcAAAAAAAAAAAADAAgAAAAAAAAAAAAGAAgAAAAAAAAAAAADAAkAAAAAAAAAAAAGAAkAAAAAAAAAAAANAAkAAAAAAAAAAAADAAoAAAAAAAAAAAAGAAoAAAAAAAAAAAANAAoAAAAAAAAAAAArAAoAAAAAAAAAAAAsAAoAAAAAAAAAAAAtAAoAAAAAAAAAAAAuAAoAAAAAAAAAAAAvAAoAAAAAAAAAAAAwAAoAAAAAAAAAAAAxAAoAAAAAAAAAAAADAAsAAAAAAAAAAAAGAAsAAAAAAAAAAAAHAAsAAAAAAAAAAAAIAAsAAAAAAAAAAAAJAAsAAAAAAAAAAAAKAAsAAAAAAAAAAAALAAsAAAAAAAAAAAAMAAsAAAAAAAAAAAANAAsAAAAAAAAAAAA5AAsAAAAAAAAAAAADAAwAAAAAAAAAAAAqAAwAAAAAAAAAAAArAAwAAAAAAAAAAAAsAAwAAAAAAAAAAAAtAAwAAAAAAAAAAAAuAAwAAAAAAAAAAAAvAAwAAAAAAAAAAAAwAAwAAAAAAAAAAAA5AAwAAAAAAAAAAAADAA0AAAAAAAAAAAAQAA0AAAAAAAAAAAATAA0AAAAAAAAAAAAmAA0AAAAAAAAAAAADAA4AAAAAAAAAAAAEAA4AAAAAAAAAAAAFAA4AAAAAAAAAAAAGAA4AAAAAAAAAAAAHAA4AAAAAAAAAAAAIAA4AAAAAAAAAAAAJAA4AAAAAAAAAAAAKAA4AAAAAAAAAAAALAA4AAAAAAAAAAAAMAA4AAAAAAAAAAAANAA4AAAAAAAAAAAA=")
+tile_set = ExtResource("2_3wmpd")
+
+[node name="Markers" type="Node2D" parent="." unique_id=1512623254]
+
+[node name="PlayerStart" type="Marker2D" parent="Markers" unique_id=1652386451]
+position = Vector2(656, 80)
+script = ExtResource("4_rayyb")
+kind = 0
+
+[node name="Switch_B" type="Marker2D" parent="Markers" unique_id=2014901919]
+position = Vector2(1776, 80)
+script = ExtResource("4_rayyb")
+kind = 3
+link_id = "b"
+
+[node name="Water_1" type="Marker2D" parent="Markers" unique_id=609666693]
+position = Vector2(1456, 112)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_2" type="Marker2D" parent="Markers" unique_id=1869231264]
+position = Vector2(1488, 112)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_3" type="Marker2D" parent="Markers" unique_id=336301444]
+position = Vector2(1520, 112)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_4" type="Marker2D" parent="Markers" unique_id=1823018320]
+position = Vector2(1552, 112)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_5" type="Marker2D" parent="Markers" unique_id=178371516]
+position = Vector2(1584, 112)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Switch_A" type="Marker2D" parent="Markers" unique_id=1920913277]
+position = Vector2(144, 144)
+script = ExtResource("4_rayyb")
+kind = 3
+link_id = "a"
+
+[node name="Water_6" type="Marker2D" parent="Markers" unique_id=337851349]
+position = Vector2(1456, 144)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_7" type="Marker2D" parent="Markers" unique_id=862234790]
+position = Vector2(1488, 144)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_8" type="Marker2D" parent="Markers" unique_id=1703600124]
+position = Vector2(1520, 144)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_9" type="Marker2D" parent="Markers" unique_id=1228309553]
+position = Vector2(1552, 144)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_10" type="Marker2D" parent="Markers" unique_id=1289162161]
+position = Vector2(1584, 144)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Door_B" type="Marker2D" parent="Markers" unique_id=1116285887]
+position = Vector2(1136, 176)
+script = ExtResource("4_rayyb")
+kind = 4
+link_id = "B"
+
+[node name="Water_11" type="Marker2D" parent="Markers" unique_id=162394796]
+position = Vector2(48, 272)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_12" type="Marker2D" parent="Markers" unique_id=1846504391]
+position = Vector2(80, 272)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Door_C" type="Marker2D" parent="Markers" unique_id=1105064007]
+position = Vector2(432, 272)
+script = ExtResource("4_rayyb")
+kind = 4
+link_id = "C"
+
+[node name="Water_13" type="Marker2D" parent="Markers" unique_id=1606464437]
+position = Vector2(656, 272)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_14" type="Marker2D" parent="Markers" unique_id=1229462464]
+position = Vector2(688, 272)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_15" type="Marker2D" parent="Markers" unique_id=1828283395]
+position = Vector2(1424, 272)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_16" type="Marker2D" parent="Markers" unique_id=242338611]
+position = Vector2(1456, 272)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_17" type="Marker2D" parent="Markers" unique_id=872429890]
+position = Vector2(1488, 272)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_18" type="Marker2D" parent="Markers" unique_id=1860411707]
+position = Vector2(1520, 272)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_19" type="Marker2D" parent="Markers" unique_id=1647678706]
+position = Vector2(48, 304)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_20" type="Marker2D" parent="Markers" unique_id=788680700]
+position = Vector2(80, 304)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Switch_D" type="Marker2D" parent="Markers" unique_id=1455540952]
+position = Vector2(304, 304)
+script = ExtResource("4_rayyb")
+kind = 3
+link_id = "d"
+
+[node name="Water_21" type="Marker2D" parent="Markers" unique_id=77004899]
+position = Vector2(656, 304)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_22" type="Marker2D" parent="Markers" unique_id=1429719139]
+position = Vector2(688, 304)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Door_B2" type="Marker2D" parent="Markers" unique_id=1243705016]
+position = Vector2(1232, 304)
+script = ExtResource("4_rayyb")
+kind = 4
+link_id = "B"
+
+[node name="Water_23" type="Marker2D" parent="Markers" unique_id=200648880]
+position = Vector2(1424, 304)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_24" type="Marker2D" parent="Markers" unique_id=165877774]
+position = Vector2(1456, 304)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_25" type="Marker2D" parent="Markers" unique_id=1857777774]
+position = Vector2(1488, 304)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_26" type="Marker2D" parent="Markers" unique_id=1290718526]
+position = Vector2(1520, 304)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_27" type="Marker2D" parent="Markers" unique_id=1493350605]
+position = Vector2(656, 336)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_28" type="Marker2D" parent="Markers" unique_id=1131823394]
+position = Vector2(688, 336)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_29" type="Marker2D" parent="Markers" unique_id=1856954360]
+position = Vector2(1168, 336)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_30" type="Marker2D" parent="Markers" unique_id=1232375132]
+position = Vector2(1200, 336)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_31" type="Marker2D" parent="Markers" unique_id=786078363]
+position = Vector2(1168, 368)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_32" type="Marker2D" parent="Markers" unique_id=1278312225]
+position = Vector2(1200, 368)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Switch_C" type="Marker2D" parent="Markers" unique_id=2092483978]
+position = Vector2(1296, 368)
+script = ExtResource("4_rayyb")
+kind = 3
+link_id = "c"
+
+[node name="Water_33" type="Marker2D" parent="Markers" unique_id=1824734224]
+position = Vector2(1616, 368)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_34" type="Marker2D" parent="Markers" unique_id=913787979]
+position = Vector2(1648, 368)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_35" type="Marker2D" parent="Markers" unique_id=115929863]
+position = Vector2(1680, 368)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_36" type="Marker2D" parent="Markers" unique_id=1995486225]
+position = Vector2(1712, 368)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_37" type="Marker2D" parent="Markers" unique_id=984785175]
+position = Vector2(336, 400)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_38" type="Marker2D" parent="Markers" unique_id=795291877]
+position = Vector2(368, 400)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_39" type="Marker2D" parent="Markers" unique_id=1653995822]
+position = Vector2(336, 432)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_40" type="Marker2D" parent="Markers" unique_id=595496951]
+position = Vector2(368, 432)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Door_A" type="Marker2D" parent="Markers" unique_id=541206331]
+position = Vector2(720, 432)
+script = ExtResource("4_rayyb")
+kind = 4
+link_id = "A"
+
+[node name="Water_41" type="Marker2D" parent="Markers" unique_id=563046925]
+position = Vector2(816, 432)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_42" type="Marker2D" parent="Markers" unique_id=196958433]
+position = Vector2(848, 432)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_43" type="Marker2D" parent="Markers" unique_id=1421219862]
+position = Vector2(880, 432)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_44" type="Marker2D" parent="Markers" unique_id=768622859]
+position = Vector2(912, 432)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_45" type="Marker2D" parent="Markers" unique_id=1887577101]
+position = Vector2(944, 432)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_46" type="Marker2D" parent="Markers" unique_id=1970220742]
+position = Vector2(976, 432)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_47" type="Marker2D" parent="Markers" unique_id=542972846]
+position = Vector2(1008, 432)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_48" type="Marker2D" parent="Markers" unique_id=956483760]
+position = Vector2(272, 496)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_49" type="Marker2D" parent="Markers" unique_id=438202345]
+position = Vector2(304, 496)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Door_D" type="Marker2D" parent="Markers" unique_id=586245982]
+position = Vector2(1232, 496)
+script = ExtResource("4_rayyb")
+kind = 4
+link_id = "D"
+
+[node name="Water_50" type="Marker2D" parent="Markers" unique_id=1783871128]
+position = Vector2(1424, 496)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_51" type="Marker2D" parent="Markers" unique_id=618132786]
+position = Vector2(1456, 496)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_52" type="Marker2D" parent="Markers" unique_id=370235111]
+position = Vector2(1488, 496)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_53" type="Marker2D" parent="Markers" unique_id=1616880597]
+position = Vector2(1616, 496)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_54" type="Marker2D" parent="Markers" unique_id=852636161]
+position = Vector2(1648, 496)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_55" type="Marker2D" parent="Markers" unique_id=32186265]
+position = Vector2(1680, 496)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Water_56" type="Marker2D" parent="Markers" unique_id=1512750179]
+position = Vector2(1712, 496)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Exit" type="Marker2D" parent="Markers" unique_id=1250844767]
+position = Vector2(1808, 496)
+script = ExtResource("4_rayyb")
+
+[node name="Water_57" type="Marker2D" parent="Markers" unique_id=707033131]
+position = Vector2(272, 528)
+script = ExtResource("4_rayyb")
+kind = 2
+
+[node name="Switch_a_1" type="Marker2D" parent="." unique_id=572238467]
+position = Vector2(44, 112)
+script = ExtResource("4_rayyb")
+kind = 3
+link_id = "a"
+
+[node name="Enemies" type="Node2D" parent="." unique_id=1232119591]
+
+[node name="EnemySleeper_1" parent="Enemies" unique_id=236420558 instance=ExtResource("5_hmv7y")]
+position = Vector2(336, 48)
+
+[node name="EnemySleeper_2" parent="Enemies" unique_id=2111681792 instance=ExtResource("5_hmv7y")]
+position = Vector2(1328, 80)
+
+[node name="EnemyScreamer_1" parent="Enemies" unique_id=1890827451 instance=ExtResource("7_oolj0")]
+position = Vector2(1712, 144)
+
+[node name="EnemySleeper_3" parent="Enemies" unique_id=2129552250 instance=ExtResource("5_hmv7y")]
+position = Vector2(336, 176)
+
+[node name="EnemyPatroller_1" parent="Enemies" unique_id=202286172 instance=ExtResource("7_s5b7g")]
+position = Vector2(912, 176)
+
+[node name="EnemySleeper_4" parent="Enemies" unique_id=1022570750 instance=ExtResource("5_hmv7y")]
+position = Vector2(1360, 176)
+
+[node name="EnemySleeper_5" parent="Enemies" unique_id=1192871387 instance=ExtResource("5_hmv7y")]
+position = Vector2(1648, 208)
+
+[node name="EnemySleeper_6" parent="Enemies" unique_id=839355501 instance=ExtResource("5_hmv7y")]
+position = Vector2(80, 240)
+
+[node name="EnemySleeper_7" parent="Enemies" unique_id=1511382079 instance=ExtResource("5_hmv7y")]
+position = Vector2(1680, 272)
+
+[node name="EnemyScreamer_2" parent="Enemies" unique_id=88885852 instance=ExtResource("7_oolj0")]
+position = Vector2(1552, 304)
+
+[node name="EnemySleeper_8" parent="Enemies" unique_id=1733202695 instance=ExtResource("5_hmv7y")]
+position = Vector2(176, 336)
+
+[node name="EnemySleeper_9" parent="Enemies" unique_id=1317373821 instance=ExtResource("5_hmv7y")]
+position = Vector2(560, 336)
+
+[node name="EnemySleeper_10" parent="Enemies" unique_id=1710831294 instance=ExtResource("5_hmv7y")]
+position = Vector2(688, 400)
+
+[node name="EnemySleeper_11" parent="Enemies" unique_id=1461867655 instance=ExtResource("5_hmv7y")]
+position = Vector2(304, 432)
+
+[node name="EnemySleeper_12" parent="Enemies" unique_id=366445392 instance=ExtResource("5_hmv7y")]
+position = Vector2(1392, 432)
+
+[node name="EnemyChaser_1" parent="Enemies" unique_id=1142431749 instance=ExtResource("5_5xg7u")]
+position = Vector2(912, 464)
+
+[node name="EnemyListener_1" parent="Enemies" unique_id=1090196703 instance=ExtResource("10_rbabb")]
+position = Vector2(1552, 464)
+
+[node name="EnemySleeper_13" parent="Enemies" unique_id=972438751 instance=ExtResource("5_hmv7y")]
+position = Vector2(304, 528)
+
+[node name="EnemySleeper_14" parent="Enemies" unique_id=452481350 instance=ExtResource("5_hmv7y")]
+position = Vector2(1680, 528)

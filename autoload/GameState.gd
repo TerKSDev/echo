@@ -22,6 +22,7 @@ const LEVELS: Array[String] = [
 	"res://levels/level_11.tscn",
 	"res://levels/level_12.tscn",
 	"res://levels/level_13.tscn",
+	"res://levels/level_14.tscn",
 ]
 
 var current_level := 0
