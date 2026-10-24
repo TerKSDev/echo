@@ -59,9 +59,21 @@ fill = 1
 fill_from = Vector2(0.51, 0)
 fill_to = Vector2(0.51, 0.45)
 
+[sub_resource type="Gradient" id="Gradient_bottom_light"]
+offsets = PackedFloat32Array(0, 0.55, 1)
+colors = PackedColorArray(0.12, 0.42, 0.65, 0.22, 0.04, 0.2, 0.36, 0.08, 0, 0, 0, 0)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_bottom_light"]
+gradient = SubResource("Gradient_bottom_light")
+width = 256
+height = 256
+fill = 1
+fill_from = Vector2(0.5, 1)
+fill_to = Vector2(0.5, 0.76)
+
 [sub_resource type="Gradient" id="Gradient_shade"]
-offsets = PackedFloat32Array(0, 0.1, 0.25, 1)
-colors = PackedColorArray(0.01, 0.03, 0.07, 0.32, 0.01, 0.03, 0.07, 0.46, 0.01, 0.03, 0.07, 0.72, 0.01, 0.03, 0.07, 0.72)
+offsets = PackedFloat32Array(0, 0.1, 0.25, 0.82, 1)
+colors = PackedColorArray(0.01, 0.03, 0.07, 0.32, 0.01, 0.03, 0.07, 0.46, 0.01, 0.03, 0.07, 0.72, 0.01, 0.03, 0.07, 0.72, 0.01, 0.03, 0.07, 0.45)
 
 [sub_resource type="GradientTexture2D" id="GradientTexture2D_shade"]
 gradient = SubResource("Gradient_shade")
@@ -102,6 +114,18 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 texture = SubResource("GradientTexture2D_top_light")
+expand_mode = 1
+
+[node name="BottomLight" type="TextureRect" parent="."]
+material = SubResource("CanvasItemMaterial_top_light")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = SubResource("GradientTexture2D_bottom_light")
 expand_mode = 1
 
 [node name="ShadeOverlay" type="TextureRect" parent="."]
