@@ -4,13 +4,13 @@ const MIX_RATE := 22050
 const TOTAL_LEVEL_COUNT := 13
 
 @onready var sonar_backdrop: Control = $SonarBackdrop
-@onready var title_label: Label = $Content/VBoxContainer/Title
-@onready var start_button: Button = $Content/VBoxContainer/StartButton
-@onready var settings_button: Button = $Content/VBoxContainer/SettingsButton
-@onready var how_to_play_button: Button = $Content/VBoxContainer/HowToPlayButton
-@onready var credits_button: Button = $Content/VBoxContainer/CreditsButton
+@onready var title_label: Label = $Content/HeaderBox/Title
+@onready var touch_cue: Label = $Content/StartCue/TouchToStart
+@onready var credits_button: Button = $Content/CreditsButton
+@onready var touch_area: Button = $TouchArea
 
 var _time := 0.0
+var _ambient_wave_timer := 2.5
 var _ripples: Array[Dictionary] = []
 var _spores: Array[Dictionary] = []
 
@@ -22,9 +22,6 @@ var _modal_title: Label
 var _modal_subtitle: Label
 var _modal_body: VBoxContainer
 var _is_modal_open := false
-var _menu_mic: MicInput
-var _menu_meter_canvas: Control
-var _menu_calib_btn: Button
 
 # Procedural UI & BGM audio
 const BGM_SCALE: Array[float] = [0.75, 1.0, 1.125, 1.2, 1.333, 1.5, 1.6, 1.8, 2.0]
@@ -45,19 +42,11 @@ func _ready() -> void:
 	_init_spores()
 	sonar_backdrop.draw.connect(_draw_sonar_backdrop)
 
-	var buttons: Array[Button] = [
-		start_button,
-		settings_button,
-		how_to_play_button,
-		credits_button,
-	]
-	for btn in buttons:
-		_wire_button_Juice(btn)
-
-	start_button.pressed.connect(_on_start_pressed)
-	settings_button.pressed.connect(_on_settings_pressed)
-	how_to_play_button.pressed.connect(_on_how_to_play_pressed)
+	_wire_button_Juice(credits_button)
 	credits_button.pressed.connect(_on_credits_pressed)
+
+	if touch_area != null:
+		touch_area.pressed.connect(_on_touch_area_pressed)
 
 	_build_modal_shell()
 
@@ -71,14 +60,27 @@ func _process(delta: float) -> void:
 		var pulse: float = 0.5 + 0.5 * sin(_time * 2.2)
 		title_label.modulate = Color(1.0, 1.0, 1.0, 0.88 + 0.12 * pulse)
 
-	# Periodic ambient sonar wave behind the title
-	if fmod(_time, 2.6) < delta:
-		var center: Vector2 = size * Vector2(0.5, 0.34)
-		_ripples.append({"pos": center, "age": 0.0, "max_r": 290.0, "alpha": 0.28})
+	# Gentle breathing glow on the "TOUCH TO START" prompt (TOS style)
+	if touch_cue != null and not _descending:
+		var cue_pulse: float = 0.5 + 0.5 * sin(_time * 3.2)
+		touch_cue.modulate = Color(1.0, 1.0, 1.0, 0.4 + 0.6 * cue_pulse)
+
+	# Periodic ambient sonar wave - low frequency, random position, faint color
+	_ambient_wave_timer -= delta
+	if _ambient_wave_timer <= 0.0:
+		_ambient_wave_timer = randf_range(5.2, 8.8)
+		var w_w: float = maxf(size.x, 720.0)
+		var w_h: float = maxf(size.y, 1280.0)
+		var rand_pos := Vector2(
+			randf_range(w_w * 0.18, w_w * 0.82),
+			randf_range(w_h * 0.22, w_h * 0.76)
+		)
+		var rand_r: float = randf_range(160.0, 220.0)
+		_ripples.append({"pos": rand_pos, "age": 0.0, "max_r": rand_r, "alpha": 0.20})
 
 	for r in _ripples:
 		r["age"] = float(r["age"]) + delta
-	_ripples = _ripples.filter(func(r): return float(r["age"]) < 2.8)
+	_ripples = _ripples.filter(func(r): return float(r["age"]) < 2.0)
 
 	for s in _spores:
 		var pos: Vector2 = s["pos"]
@@ -90,24 +92,43 @@ func _process(delta: float) -> void:
 		s["pos"] = pos
 
 	sonar_backdrop.queue_redraw()
-	if _is_modal_open and _menu_meter_canvas != null and is_instance_valid(_menu_meter_canvas):
-		_menu_meter_canvas.queue_redraw()
-		if _menu_calib_btn != null and is_instance_valid(_menu_calib_btn) and _menu_mic != null:
-			if _menu_mic.is_calibrating():
-				_menu_calib_btn.text = "SAMPLING..."
-				_menu_calib_btn.disabled = true
-			else:
-				_menu_calib_btn.text = "CALIBRATE ROOM"
-				_menu_calib_btn.disabled = not GameState.mic_enabled
+
+
+func _on_touch_area_pressed() -> void:
+	var click_pos := get_viewport().get_mouse_position()
+	_on_screen_tapped(click_pos)
 
 
 func _gui_input(event: InputEvent) -> void:
-	if _is_modal_open:
+	if _is_modal_open or _descending:
 		return
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		_ripples.append({"pos": event.position, "age": 0.0, "max_r": 180.0, "alpha": 0.45})
-	elif event is InputEventScreenTouch and event.pressed:
-		_ripples.append({"pos": event.position, "age": 0.0, "max_r": 180.0, "alpha": 0.45})
+	if (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT) or (event is InputEventScreenTouch and event.pressed):
+		_on_screen_tapped(event.position)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if _is_modal_open:
+		if event.is_action_pressed("ui_cancel"):
+			_close_modal()
+			get_viewport().set_input_as_handled()
+		return
+	if (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT) or (event is InputEventScreenTouch and event.pressed):
+		_on_screen_tapped(event.position)
+		get_viewport().set_input_as_handled()
+
+
+func _on_screen_tapped(tap_pos: Vector2) -> void:
+	if _is_modal_open or _descending:
+		return
+	# Standard clean sound wave ripple expanding across the screen
+	_ripples.append({
+		"pos": tap_pos,
+		"age": 0.0,
+		"dur": 1.4,
+		"max_r": 220.0,
+		"alpha": 0.65,
+	})
+	_start_game_sequence()
 
 
 # --- Ambient Sonar & Bioluminescent Backdrop ---------------------------------
@@ -127,13 +148,14 @@ func _draw_sonar_backdrop() -> void:
 		var pos: Vector2 = s["pos"]
 		var r: float = float(s["r"])
 		var twinkle: float = 0.35 + 0.35 * sin(_time * 2.5 + float(s["phase"]))
-		sonar_backdrop.draw_circle(pos, r * 2.4, Color(0.2, 0.75, 1.0, twinkle * 0.18))
-		sonar_backdrop.draw_circle(pos, r, Color(0.55, 0.92, 1.0, twinkle))
+		sonar_backdrop.draw_circle(pos, r * 2.4, Color(0.2, 0.75, 1.0, twinkle * 0.14))
+		sonar_backdrop.draw_circle(pos, r, Color(0.55, 0.92, 1.0, twinkle * 0.75))
 
 	for r in _ripples:
-		var prog: float = clampf(float(r["age"]) / 2.8, 0.0, 1.0)
+		var dur: float = float(r.get("dur", 2.0))
+		var prog: float = clampf(float(r["age"]) / dur, 0.0, 1.0)
 		var rad: float = prog * float(r["max_r"])
-		var a: float = (1.0 - prog) * float(r["alpha"])
+		var a: float = (1.0 - prog) * float(r.get("alpha", 0.45))
 		sonar_backdrop.draw_arc(r["pos"], rad, 0.0, TAU, 64, Color(0.35, 0.88, 1.0, a), 1.8)
 
 
@@ -164,188 +186,50 @@ func _wire_button_Juice(btn: Button) -> void:
 
 # --- Button Actions ----------------------------------------------------------
 
+var _descending := false
+
+func _start_game_sequence() -> void:
+	if _descending or _is_modal_open:
+		return
+	_descending = true
+	_play_ui_sound(_wav_start, -2.5, 1.0)
+	Input.vibrate_handheld(45)
+
+	# Responsive feedback on Touch Cue:
+	# Flash bright cyan upon click, then pulse and gently fade out over ~0.8s
+	if touch_cue != null:
+		var cue_tw := create_tween()
+		cue_tw.tween_property(touch_cue, "modulate", Color(1.8, 2.3, 2.8, 1.0), 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		cue_tw.tween_property(touch_cue, "modulate", Color(0.4, 0.85, 1.0, 0.85), 0.25).set_trans(Tween.TRANS_SINE)
+		cue_tw.tween_property(touch_cue, "modulate", Color(1.4, 2.0, 2.6, 1.0), 0.16).set_trans(Tween.TRANS_SINE)
+		cue_tw.tween_property(touch_cue, "modulate:a", 0.0, 0.32).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+
+	# Smooth black curtain transition into Level Select with ~1.0s delay
+	var curtain := ColorRect.new()
+	curtain.set_anchors_preset(Control.PRESET_FULL_RECT)
+	curtain.color = Color.BLACK
+	curtain.modulate.a = 0.0
+	curtain.mouse_filter = Control.MOUSE_FILTER_STOP
+	curtain.top_level = true
+	curtain.z_index = 4096
+	get_tree().root.add_child(curtain)
+
+	var c_tw := curtain.create_tween()
+	# Wait ~0.75s so the sound wave ripples out, chime resonates, and feedback is fully seen
+	c_tw.tween_interval(0.75)
+	# Smoothly fade to black over 0.35s (total elapsed time ≈ 1.1s)
+	c_tw.tween_property(curtain, "modulate:a", 1.0, 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	c_tw.tween_callback(func():
+		get_tree().change_scene_to_file("res://ui/level_select.tscn")
+		var fade_in := curtain.create_tween()
+		fade_in.tween_interval(0.08)
+		fade_in.tween_property(curtain, "modulate:a", 0.0, 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		fade_in.tween_callback(curtain.queue_free)
+	)
+
+
 func _on_start_pressed() -> void:
-	if _is_modal_open:
-		return
-	_play_ui_sound(_wav_start, -4.0, 1.0)
-	Input.vibrate_handheld(35)
-	get_tree().change_scene_to_file("res://ui/level_select.tscn")
-
-
-func _on_settings_pressed() -> void:
-	_open_modal("SETTINGS", "AUDIO & MICROPHONE SENSOR")
-
-	var bus_idx: int = AudioServer.get_bus_index("Master")
-	var cur_vol: float = db_to_linear(AudioServer.get_bus_volume_db(bus_idx))
-
-	var vol_header := HBoxContainer.new()
-	var vol_lbl := Label.new()
-	vol_lbl.text = "MASTER VOLUME"
-	vol_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	vol_lbl.add_theme_color_override("font_color", Color(0.65, 0.85, 1.0, 0.9))
-	vol_lbl.add_theme_font_size_override("font_size", 13)
-
-	var vol_val := Label.new()
-	vol_val.text = "%d%%" % int(round(cur_vol * 100.0))
-	vol_val.add_theme_color_override("font_color", Color(0.88, 0.96, 1.0, 1.0))
-	vol_val.add_theme_font_size_override("font_size", 13)
-
-	vol_header.add_child(vol_lbl)
-	vol_header.add_child(vol_val)
-	_modal_body.add_child(vol_header)
-
-	var slider := HSlider.new()
-	slider.custom_minimum_size = Vector2(0, 26)
-	slider.max_value = 1.0
-	slider.step = 0.01
-	slider.value = cur_vol
-	slider.focus_mode = Control.FOCUS_NONE
-	slider.value_changed.connect(func(v: float):
-		GameState.set_master_volume(v)
-		vol_val.text = "%d%%" % int(round(v * 100.0))
-	)
-	_modal_body.add_child(slider)
-
-	var mic_row := HBoxContainer.new()
-	var mic_lbl := Label.new()
-	mic_lbl.text = "MICROPHONE SENSOR"
-	mic_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	mic_lbl.add_theme_color_override("font_color", Color(0.65, 0.85, 1.0, 0.9))
-	mic_lbl.add_theme_font_size_override("font_size", 13)
-
-	var mic_btn := Button.new()
-	mic_btn.custom_minimum_size = Vector2(110, 36)
-	mic_btn.focus_mode = Control.FOCUS_NONE
-	mic_btn.add_theme_font_size_override("font_size", 13)
-	_refresh_mic_btn(mic_btn)
-	mic_btn.pressed.connect(func():
-		_play_ui_sound(_wav_click, -5.0, 1.0)
-		GameState.mic_enabled = not GameState.mic_enabled
-		GameState.save_settings()
-		if _menu_mic != null:
-			_menu_mic.enabled = GameState.mic_enabled
-		_refresh_mic_btn(mic_btn)
-	)
-
-	mic_row.add_child(mic_lbl)
-	mic_row.add_child(mic_btn)
-	_modal_body.add_child(mic_row)
-
-	# Ensure live MicInput exists for testing & calibration in Main Menu
-	if _menu_mic == null:
-		_menu_mic = MicInput.new()
-		add_child(_menu_mic)
-		_menu_mic.start()
-	_menu_mic.enabled = GameState.mic_enabled
-
-	# Mic Sensitivity Header + Slider
-	var sens_header := HBoxContainer.new()
-	var sens_lbl := Label.new()
-	sens_lbl.text = "MIC SENSITIVITY"
-	sens_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	sens_lbl.add_theme_color_override("font_color", Color(0.65, 0.85, 1.0, 0.9))
-	sens_lbl.add_theme_font_size_override("font_size", 13)
-
-	var sens_val := Label.new()
-	sens_val.text = "%d%%" % int(round(GameState.mic_sensitivity * 100.0))
-	sens_val.add_theme_color_override("font_color", Color(0.88, 0.96, 1.0, 1.0))
-	sens_val.add_theme_font_size_override("font_size", 13)
-
-	sens_header.add_child(sens_lbl)
-	sens_header.add_child(sens_val)
-	_modal_body.add_child(sens_header)
-
-	var sens_slider := HSlider.new()
-	sens_slider.custom_minimum_size = Vector2(0, 26)
-	sens_slider.max_value = 1.0
-	sens_slider.step = 0.01
-	sens_slider.value = GameState.mic_sensitivity
-	sens_slider.focus_mode = Control.FOCUS_NONE
-	sens_slider.value_changed.connect(func(v: float):
-		GameState.mic_sensitivity = v
-		sens_val.text = "%d%%" % int(round(v * 100.0))
-		GameState.save_settings()
-	)
-	_modal_body.add_child(sens_slider)
-
-	# Live Mic Meter + Calibrate Room Button
-	var calib_row := HBoxContainer.new()
-	calib_row.add_theme_constant_override("separation", 12)
-
-	_menu_meter_canvas = Control.new()
-	_menu_meter_canvas.custom_minimum_size = Vector2(0, 32)
-	_menu_meter_canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_menu_meter_canvas.draw.connect(_draw_menu_mic_meter)
-	calib_row.add_child(_menu_meter_canvas)
-
-	_menu_calib_btn = Button.new()
-	_menu_calib_btn.custom_minimum_size = Vector2(142, 34)
-	_menu_calib_btn.focus_mode = Control.FOCUS_NONE
-	_menu_calib_btn.add_theme_font_size_override("font_size", 12)
-	_menu_calib_btn.text = "CALIBRATE ROOM"
-	_menu_calib_btn.pressed.connect(func():
-		_play_ui_sound(_wav_click, -5.0, 1.0)
-		if _menu_mic != null:
-			_menu_mic.recalibrate()
-	)
-	calib_row.add_child(_menu_calib_btn)
-	_modal_body.add_child(calib_row)
-
-
-func _draw_menu_mic_meter() -> void:
-	if _menu_meter_canvas == null or not is_instance_valid(_menu_meter_canvas):
-		return
-	var w: float = _menu_meter_canvas.size.x
-	var bar_y := 6.0
-	var bar_h := 12.0
-
-	_menu_meter_canvas.draw_rect(Rect2(0.0, bar_y, w, bar_h), Color(0.03, 0.08, 0.15, 0.9))
-
-	var cur_db: float = _menu_mic.level_db if (_menu_mic != null and GameState.mic_enabled) else -80.0
-	var trig_db: float = GameState.get_mic_trigger_db()
-
-	var fill_frac: float = clampf(inverse_lerp(-70.0, -5.0, cur_db), 0.0, 1.0)
-	var trig_frac: float = clampf(inverse_lerp(-70.0, -5.0, trig_db), 0.0, 1.0)
-
-	var active: bool = cur_db >= trig_db
-	var fill_col: Color = Color(0.35, 0.95, 1.0, 0.95) if active else Color(0.22, 0.58, 0.85, 0.75)
-	if fill_frac > 0.01:
-		_menu_meter_canvas.draw_rect(Rect2(0.0, bar_y, w * fill_frac, bar_h), fill_col)
-
-	_menu_meter_canvas.draw_rect(Rect2(0.0, bar_y, w, bar_h), Color(0.24, 0.52, 0.78, 0.6), false, 1.0)
-
-	var tx: float = w * trig_frac
-	_menu_meter_canvas.draw_line(Vector2(tx, bar_y - 3.0), Vector2(tx, bar_y + bar_h + 3.0), Color(1.0, 0.82, 0.28, 0.95), 2.0)
-
-	var hint_text := "SPEAK TO TEST  (YELLOW LINE = TRIGGER)"
-	_menu_meter_canvas.draw_string(ThemeDB.fallback_font, Vector2(0.0, bar_y + bar_h + 12.0), hint_text, HORIZONTAL_ALIGNMENT_LEFT, int(w), 9, Color(0.55, 0.78, 0.95, 0.65))
-
-
-func _refresh_mic_btn(btn: Button) -> void:
-	if GameState.mic_enabled:
-		btn.text = "ENABLED"
-		btn.self_modulate = Color(0.35, 1.2, 1.8, 1.0)
-	else:
-		btn.text = "MUTED"
-		btn.self_modulate = Color(0.7, 0.7, 0.7, 0.7)
-
-
-func _on_how_to_play_pressed() -> void:
-	_open_modal("HOW TO PLAY", "SURVIVAL GUIDE & MONSTER BESTIARY")
-
-	_add_section_header("CORE CONTROLS")
-	_add_guide_row(Color(0.35, 0.92, 1.0), "MOVE", "Tap / Left-Click anywhere to walk toward that spot.")
-	_add_guide_row(Color(0.55, 0.96, 1.0), "SONAR ECHO", "Hold [SPACE / ECHO] or speak into your Mic to reveal walls.")
-	_add_guide_row(Color(0.3, 0.72, 0.95), "SNEAK", "Press [SHIFT / SNEAK] to silence footsteps and move quietly.")
-	_add_guide_row(Color(0.5, 0.68, 0.88), "WALL COVER", "Solid walls block your footsteps and shield you from Screamers.")
-
-	_add_divider()
-	_add_section_header("MONSTER BESTIARY")
-	_add_guide_row(Color(0.68, 0.42, 0.98), "SLEEPER", "Dormant in the dark. Wakes up if you walk loud or step too close.")
-	_add_guide_row(Color(1.0, 0.82, 0.25), "PATROLLER", "Roams fixed paths. Acute hearing—can even hear sneaking nearby.")
-	_add_guide_row(Color(1.0, 0.22, 0.22), "CHASER", "Deaf to sneaking, but charges at lethal speed when alerted.")
-	_add_guide_row(Color(0.95, 0.28, 0.72), "SCREAMER", "Stationary cocoon. Shrieks on the 2nd shout to stun you.")
-	_add_guide_row(Color(0.2, 0.94, 0.68), "LISTENER", "Ignores footsteps. Counts 5 shouts, then alerts the whole map.")
+	_start_game_sequence()
 
 
 func _on_credits_pressed() -> void:
@@ -485,12 +369,6 @@ func _close_modal() -> void:
 	_modal_root.visible = false
 
 
-func _unhandled_input(event: InputEvent) -> void:
-	if _is_modal_open and event.is_action_pressed("ui_cancel"):
-		_close_modal()
-		get_viewport().set_input_as_handled()
-
-
 func _add_section_header(title: String) -> void:
 	var lbl := Label.new()
 	lbl.text = title
@@ -552,13 +430,8 @@ func _setup_menu_bgm() -> void:
 
 
 func _process_menu_bgm(delta: float) -> void:
-	var calibrating_mic: bool = _is_modal_open and _menu_meter_canvas != null and is_instance_valid(_menu_meter_canvas)
 	if _bgm_pad_player != null:
-		var target_db: float = -22.0 if calibrating_mic else -7.5
-		_bgm_pad_player.volume_db = lerpf(_bgm_pad_player.volume_db, target_db, clampf(delta * 4.0, 0.0, 1.0))
-
-	if calibrating_mic:
-		return
+		_bgm_pad_player.volume_db = lerpf(_bgm_pad_player.volume_db, -7.5, clampf(delta * 4.0, 0.0, 1.0))
 
 	# Generative crystalline echo notes (A minor / Dorian motif)
 	_bgm_note_timer -= delta
@@ -574,7 +447,7 @@ func _process_menu_bgm(delta: float) -> void:
 		if randf() < 0.45:
 			var ans_pitch: float = BGM_SCALE[(idx + 2) % BGM_SCALE.size()]
 			get_tree().create_timer(0.44).timeout.connect(func():
-				if is_inside_tree() and not (_is_modal_open and _menu_meter_canvas != null and is_instance_valid(_menu_meter_canvas)):
+				if is_inside_tree():
 					_play_ui_sound(_wav_bgm_note, -13.5, ans_pitch)
 			)
 
@@ -595,7 +468,7 @@ func _build_ui_audio() -> void:
 
 
 func _synth_start_chime() -> AudioStreamWAV:
-	var dur := 0.42
+	var dur := 0.85
 	var count := int(dur * MIX_RATE)
 	var bytes := PackedByteArray()
 	bytes.resize(count * 2)
@@ -604,11 +477,11 @@ func _synth_start_chime() -> AudioStreamWAV:
 	var p3 := 0.0
 	for i in count:
 		var t: float = float(i) / MIX_RATE
-		var env: float = minf(t / 0.008, 1.0) * exp(-t * 6.5)
+		var env: float = minf(t / 0.008, 1.0) * exp(-t * 3.8)
 		p1 += TAU * 330.0 / MIX_RATE
 		p2 += TAU * 495.0 / MIX_RATE
 		p3 += TAU * 660.0 / MIX_RATE
-		var s: float = (sin(p1) * 0.45 + sin(p2) * 0.35 + sin(p3) * 0.25) * env
+		var s: float = (sin(p1) * 0.42 + sin(p2) * 0.35 + sin(p3) * 0.23) * env
 		bytes.encode_s16(i * 2, int(clampf(s, -1.0, 1.0) * 32767.0))
 	var wav := AudioStreamWAV.new()
 	wav.format = AudioStreamWAV.FORMAT_16_BITS

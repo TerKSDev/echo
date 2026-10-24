@@ -44,6 +44,32 @@ corner_radius_top_right = 16
 corner_radius_bottom_right = 16
 corner_radius_bottom_left = 16
 
+[sub_resource type="CanvasItemMaterial" id="CanvasItemMaterial_top_light"]
+blend_mode = 1
+
+[sub_resource type="Gradient" id="Gradient_top_light"]
+offsets = PackedFloat32Array(0, 0.4, 0.8, 1)
+colors = PackedColorArray(0.18, 0.35, 0.48, 0.22, 0.08, 0.2, 0.32, 0.12, 0.02, 0.08, 0.15, 0.04, 0, 0, 0, 0)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_top_light"]
+gradient = SubResource("Gradient_top_light")
+width = 256
+height = 256
+fill = 1
+fill_from = Vector2(0.51, 0)
+fill_to = Vector2(0.51, 0.45)
+
+[sub_resource type="Gradient" id="Gradient_shade"]
+offsets = PackedFloat32Array(0, 0.1, 0.25, 1)
+colors = PackedColorArray(0.01, 0.03, 0.07, 0.32, 0.01, 0.03, 0.07, 0.46, 0.01, 0.03, 0.07, 0.72, 0.01, 0.03, 0.07, 0.72)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_shade"]
+gradient = SubResource("Gradient_shade")
+width = 32
+height = 256
+fill_from = Vector2(0.5, 0)
+fill_to = Vector2(0.5, 1)
+
 [node name="MainMenu" type="Control" unique_id=1745980315]
 layout_mode = 3
 anchors_preset = 15
@@ -61,11 +87,13 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 texture = ExtResource("2_vjb58")
 expand_mode = 1
 stretch_mode = 6
 
-[node name="ShadeOverlay" type="ColorRect" parent="."]
+[node name="TopLight" type="TextureRect" parent="."]
+material = SubResource("CanvasItemMaterial_top_light")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -73,7 +101,19 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0.01, 0.04, 0.09, 0.42)
+texture = SubResource("GradientTexture2D_top_light")
+expand_mode = 1
+
+[node name="ShadeOverlay" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = SubResource("GradientTexture2D_shade")
+expand_mode = 1
 
 [node name="SonarBackdrop" type="Control" parent="."]
 layout_mode = 1
@@ -84,82 +124,116 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="Content" type="CenterContainer" parent="." unique_id=1394293508]
+[node name="TouchArea" type="Button" parent="." unique_id=778899001]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+focus_mode = 0
+flat = true
 
-[node name="VBoxContainer" type="VBoxContainer" parent="Content" unique_id=1082356201]
-layout_mode = 2
-theme_override_constants/separation = 16
+[node name="Content" type="Control" parent="." unique_id=1394293508]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
 
-[node name="Tagline" type="Label" parent="Content/VBoxContainer"]
+[node name="HeaderBox" type="VBoxContainer" parent="Content"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 180.0
+offset_bottom = 340.0
+grow_horizontal = 2
+mouse_filter = 2
+theme_override_constants/separation = 12
+
+[node name="Tagline" type="Label" parent="Content/HeaderBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.38, 0.82, 1, 0.8)
-theme_override_font_sizes/font_size = 14
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.4, 0.85, 1, 0.85)
+theme_override_font_sizes/font_size = 13
 text = "((   A C O U S T I C   S U R V I V A L   ))"
 horizontal_alignment = 1
 
-[node name="Title" type="Label" parent="Content/VBoxContainer" unique_id=14693147]
+[node name="Title" type="Label" parent="Content/HeaderBox" unique_id=14693147]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.72, 0.94, 1, 1)
-theme_override_colors/font_shadow_color = Color(0.05, 0.35, 0.68, 0.65)
-theme_override_colors/font_outline_color = Color(0.18, 0.62, 0.92, 0.45)
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.92, 0.97, 1, 1)
+theme_override_colors/font_shadow_color = Color(0.02, 0.18, 0.42, 0.85)
+theme_override_colors/font_outline_color = Color(0.28, 0.72, 1, 0.55)
 theme_override_constants/shadow_offset_x = 0
 theme_override_constants/shadow_offset_y = 4
-theme_override_constants/outline_size = 4
-theme_override_font_sizes/font_size = 58
+theme_override_constants/outline_size = 2
+theme_override_font_sizes/font_size = 52
 text = "ECHO: STAY SILENT"
 horizontal_alignment = 1
 
-[node name="Subtitle" type="Label" parent="Content/VBoxContainer" unique_id=1857381258]
+[node name="Subtitle" type="Label" parent="Content/HeaderBox" unique_id=1857381258]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.68, 0.84, 0.96, 0.85)
-theme_override_font_sizes/font_size = 17
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.62, 0.8, 0.95, 0.82)
+theme_override_font_sizes/font_size = 15
 text = "Sound is your only light — and your greatest danger"
 horizontal_alignment = 1
 
-[node name="HeroSpacer" type="Control" parent="Content/VBoxContainer"]
-custom_minimum_size = Vector2(0, 22)
-layout_mode = 2
+[node name="StartCue" type="VBoxContainer" parent="Content"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -260.0
+offset_top = -320.0
+offset_right = 260.0
+offset_bottom = -210.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+theme_override_constants/separation = 8
+alignment = 1
 
-[node name="StartButton" type="Button" parent="Content/VBoxContainer" unique_id=1601659484]
-custom_minimum_size = Vector2(360, 68)
+[node name="TouchToStart" type="Label" parent="Content/StartCue" unique_id=1601659484]
 layout_mode = 2
-size_flags_horizontal = 4
-focus_mode = 0
-theme_override_colors/font_color = Color(0.95, 0.99, 1, 1)
-theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
-theme_override_colors/font_pressed_color = Color(0.65, 0.92, 1, 1)
-theme_override_font_sizes/font_size = 21
-theme_override_styles/normal = SubResource("StyleBoxFlat_primary_normal")
-theme_override_styles/hover = SubResource("StyleBoxFlat_primary_hover")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_primary_pressed")
-text = "START GAME"
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.88, 0.96, 1, 1)
+theme_override_font_shadow_color = Color(0.08, 0.45, 0.85, 0.6)
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 22
+text = "—   TOUCH TO START   —"
+horizontal_alignment = 1
 
-[node name="SettingsButton" type="Button" parent="Content/VBoxContainer" unique_id=1085371999]
-custom_minimum_size = Vector2(360, 56)
+[node name="HintText" type="Label" parent="Content/StartCue"]
 layout_mode = 2
-size_flags_horizontal = 4
-focus_mode = 0
-theme_override_font_sizes/font_size = 17
-text = "SETTINGS"
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.45, 0.72, 0.92, 0.65)
+theme_override_font_sizes/font_size = 12
+text = "TAP ANYWHERE TO DESCEND"
+horizontal_alignment = 1
 
-[node name="HowToPlayButton" type="Button" parent="Content/VBoxContainer" unique_id=1834183942]
-custom_minimum_size = Vector2(360, 56)
-layout_mode = 2
-size_flags_horizontal = 4
+[node name="CreditsButton" type="Button" parent="Content" unique_id=477933379]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -130.0
+offset_top = -65.0
+offset_right = -25.0
+offset_bottom = -25.0
+grow_horizontal = 0
+grow_vertical = 0
 focus_mode = 0
-theme_override_font_sizes/font_size = 17
-text = "HOW TO PLAY"
-
-[node name="CreditsButton" type="Button" parent="Content/VBoxContainer" unique_id=477933379]
-custom_minimum_size = Vector2(360, 56)
-layout_mode = 2
-size_flags_horizontal = 4
-focus_mode = 0
-theme_override_font_sizes/font_size = 17
-text = "CREDITS"
+theme_override_colors/font_color = Color(0.48, 0.68, 0.85, 0.55)
+theme_override_colors/font_hover_color = Color(0.85, 0.96, 1, 1)
+theme_override_colors/font_pressed_color = Color(0.38, 0.85, 1, 1)
+theme_override_font_sizes/font_size = 13
+text = "◈ CREDITS"
+flat = true
