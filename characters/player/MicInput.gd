@@ -112,6 +112,10 @@ func get_trigger_db() -> float:
 	return GameState.get_mic_trigger_db()
 
 
+func get_current_db() -> float:
+	return level_db
+
+
 func _process(delta: float) -> void:
 	if suppress_timer > 0.0:
 		suppress_timer = maxf(0.0, suppress_timer - delta)

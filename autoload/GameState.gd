@@ -3,9 +3,9 @@ extends Node
 ## Keeps the level list, current level, and persistent audio/microphone settings
 ## automatically saved to `user://settings.cfg`.
 
-const MENU_SCENE := "res://ui/menu.tscn"
+const MENU_SCENE := "res://ui/screens/menu.tscn"
 const MAIN_SCENE := "res://scenes/main.tscn"
-const LEVEL_SELECT_SCENE := "res://ui/level_select.tscn"
+const LEVEL_SELECT_SCENE := "res://ui/screens/level_select.tscn"
 const SETTINGS_PATH := "user://settings.cfg"
 const PROGRESS_PATH := "user://level_progress.cfg"
 
@@ -131,8 +131,18 @@ var max_fps := 60                  # 60, 120, 0 (uncapped)
 var sonar_palette := "cyan"        # "cyan", "emerald", "amber", "white"
 
 # Navigation tracking
-const SETTINGS_SCENE := "res://ui/settings_scene.tscn"
+const SETTINGS_SCENE := "res://ui/screens/settings_scene.tscn"
 var previous_scene_path: String = LEVEL_SELECT_SCENE
+
+# Global Procedural Subterranean Menu & UI BGM System
+const BGM_SCALE: Array[float] = [0.75, 1.0, 1.125, 1.2, 1.333, 1.5, 1.6, 1.8, 2.0]
+var _bgm_pad_player: AudioStreamPlayer = null
+var _wav_bgm_note: AudioStreamWAV = null
+var _wav_bgm_droplet: AudioStreamWAV = null
+var _bgm_note_timer := 1.2
+var _bgm_drop_timer := 2.8
+var _bgm_note_step := 0
+var _bgm_active := false
 
 
 func _ready() -> void:
@@ -360,6 +370,7 @@ func transition_to_scene(scene_path: String, fade_out_dur: float = 0.22, fade_in
 		var err := get_tree().change_scene_to_file(scene_path)
 		if err != OK:
 			push_error("Failed to change scene to %s: %s" % [scene_path, err])
+		_sync_bgm_for_scene(scene_path)
 		var fade_in := curtain.create_tween()
 		fade_in.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 		fade_in.tween_interval(0.04)
@@ -369,6 +380,17 @@ func transition_to_scene(scene_path: String, fade_out_dur: float = 0.22, fade_in
 			curtain_layer.queue_free()
 		)
 	)
+
+
+func change_level(target) -> void:
+	if target is int:
+		start_game(target)
+	elif target is String:
+		var actual_idx: int = LEVELS.find(target)
+		if actual_idx != -1:
+			start_game(actual_idx)
+		else:
+			transition_to_scene(target)
 
 
 func start_game(level_index: int = 0) -> void:
@@ -439,6 +461,34 @@ func return_from_settings() -> void:
 	if target.is_empty():
 		target = LEVEL_SELECT_SCENE
 	transition_to_scene(target, 0.22, 0.28)
+
+
+func go_to_previous_scene() -> void:
+	return_from_settings()
+
+
+func reset_to_defaults() -> void:
+	master_muted = false
+	master_volume = 1.0
+	bgm_volume = 0.8
+	sfx_volume = 1.0
+	mic_enabled = true
+	mic_sensitivity = 0.5
+	mic_push_to_talk = false
+	sneak_hold_mode = false
+	fast_pulse_mode = false
+	sound_indicator_enabled = true
+	blind_assist_mode = true
+	fullscreen_enabled = false
+	screen_shake_intensity = 1.0
+	sonar_glow_boost = 1.0
+	vignette_enabled = true
+	vsync_enabled = true
+	max_fps = 60
+	sonar_palette = "cyan"
+	apply_audio_settings()
+	apply_display_settings()
+	save_settings()
 
 
 func reset_progress() -> void:
@@ -594,3 +644,89 @@ func complete_level(level_number: int) -> void:
 
 	if error != OK:
 		push_error("Failed to save level progress: %s" % error)
+
+
+func start_menu_bgm() -> void:
+	if _bgm_pad_player == null:
+		_setup_menu_bgm()
+	_bgm_active = true
+	if _bgm_pad_player != null and not _bgm_pad_player.playing:
+		_bgm_pad_player.volume_db = -26.0
+		_bgm_pad_player.play()
+		var tw := create_tween()
+		tw.tween_property(_bgm_pad_player, "volume_db", -7.5, 1.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+
+
+func stop_menu_bgm(fade_dur: float = 0.4) -> void:
+	_bgm_active = false
+	if _bgm_pad_player != null and _bgm_pad_player.playing:
+		var tw := create_tween()
+		tw.tween_property(_bgm_pad_player, "volume_db", -40.0, fade_dur).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		tw.tween_callback(func():
+			if not _bgm_active and _bgm_pad_player != null:
+				_bgm_pad_player.stop()
+		)
+
+
+func _setup_menu_bgm() -> void:
+	_wav_bgm_note = SfxManager.get_menu_bgm_note()
+	_wav_bgm_droplet = SfxManager.get_menu_bgm_droplet()
+
+	_bgm_pad_player = AudioStreamPlayer.new()
+	_bgm_pad_player.name = "GlobalMenuBGM"
+	_bgm_pad_player.stream = SfxManager.get_menu_bgm_pad()
+	_bgm_pad_player.bus = &"BGM"
+	_bgm_pad_player.volume_db = -26.0
+	add_child(_bgm_pad_player)
+
+
+func _process(delta: float) -> void:
+	if not _bgm_active or _bgm_pad_player == null or not _bgm_pad_player.playing:
+		return
+
+	_bgm_pad_player.volume_db = lerpf(_bgm_pad_player.volume_db, -7.5, clampf(delta * 4.0, 0.0, 1.0))
+
+	# Generative crystalline echo notes (A minor / Dorian motif)
+	_bgm_note_timer -= delta
+	if _bgm_note_timer <= 0.0:
+		_bgm_note_timer = randf_range(2.8, 4.8)
+		var motif_indices: Array[int] = [1, 4, 3, 1, 5, 3, 2, 0, 1, 6, 4, 3]
+		var idx: int = motif_indices[_bgm_note_step % motif_indices.size()]
+		_bgm_note_step += 1
+		var pitch: float = BGM_SCALE[idx]
+		_play_bgm_sfx(_wav_bgm_note, randf_range(-11.5, -8.5), pitch)
+
+		if randf() < 0.45:
+			var ans_pitch: float = BGM_SCALE[(idx + 2) % BGM_SCALE.size()]
+			get_tree().create_timer(0.44).timeout.connect(func():
+				if _bgm_active:
+					_play_bgm_sfx(_wav_bgm_note, -13.5, ans_pitch)
+			)
+
+	# Subterranean cavern water droplets
+	_bgm_drop_timer -= delta
+	if _bgm_drop_timer <= 0.0:
+		_bgm_drop_timer = randf_range(4.2, 7.8)
+		_play_bgm_sfx(_wav_bgm_droplet, randf_range(-13.0, -9.5), randf_range(0.84, 1.26))
+
+
+func _play_bgm_sfx(stream: AudioStreamWAV, vol_db: float, pitch: float) -> void:
+	if stream == null or not _bgm_active:
+		return
+	var player := AudioStreamPlayer.new()
+	player.stream = stream
+	player.volume_db = vol_db
+	player.pitch_scale = pitch
+	player.bus = &"BGM"
+	add_child(player)
+	player.finished.connect(player.queue_free)
+	player.play()
+
+
+func _sync_bgm_for_scene(target_path: String) -> void:
+	if "headphone_warning" in target_path:
+		stop_menu_bgm(0.1)
+	elif target_path == MAIN_SCENE or target_path.begins_with("res://levels/"):
+		stop_menu_bgm(0.35)
+	else:
+		start_menu_bgm()

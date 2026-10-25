@@ -79,7 +79,7 @@ func _go_to_menu() -> void:
 	var root := get_tree().root
 	root.add_child(curtain)
 
-	get_tree().change_scene_to_file("res://ui/menu.tscn")
+	get_tree().change_scene_to_file("res://ui/screens/menu.tscn")
 
 	var fade_tw := curtain.create_tween()
 	fade_tw.tween_interval(0.1)

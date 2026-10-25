@@ -37,6 +37,7 @@ var _wav_error: AudioStreamWAV
 
 func _ready() -> void:
 	_build_ui_audio()
+	GameState.start_menu_bgm()
 	_init_spores()
 
 	# Background effects should not block button input.
@@ -44,6 +45,20 @@ func _ready() -> void:
 	sonar_backdrop.draw.connect(_draw_sonar_backdrop)
 
 	scroll_container.gui_input.connect(_on_scroll_container_gui_input)
+
+	# Hide scrollbar visually while retaining smooth scrolling
+	var scrollbar := scroll_container.get_v_scroll_bar()
+	scrollbar.modulate.a = 0.0
+	scrollbar.value_changed.connect(func(_val: float) -> void:
+		_depth_tag_timer = 1.0
+		if depth_gauge != null and is_instance_valid(depth_gauge):
+			depth_gauge.queue_redraw()
+	)
+
+	# Two columns create the left-right staggered vertical ascent map
+	level_grid.columns = 2
+	level_grid.add_theme_constant_override("h_separation", 16)
+	level_grid.add_theme_constant_override("v_separation", 30)
 
 	# Wire level grid path drawing
 	level_grid.draw.connect(_draw_level_path)
@@ -53,20 +68,56 @@ func _ready() -> void:
 		depth_gauge.draw.connect(_draw_depth_gauge)
 		depth_gauge.gui_input.connect(_on_depth_gauge_gui_input)
 
+	# Status pill stylish dark panel styling
+	if status_pill != null:
+		var pill_style := StyleBoxFlat.new()
+		pill_style.bg_color = Color(0.03, 0.09, 0.16, 0.9)
+		pill_style.border_color = Color(0.18, 0.45, 0.7, 0.8)
+		pill_style.set_border_width_all(1)
+		pill_style.set_corner_radius_all(12)
+		status_pill.add_theme_stylebox_override("panel", pill_style)
+
 	_setup_intel_button()
 	_setup_settings_button()
 	_setup_leaderboard_button()
 
 	_create_level_buttons()
 
-	# Update Top Status Bar progress text
+	# Update Top Status Bar progress text with sectors and stars
 	var playable_levels := _get_playable_levels()
+	var total_levels: int = playable_levels.size()
 	var highest: int = GameState.highest_unlocked_level
-	var total_unlocked: int = clampi(highest, 1, playable_levels.size())
-	progress_label.text = "UNLOCKED: %02d / %02d" % [total_unlocked, playable_levels.size()]
+	var cur_unlocked := clampi(highest, 1, total_levels)
+	var total_stars := 0
+	for i in range(1, total_levels + 1):
+		total_stars += GameState.get_level_stars(i)
+	if progress_label != null:
+		progress_label.text = "SECTORS: %02d/%02d   ★ %d/%d" % [cur_unlocked, total_levels, total_stars, total_levels * 3]
 
 	# Auto-scroll directly to the highest active level on entry
 	call_deferred("_scroll_to_current_level")
+	_apply_safe_area()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_SIZE_CHANGED or what == NOTIFICATION_RESIZED:
+		_apply_safe_area()
+
+
+func _apply_safe_area() -> void:
+	if not OS.has_feature("mobile") and OS.get_name() != "Android":
+		return
+	var safe := DisplayServer.get_display_safe_area()
+	var screen_sz := DisplayServer.screen_get_size()
+	var vp_sz := get_viewport_rect().size
+	if screen_sz.y > 0 and safe.position.y > 0:
+		var top_pad := (float(safe.position.y) / float(screen_sz.y)) * vp_sz.y
+		var target_top := maxf(top_pad + 8.0, 45.0)
+		if has_node("TopBar"):
+			$TopBar.position.y = target_top
+		if has_node("MainArea"):
+			var main := $MainArea as Control
+			main.offset_top = target_top + 68.0
 
 
 # --------------------------------------------------
@@ -101,7 +152,7 @@ func _on_scroll_container_gui_input(event: InputEvent) -> void:
 # --------------------------------------------------
 
 func _setup_intel_button() -> void:
-	intel_button.custom_minimum_size = Vector2(48, 48)
+	intel_button.custom_minimum_size = Vector2(56, 56)
 	var n_sb := LevelCardBuilder.make_button_style(Color(0.04, 0.12, 0.22, 0.85), Color(0.28, 0.72, 0.95, 0.8), 2, 12)
 	var h_sb := LevelCardBuilder.make_button_style(Color(0.08, 0.22, 0.38, 0.95), Color(0.5, 0.92, 1.0, 1.0), 2, 12)
 	var p_sb := LevelCardBuilder.make_button_style(Color(0.12, 0.30, 0.50, 1.0), Color(0.7, 1.0, 1.0, 1.0), 2, 12)
@@ -120,7 +171,7 @@ func _setup_intel_button() -> void:
 
 
 func _setup_settings_button() -> void:
-	settings_button.custom_minimum_size = Vector2(48, 48)
+	settings_button.custom_minimum_size = Vector2(56, 56)
 	var n_sb := LevelCardBuilder.make_button_style(Color(0.04, 0.12, 0.22, 0.85), Color(0.28, 0.72, 0.95, 0.8), 2, 12)
 	var h_sb := LevelCardBuilder.make_button_style(Color(0.08, 0.22, 0.38, 0.95), Color(0.5, 0.92, 1.0, 1.0), 2, 12)
 	var p_sb := LevelCardBuilder.make_button_style(Color(0.12, 0.30, 0.50, 1.0), Color(0.7, 1.0, 1.0, 1.0), 2, 12)
@@ -139,7 +190,7 @@ func _setup_settings_button() -> void:
 
 
 func _setup_leaderboard_button() -> void:
-	leaderboard_button.custom_minimum_size = Vector2(48, 48)
+	leaderboard_button.custom_minimum_size = Vector2(56, 56)
 	var n_sb := LevelCardBuilder.make_button_style(Color(0.04, 0.12, 0.22, 0.85), Color(0.28, 0.72, 0.95, 0.8), 2, 12)
 	var h_sb := LevelCardBuilder.make_button_style(Color(0.08, 0.22, 0.38, 0.95), Color(0.5, 0.92, 1.0, 1.0), 2, 12)
 	var p_sb := LevelCardBuilder.make_button_style(Color(0.12, 0.30, 0.50, 1.0), Color(0.7, 1.0, 1.0, 1.0), 2, 12)
@@ -159,21 +210,21 @@ func _setup_leaderboard_button() -> void:
 
 func _on_leaderboard_pressed() -> void:
 	_play_ui_sound(_wav_click, -5.0, 1.0)
-	var modal_script: GDScript = load("res://ui/LeaderboardModal.gd") as GDScript
+	var modal_script: GDScript = load("res://ui/modals/LeaderboardModal.gd") as GDScript
 	if modal_script != null:
 		modal_script.open_modal(self)
 
 
 func _on_intel_pressed() -> void:
 	_play_ui_sound(_wav_click, -5.0, 1.0)
-	var script: GDScript = load("res://ui/IntelModal.gd") as GDScript
+	var script: GDScript = load("res://ui/modals/IntelModal.gd") as GDScript
 	if script != null:
 		script.open_modal(self)
 
 
 func _on_settings_pressed() -> void:
 	_play_ui_sound(_wav_click, -5.0, 1.0)
-	GameState.go_to_settings("res://ui/level_select.tscn")
+	GameState.go_to_settings("res://ui/screens/level_select.tscn")
 
 
 func _on_back_pressed() -> void:
@@ -191,7 +242,22 @@ func _create_level_buttons() -> void:
 	_level_buttons.clear()
 
 	var playable_levels := _get_playable_levels()
-	for level_number in range(1, playable_levels.size() + 1):
+	var total_levels: int = playable_levels.size()
+
+	# Top padding in the grid (at top of cavern ascent, near surface)
+	var top_pad_a := Control.new()
+	top_pad_a.custom_minimum_size = Vector2(0, 20)
+	top_pad_a.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var top_pad_b := Control.new()
+	top_pad_b.custom_minimum_size = Vector2(0, 20)
+	top_pad_b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	level_grid.add_child(top_pad_a)
+	level_grid.add_child(top_pad_b)
+
+	# Levels progress from bottom (Depth 01 - Abyss Origin) to top (Depth 13 - Surface Breach).
+	# Because GridContainer lays out items from top to bottom,
+	# we iterate downwards from total_levels down to 1 with alternating spacers for a zigzag trail.
+	for level_number in range(total_levels, 0, -1):
 		var button := LevelCardBuilder.build_level_card(
 			level_number,
 			func() -> float: return _time,
@@ -200,8 +266,32 @@ func _create_level_buttons() -> void:
 			_play_ui_sound,
 			_wav_error
 		)
-		level_grid.add_child(button)
 		_level_buttons[level_number] = button
+
+		var spacer := Control.new()
+		spacer.custom_minimum_size = Vector2(0, 60)
+		spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+		# Alternating zigzag:
+		# If level_number is odd (1, 3, 5, ...): Card on Left (col 0), Spacer on Right (col 1)
+		# If level_number is even (2, 4, 6, ...): Spacer on Left (col 0), Card on Right (col 1)
+		if level_number % 2 == 1:
+			level_grid.add_child(button)
+			level_grid.add_child(spacer)
+		else:
+			level_grid.add_child(spacer)
+			level_grid.add_child(button)
+
+	# Bottom padding in the grid (so Depth 01 has comfortable margin at bottom)
+	var bot_pad_a := Control.new()
+	bot_pad_a.custom_minimum_size = Vector2(0, 16)
+	bot_pad_a.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var bot_pad_b := Control.new()
+	bot_pad_b.custom_minimum_size = Vector2(0, 16)
+	bot_pad_b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	level_grid.add_child(bot_pad_a)
+	level_grid.add_child(bot_pad_b)
 
 
 func _scroll_to_current_level() -> void:
@@ -252,21 +342,26 @@ func _on_level_pressed(level_number: int) -> void:
 		return
 
 	var playable_levels := _get_playable_levels()
-	if level_number < 1 or level_number > playable_levels.size():
+	var playable_index: int = level_number - 1
+	if playable_index < 0 or playable_index >= playable_levels.size():
 		return
 
-	var level_path := playable_levels[level_number - 1]
+	var level_path := playable_levels[playable_index]
+	var actual_level_index: int = GameState.LEVELS.find(level_path)
 	_play_ui_sound(_wav_click, -4.0, 1.0)
-	GameState.change_level(level_path)
+	if actual_level_index != -1:
+		GameState.start_game(actual_level_index)
+	else:
+		GameState.change_level(level_path)
 
 
 func _on_test_arena_pressed() -> void:
 	_play_ui_sound(_wav_click, -4.0, 1.0)
-	GameState.change_level(TEST_LEVEL_PATH)
+	GameState.start_game(0)
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("ui_cancel"):
+	if event.is_action_pressed("ui_cancel") or (event is InputEventKey and event.pressed and (event.keycode == KEY_ESCAPE or event.keycode == KEY_BACK)):
 		_on_back_pressed()
 		get_viewport().set_input_as_handled()
 		return
@@ -340,13 +435,14 @@ func _process(delta: float) -> void:
 	if level_grid != null and is_instance_valid(level_grid):
 		level_grid.queue_redraw()
 	if depth_gauge != null and is_instance_valid(depth_gauge):
-		depth_gauge.queue_redraw()
+		if _depth_tag_alpha > 0.001 or _is_dragging_gauge:
+			depth_gauge.queue_redraw()
 
-	# Redraw active level card (pulsing glow) and locked cards (scanning laser effect)
+	# Redraw active level card (pulsing glow) and visible locked cards (scanning laser effect)
 	for lvl in _level_buttons:
 		var btn: Button = _level_buttons[lvl]
 		if btn != null and is_instance_valid(btn):
-			if lvl >= GameState.highest_unlocked_level:
+			if lvl == GameState.highest_unlocked_level and btn.is_visible_in_tree():
 				btn.queue_redraw()
 
 

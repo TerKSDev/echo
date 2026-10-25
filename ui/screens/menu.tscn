@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://picpdgq0lblw"]
 
-[ext_resource type="Script" uid="uid://4w7wjtp4bfrv" path="res://ui/Menu.gd" id="1_yqeox"]
+[ext_resource type="Script" uid="uid://4w7wjtp4bfrv" path="res://ui/screens/Menu.gd" id="1_yqeox"]
 [ext_resource type="Texture2D" uid="uid://cuprl0tej7njc" path="res://assets/cave_background.png" id="2_vjb58"]
 [ext_resource type="Theme" uid="uid://c6y7u4n8raw2e" path="res://ui/echo_theme.tres" id="3_theme"]
 

@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://qatana21f57u"]
 
 [ext_resource type="Theme" uid="uid://c6y7u4n8raw2e" path="res://ui/echo_theme.tres" id="1_theme"]
-[ext_resource type="Script" path="res://ui/SettingsScene.gd" id="2_script"]
+[ext_resource type="Script" path="res://ui/screens/SettingsScene.gd" id="2_script"]
 [ext_resource type="Texture2D" uid="uid://cuprl0tej7njc" path="res://assets/cave_background.png" id="3_bg"]
 
 [sub_resource type="CanvasItemMaterial" id="CanvasItemMaterial_top_light"]
@@ -114,18 +114,17 @@ layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
 offset_left = 24.0
-offset_top = 34.0
+offset_top = 44.0
 offset_right = -24.0
-offset_bottom = 90.0
+offset_bottom = 100.0
 grow_horizontal = 2
 theme_override_constants/separation = 14
 
 [node name="BackButton" type="Button" parent="TopBar"]
-custom_minimum_size = Vector2(40, 40)
+custom_minimum_size = Vector2(44, 44)
 layout_mode = 2
 size_flags_vertical = 4
 focus_mode = 0
-flat = true
 
 [node name="TitleBox" type="VBoxContainer" parent="TopBar"]
 layout_mode = 2

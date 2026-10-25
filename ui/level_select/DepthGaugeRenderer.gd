@@ -42,8 +42,8 @@ static func draw_depth_gauge(
 	# Minimal Reference Milestones: 0M, -1300M, -2680M
 	var milestones = [
 		{"label": "0M", "ratio": 0.0},
-		{"label": "-1300M", "ratio": 0.5},
-		{"label": "-2680M", "ratio": 1.0},
+		{"label": "-1,300M", "ratio": 0.5},
+		{"label": "-2,680M", "ratio": 1.0},
 	]
 
 	for ms in milestones:
@@ -62,7 +62,7 @@ static func draw_depth_gauge(
 			str(ms["label"]),
 			HORIZONTAL_ALIGNMENT_RIGHT,
 			int(x_axis - 7.0),
-			11,
+			10,
 			Color(0.5, 0.72, 0.9, 0.6)
 		)
 

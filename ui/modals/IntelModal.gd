@@ -30,7 +30,6 @@ func _ready() -> void:
 	modulate.a = 0.0
 	_sync_viewport_size()
 	_build_ui_audio()
-	_init_sfx_manager()
 	_build_modal_shell()
 
 
@@ -52,7 +51,7 @@ func _sync_viewport_size() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not _is_open:
 		return
-	if event.is_action_pressed("ui_cancel") or (event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE):
+	if event.is_action_pressed("ui_cancel") or (event is InputEventKey and event.pressed and (event.keycode == KEY_ESCAPE or event.keycode == KEY_BACK)):
 		close()
 		get_viewport().set_input_as_handled()
 
@@ -81,7 +80,7 @@ static func open_modal(parent: Node) -> Control:
 	if existing != null:
 		existing.open()
 		return existing
-	var script: GDScript = load("res://ui/IntelModal.gd") as GDScript
+	var script: GDScript = load("res://ui/modals/IntelModal.gd") as GDScript
 	var modal := script.new() as Control
 	modal.name = "IntelModal"
 	parent.add_child(modal)
@@ -95,7 +94,8 @@ func open() -> void:
 	_is_open = true
 	visible = true
 	_sync_viewport_size()
-	_populate_content()
+	if _bestiary_entries.is_empty():
+		_populate_content()
 
 	var tw := create_tween().set_parallel(true)
 	tw.tween_property(self, "modulate:a", 1.0, 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
@@ -656,8 +656,12 @@ func _init_sfx_manager() -> void:
 
 
 func _get_or_create_sfx_mgr() -> SfxManager:
-	if _sfx_mgr == null or not is_instance_valid(_sfx_mgr):
-		_init_sfx_manager()
+	if _sfx_mgr != null and is_instance_valid(_sfx_mgr):
+		return _sfx_mgr
+	var existing = get_tree().get_first_node_in_group("sfx_manager") as SfxManager
+	if existing != null:
+		return existing
+	_init_sfx_manager()
 	return _sfx_mgr
 
 

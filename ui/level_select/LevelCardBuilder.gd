@@ -55,25 +55,7 @@ static func draw_card_decorations(canvas: Control, is_active: bool, is_cleared: 
 			if p_a.x < w and p_b.x > 0:
 				canvas.draw_line(p_a, p_b, Color(0.16, 0.28, 0.42, 0.20), 1.0)
 
-		# 2. Smooth Subterranean Sensor Scan Beam (subtle, semi-transparent radar sweep)
-		var card_seed: float = float(canvas.get_instance_id() % 11) * 0.28
-		var scan_phase: float = fmod(time * 0.42 + card_seed, 1.0)
-		var scan_y: float = lerpf(5.0, h - 5.0, scan_phase)
-		var beam_fade: float = sin(scan_phase * PI)
 
-		# Soft, faint gradient trail above the beam
-		for b in range(1, 5):
-			var trail_y: float = scan_y - float(b) * 2.4
-			if trail_y >= 3.0:
-				var a: float = (1.0 - float(b) / 5.0) * 0.07 * beam_fade
-				canvas.draw_line(Vector2(6.0, trail_y), Vector2(w - 6.0, trail_y), Color(0.20, 0.60, 0.90, a), 1.5)
-
-		# Primary scanning laser line (delicate and semi-transparent)
-		canvas.draw_line(Vector2(6.0, scan_y), Vector2(w - 6.0, scan_y), Color(0.35, 0.85, 1.0, 0.30 * beam_fade), 1.2)
-
-		# Subtle boundary sensor dots
-		canvas.draw_circle(Vector2(6.0, scan_y), 1.6, Color(0.55, 0.90, 1.0, 0.42 * beam_fade))
-		canvas.draw_circle(Vector2(w - 6.0, scan_y), 1.6, Color(0.55, 0.90, 1.0, 0.42 * beam_fade))
 
 
 static func play_locked_feedback(
@@ -85,6 +67,10 @@ static func play_locked_feedback(
 ) -> void:
 	if play_sound.is_valid() and wav_error != null:
 		play_sound.call(wav_error, -4.0, randf_range(0.96, 1.04))
+
+	# Mobile haptic feedback on rejection
+	if OS.has_feature("mobile") or OS.get_name() == "Android":
+		Input.vibrate_handheld(35)
 
 	# Haptic micro-shake animation
 	var orig_pos := btn.position
@@ -328,6 +314,7 @@ static func build_level_card(
 	# Display earned stars and best time exclusively on cleared levels
 	if is_unlocked and stars > 0:
 		var best_time: float = GameState.get_level_best_time(level_number)
+		var is_ghost: bool = GameState.is_level_ghost_cleared(level_number)
 
 		var star_box := HBoxContainer.new()
 		star_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -336,7 +323,7 @@ static func build_level_card(
 		star_box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 
 		var s1 := "★" if stars >= 1 else "☆"
-		var s2 := "★" if stars >= 2 else "☆"
+		var s2 := "★" if is_ghost else ("★" if stars >= 2 else "☆")
 		var s3 := "★" if stars >= 3 else "☆"
 
 		var star_lbl := Label.new()

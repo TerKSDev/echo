@@ -1,5 +1,7 @@
 extends CanvasLayer
 
+const DebriefModal = preload("res://ui/modals/DebriefModal.gd")
+
 @onready var player: Node2D = get_node_or_null("../Player")
 
 var _base_inner_radius := 0.42
@@ -65,19 +67,19 @@ func flash_death() -> void:
 	tw.tween_property(mat, "shader_parameter/vignette_color", Color(0.65, 0.05, 0.08, 0.95), 0.08)
 	tw.tween_property(mat, "shader_parameter/vignette_color", Color(0.28, 0.02, 0.04, 0.85), 0.6)
 
-func set_gameplay_buttons_visible(is_visible: bool) -> void:
+func set_gameplay_buttons_visible(buttons_visible: bool) -> void:
 	if has_node("PauseBtn"):
-		$PauseBtn.visible = is_visible
+		$PauseBtn.visible = buttons_visible
 	if has_node("SneakBtn"):
-		$SneakBtn.visible = is_visible
+		$SneakBtn.visible = buttons_visible
 	if has_node("SoundBtn"):
-		$SoundBtn.visible = is_visible
+		$SoundBtn.visible = buttons_visible
 	if has_node("PebbleBtn"):
-		$PebbleBtn.visible = is_visible
+		$PebbleBtn.visible = buttons_visible
 	if has_node("MicIndicator"):
-		$MicIndicator.visible = is_visible
+		$MicIndicator.visible = buttons_visible
 	if _sector_badge != null:
-		_sector_badge.visible = is_visible
+		_sector_badge.visible = buttons_visible
 
 
 func show_death_screen(killer_type: int = -1) -> void:

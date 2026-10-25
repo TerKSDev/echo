@@ -61,6 +61,7 @@ func _on_native_sign_in_success(p_display_name: String, p_huawei_id: String) -> 
 	display_name = p_display_name
 	huawei_id = p_huawei_id
 	_save_auth_state()
+	_sync_offline_records_to_hms()
 	auth_status_changed.emit(true)
 	show_hms_toast("Welcome back, %s!" % display_name, "HUAWEI Game Service Connected")
 
@@ -121,6 +122,7 @@ func login_huawei(on_success: Callable = Callable(), _on_fail: Callable = Callab
 	huawei_id = "hw_uid_%d" % (randi() % 8999999 + 1000000)
 	player_level = 12
 	_save_auth_state()
+	_sync_offline_records_to_hms()
 
 	auth_status_changed.emit(true)
 	show_hms_toast("Welcome back, %s!" % display_name, "HUAWEI Game Service Connected")
@@ -157,10 +159,25 @@ func submit_sector_score(sector_idx: int, escape_time: float, _pings: int, stars
 	score_submitted.emit(sector_idx, escape_time)
 
 
+## Automatically synchronizes all offline cleared sector records to HMS upon user sign-in.
+func _sync_offline_records_to_hms() -> void:
+	for lvl in range(1, 14):
+		var stars: int = GameState.get_level_stars(lvl)
+		if stars > 0:
+			var best_t: float = GameState.get_level_best_time(lvl)
+			if best_t > 0.0 and best_t < 900.0:
+				submit_sector_score(lvl, best_t, 0, stars)
+
+
 func get_sector_leaderboard(sector_idx: int) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
 	if _leaderboards.has(sector_idx):
-		return _leaderboards[sector_idx]
-	return []
+		var raw_board = _leaderboards[sector_idx]
+		if raw_board is Array:
+			for item in raw_board:
+				if item is Dictionary:
+					result.append(item)
+	return result
 
 
 func get_player_rank(sector_idx: int) -> Dictionary:

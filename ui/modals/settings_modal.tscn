@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://dkn6w2e4r5t8y"]
 
-[ext_resource type="Script" path="res://ui/SettingsModal.gd" id="1_modal"]
+[ext_resource type="Script" path="res://ui/modals/SettingsModal.gd" id="1_modal"]
 [ext_resource type="Theme" uid="uid://c6y7u4n8raw2e" path="res://ui/echo_theme.tres" id="2_theme"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_card"]

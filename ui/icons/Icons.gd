@@ -174,12 +174,13 @@ static func draw_lock(canvas: Control) -> void:
 static func draw_back_arrow(canvas: Control) -> void:
 	var c := canvas.size * 0.5
 	var col := Color(0.78, 0.92, 1.0, 0.95)
-	var tip := Vector2(c.x - 6.0, c.y)
-	var right_top := Vector2(c.x + 5.0, c.y - 7.0)
-	var right_bot := Vector2(c.x + 5.0, c.y + 7.0)
-	canvas.draw_line(tip, right_top, col, 2.0)
-	canvas.draw_line(tip, right_bot, col, 2.0)
-	canvas.draw_line(tip, Vector2(c.x + 7.0, c.y), col, 2.0)
+	var tip := Vector2(c.x - 7.0, c.y)
+	var wing_top := Vector2(c.x - 1.0, c.y - 6.0)
+	var wing_bot := Vector2(c.x - 1.0, c.y + 6.0)
+	var stem_end := Vector2(c.x + 7.0, c.y)
+	canvas.draw_line(wing_top, tip, col, 2.2, true)
+	canvas.draw_line(wing_bot, tip, col, 2.2, true)
+	canvas.draw_line(tip, stem_end, col, 2.2, true)
 
 
 static func draw_headphone(canvas: Control) -> void:

@@ -35,7 +35,7 @@ static func open_modal(parent: Node, default_sector: int = 1) -> Control:
 	if existing != null:
 		existing.open(default_sector)
 		return existing
-	var script: GDScript = load("res://ui/LeaderboardModal.gd") as GDScript
+	var script: GDScript = load("res://ui/modals/LeaderboardModal.gd") as GDScript
 	var modal := script.new() as Control
 	modal.name = "LeaderboardModal"
 	parent.add_child(modal)
@@ -61,7 +61,7 @@ func _sync_viewport_size() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not _is_open:
 		return
-	if event.is_action_pressed("ui_cancel") or (event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE):
+	if event.is_action_pressed("ui_cancel") or (event is InputEventKey and event.pressed and (event.keycode == KEY_ESCAPE or event.keycode == KEY_BACK)):
 		close()
 		get_viewport().set_input_as_handled()
 
@@ -334,7 +334,7 @@ func _refresh_view() -> void:
 	for child in _list_container.get_children():
 		child.queue_free()
 
-	var entries: Array[Dictionary] = HMSService.get_sector_leaderboard(_current_sector)
+	var entries: Array = HMSService.get_sector_leaderboard(_current_sector)
 	for i in entries.size():
 		var row := _build_leaderboard_row(i + 1, entries[i])
 		_list_container.add_child(row)

@@ -1,14 +1,14 @@
 [gd_scene format=3 uid="uid://b415q8byb6eov"]
 
-[ext_resource type="Script" path="res://ui/Hud.gd" id="1_rbyyf"]
-[ext_resource type="Shader" path="res://ui/vignette.gdshader" id="2_shader"]
-[ext_resource type="Script" path="res://ui/MicVisualizer.gd" id="3_mic"]
-[ext_resource type="Script" path="res://ui/SneakButton.gd" id="4_sneak"]
-[ext_resource type="Script" path="res://ui/SoundButton.gd" id="5_sound"]
-[ext_resource type="Script" path="res://ui/PauseButton.gd" id="6_pause"]
-[ext_resource type="PackedScene" path="res://ui/settings_modal.tscn" id="7_modal"]
-[ext_resource type="PackedScene" path="res://ui/death_screen.tscn" id="8_death"]
-[ext_resource type="Script" path="res://ui/PebbleButton.gd" id="9_pebble"]
+[ext_resource type="Script" path="res://ui/hud/Hud.gd" id="1_rbyyf"]
+[ext_resource type="Shader" path="res://ui/hud/vignette.gdshader" id="2_shader"]
+[ext_resource type="Script" path="res://ui/hud/MicVisualizer.gd" id="3_mic"]
+[ext_resource type="Script" path="res://ui/hud/SneakButton.gd" id="4_sneak"]
+[ext_resource type="Script" path="res://ui/hud/SoundButton.gd" id="5_sound"]
+[ext_resource type="Script" path="res://ui/hud/PauseButton.gd" id="6_pause"]
+[ext_resource type="PackedScene" path="res://ui/modals/settings_modal.tscn" id="7_modal"]
+[ext_resource type="PackedScene" path="res://ui/modals/death_screen.tscn" id="8_death"]
+[ext_resource type="Script" path="res://ui/hud/PebbleButton.gd" id="9_pebble"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_vignette"]
 shader = ExtResource("2_shader")

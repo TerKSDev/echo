@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://dmknrgc8haiw1"]
 
 [ext_resource type="Theme" uid="uid://c6y7u4n8raw2e" path="res://ui/echo_theme.tres" id="1_nw0v8"]
-[ext_resource type="Script" uid="uid://g2f7or6ftwfu" path="res://ui/HeadphoneWarning.gd" id="2_v25u4"]
+[ext_resource type="Script" uid="uid://g2f7or6ftwfu" path="res://ui/screens/HeadphoneWarning.gd" id="2_v25u4"]
 
 [node name="HeadphoneWarning" type="Control" unique_id=941129480]
 layout_mode = 3
