@@ -6,7 +6,7 @@ class_name SfxManager
 
 signal beat(threat: float)
 
-const MIX_RATE := 22050
+const MIX_RATE := 44100
 
 # Heartbeat parameters
 @export var interval_calm := 1.30   # Seconds between beats when safe (~46 BPM)
@@ -21,14 +21,25 @@ var _hb_idx := 0
 var _hb_timer := 0.0
 var _threat := 0.0
 
-var _wav_step_walk: AudioStreamWAV
-var _wav_step_sneak: AudioStreamWAV
+var _wav_steps_walk: Array[AudioStreamWAV] = []
+var _wav_steps_sneak: Array[AudioStreamWAV] = []
+var _wav_steps_water: Array[AudioStreamWAV] = []
+var _last_walk_idx := -1
+var _last_sneak_idx := -1
+var _last_water_idx := -1
+
+var _ambient_drone_player: AudioStreamPlayer
+var _wav_abyssal_drone: AudioStreamWAV
+var _wav_cave_droplet: AudioStreamWAV
+var _droplet_timer := 5.0
+
 var _wav_enemy_step: AudioStreamWAV
 var _wav_echo_ping: AudioStreamWAV
 var _wav_charge_full: AudioStreamWAV
 var _wav_roar_sleeper: AudioStreamWAV
 var _wav_roar_patroller: AudioStreamWAV
 var _wav_roar_chaser: AudioStreamWAV
+var _wav_sleeper_snore: AudioStreamWAV
 var _wav_screamer_crack: AudioStreamWAV
 var _wav_screamer_shriek: AudioStreamWAV
 var _wav_listener_pip: AudioStreamWAV
@@ -44,6 +55,14 @@ var _wav_star_chimes: Array[AudioStreamWAV] = []
 var _wav_pebble_clatter: AudioStreamWAV
 var _wav_pebble_clink: AudioStreamWAV
 var _wav_deny_tick: AudioStreamWAV
+var _wav_exit_beacon: AudioStreamWAV
+var _wav_wall_echo: AudioStreamWAV
+var _wav_cane_tap: AudioStreamWAV
+var _wav_wall_bump: AudioStreamWAV
+var _wav_assist_on: AudioStreamWAV
+var _wav_assist_off: AudioStreamWAV
+var _wav_door_open: AudioStreamWAV
+var _wav_inv_pip: AudioStreamWAV
 
 var _charge_player: AudioStreamPlayer
 var _player_ref: Node2D
@@ -60,14 +79,17 @@ var _spatial_idx := 0
 
 
 func _ready() -> void:
+	add_to_group("sfx_manager")
 	_build_all_streams()
 	_setup_charge_player()
 	_setup_heartbeat_players()
 	_setup_audio_pools()
+	_setup_ambient_drone()
 
 
 func _process(delta: float) -> void:
 	_process_heartbeat(delta)
+	_process_ambient_subterranean(delta)
 
 
 func set_player(player: Node2D) -> void:
@@ -83,11 +105,40 @@ func _suppress_mic(_duration: float) -> void:
 
 func play_step_walk() -> void:
 	_suppress_mic(0.18)
-	_play_non_spatial(_wav_step_walk, -6.0, randf_range(0.92, 1.08))
+	if _wav_steps_walk.is_empty():
+		return
+	var idx := randi() % _wav_steps_walk.size()
+	if idx == _last_walk_idx and _wav_steps_walk.size() > 1:
+		idx = (idx + 1) % _wav_steps_walk.size()
+	_last_walk_idx = idx
+	_play_non_spatial(_wav_steps_walk[idx], -5.5, randf_range(0.96, 1.04))
 
 
 func play_step_sneak() -> void:
-	_play_non_spatial(_wav_step_sneak, -14.0, randf_range(0.95, 1.06))
+	if _wav_steps_sneak.is_empty():
+		return
+	var idx := randi() % _wav_steps_sneak.size()
+	if idx == _last_sneak_idx and _wav_steps_sneak.size() > 1:
+		idx = (idx + 1) % _wav_steps_sneak.size()
+	_last_sneak_idx = idx
+	_play_non_spatial(_wav_steps_sneak[idx], -13.5, randf_range(0.97, 1.03))
+
+
+func play_step_water(is_sneak: bool) -> void:
+	if _wav_steps_water.is_empty():
+		return
+	var idx := randi() % _wav_steps_water.size()
+	if idx == _last_water_idx and _wav_steps_water.size() > 1:
+		idx = (idx + 1) % _wav_steps_water.size()
+	_last_water_idx = idx
+	var vol_db: float = -12.0 if is_sneak else -5.0
+	var pitch: float = randf_range(0.96, 1.06) if is_sneak else randf_range(0.92, 1.04)
+	_play_non_spatial(_wav_steps_water[idx], vol_db, pitch)
+
+
+func play_sleeper_snore(pos: Vector2, occluded: bool = false) -> void:
+	var vol_db: float = -18.0 if occluded else -12.5
+	_play_spatial(_wav_sleeper_snore, pos, vol_db, randf_range(0.94, 1.04), 320.0)
 
 
 func play_echo_ping(loudness: float) -> void:
@@ -160,6 +211,49 @@ func play_pebble_clink(pos: Vector2) -> void:
 
 func play_deny_tick() -> void:
 	_play_non_spatial(_wav_deny_tick, -6.0, 1.0)
+
+
+# Visually Impaired (Blind) Echolocation & Navigation Audio API:
+func play_exit_beacon(pos: Vector2, is_near: bool = false, dist: float = 200.0, max_dist: float = 380.0) -> void:
+	var ratio: float = clampf(dist / maxf(max_dist, 1.0), 0.0, 1.0)
+	var vol_db: float = lerpf(0.5, -11.0, ratio)
+	var pitch: float = 1.06 if is_near else 1.0
+	_play_spatial(_wav_exit_beacon, pos, vol_db, pitch, max_dist * 1.15)
+
+
+func play_wall_echo(pos: Vector2, dist: float, max_range: float) -> void:
+	var ratio: float = clampf(dist / maxf(max_range, 1.0), 0.0, 1.0)
+	var vol_db: float = lerpf(-4.0, -18.0, ratio)
+	var pitch: float = lerpf(1.35, 0.85, ratio)
+	_play_spatial(_wav_wall_echo, pos, vol_db, pitch, 650.0)
+
+
+func play_cane_tap(dist: float) -> void:
+	var pitch: float = lerpf(1.35, 0.92, clampf(dist / 50.0, 0.0, 1.0))
+	_play_non_spatial(_wav_cane_tap, -6.5, pitch)
+
+
+func play_wall_bump() -> void:
+	_play_non_spatial(_wav_wall_bump, -3.5, randf_range(0.95, 1.05))
+
+
+func play_assist_toggle(enabled: bool) -> void:
+	_play_non_spatial(_wav_assist_on if enabled else _wav_assist_off, 0.0, 1.0)
+
+
+func play_door_open(pos: Vector2) -> void:
+	_suppress_mic(0.4)
+	_play_spatial(_wav_door_open, pos, 1.5, 1.0, 1400.0)
+
+
+func play_inventory_pips(count: int) -> void:
+	if count <= 0:
+		play_deny_tick()
+		return
+	for i in count:
+		get_tree().create_timer(float(i) * 0.11).timeout.connect(func():
+			_play_non_spatial(_wav_inv_pip, -3.0, 1.0 + float(i) * 0.16)
+		)
 
 
 func play_sneak_toggle(entering_sneak: bool) -> void:
@@ -270,6 +364,36 @@ func _process_heartbeat(delta: float) -> void:
 		beat.emit(_threat)
 
 
+func _setup_ambient_drone() -> void:
+	if _ambient_drone_player != null:
+		return
+	if not _cache.has("abyssal_drone"):
+		_cache["abyssal_drone"] = _synth_abyssal_drone()
+	_ambient_drone_player = AudioStreamPlayer.new()
+	_ambient_drone_player.stream = _cache["abyssal_drone"]
+	_ambient_drone_player.bus = &"BGM"
+	_ambient_drone_player.volume_db = -17.0
+	add_child(_ambient_drone_player)
+	_ambient_drone_player.play()
+
+
+func _process_ambient_subterranean(delta: float) -> void:
+	# Dynamic subterranean drone volume ducking during intense threats
+	if _ambient_drone_player != null and _ambient_drone_player.playing:
+		var target_vol: float = lerpf(-17.0, -29.0, _threat)
+		_ambient_drone_player.volume_db = move_toward(_ambient_drone_player.volume_db, target_vol, delta * 6.0)
+
+	# Organic distant spatial stalactite water droplets echoing in the darkness
+	if _player_ref != null and is_instance_valid(_player_ref) and bool(_player_ref.get("alive")):
+		_droplet_timer -= delta
+		if _droplet_timer <= 0.0:
+			_droplet_timer = randf_range(5.0, 9.5)
+			var ang := randf() * TAU
+			var dist := randf_range(220.0, 480.0)
+			var drop_pos: Vector2 = _player_ref.global_position + Vector2.from_angle(ang) * dist
+			_play_spatial(_wav_cave_droplet, drop_pos, -13.5, randf_range(0.92, 1.08), 850.0)
+
+
 func _synth_heartbeat() -> AudioStreamWAV:
 	var dur := 0.42
 	var count := int(dur * MIX_RATE)
@@ -342,9 +466,28 @@ func _play_spatial(stream: AudioStreamWAV, pos: Vector2, volume_db: float, pitch
 # --- Procedural Waveform Synthesis -------------------------------------------
 
 func _build_all_streams() -> void:
-	if not _cache.has("step_walk"):
-		_cache["step_walk"] = _synth_step_walk()
-		_cache["step_sneak"] = _synth_step_sneak()
+	# 1. Footstep variations (prevents machine-gun repetition)
+	for i in 4:
+		var key := "step_walk_%d" % i
+		if not _cache.has(key):
+			_cache[key] = _synth_step_walk(i)
+	for i in 3:
+		var key := "step_sneak_%d" % i
+		if not _cache.has(key):
+			_cache[key] = _synth_step_sneak(i)
+	for i in 3:
+		var key := "step_water_%d" % i
+		if not _cache.has(key):
+			_cache[key] = _synth_step_water(i)
+
+	if not _cache.has("abyssal_drone"):
+		_cache["abyssal_drone"] = _synth_abyssal_drone()
+	if not _cache.has("cave_droplet"):
+		_cache["cave_droplet"] = _synth_cave_droplet()
+	if not _cache.has("sleeper_snore"):
+		_cache["sleeper_snore"] = _synth_sleeper_snore()
+
+	if not _cache.has("enemy_step"):
 		_cache["enemy_step"] = _synth_enemy_step()
 		_cache["echo_ping"] = _synth_echo_ping()
 		_cache["charge_full"] = _synth_charge_full()
@@ -375,8 +518,40 @@ func _build_all_streams() -> void:
 	if not _cache.has("deny_tick"):
 		_cache["deny_tick"] = _synth_deny_tick()
 
-	_wav_step_walk = _cache.get("step_walk", null)
-	_wav_step_sneak = _cache.get("step_sneak", null)
+	# Visually Impaired (Blind) Echolocation & Navigation Streams
+	if not _cache.has("exit_beacon"):
+		_cache["exit_beacon"] = _synth_exit_beacon()
+	if not _cache.has("wall_echo"):
+		_cache["wall_echo"] = _synth_wall_echo()
+	if not _cache.has("cane_tap"):
+		_cache["cane_tap"] = _synth_cane_tap()
+	if not _cache.has("wall_bump"):
+		_cache["wall_bump"] = _synth_wall_bump()
+	if not _cache.has("assist_on"):
+		_cache["assist_on"] = _synth_assist_toggle(true)
+	if not _cache.has("assist_off"):
+		_cache["assist_off"] = _synth_assist_toggle(false)
+	if not _cache.has("door_open"):
+		_cache["door_open"] = _synth_door_open()
+	if not _cache.has("inv_pip"):
+		_cache["inv_pip"] = _synth_inv_pip()
+
+	_wav_steps_walk.clear()
+	for i in 4:
+		_wav_steps_walk.append(_cache.get("step_walk_%d" % i, null))
+
+	_wav_steps_sneak.clear()
+	for i in 3:
+		_wav_steps_sneak.append(_cache.get("step_sneak_%d" % i, null))
+
+	_wav_steps_water.clear()
+	for i in 3:
+		_wav_steps_water.append(_cache.get("step_water_%d" % i, null))
+
+	_wav_abyssal_drone = _cache.get("abyssal_drone", null)
+	_wav_cave_droplet = _cache.get("cave_droplet", null)
+	_wav_sleeper_snore = _cache.get("sleeper_snore", null)
+
 	_wav_enemy_step = _cache.get("enemy_step", null)
 	_wav_echo_ping = _cache.get("echo_ping", null)
 	_wav_charge_full = _cache.get("charge_full", null)
@@ -397,6 +572,14 @@ func _build_all_streams() -> void:
 	_wav_pebble_clatter = _cache.get("pebble_clatter", null)
 	_wav_pebble_clink = _cache.get("pebble_clink", null)
 	_wav_deny_tick = _cache.get("deny_tick", null)
+	_wav_exit_beacon = _cache.get("exit_beacon", null)
+	_wav_wall_echo = _cache.get("wall_echo", null)
+	_wav_cane_tap = _cache.get("cane_tap", null)
+	_wav_wall_bump = _cache.get("wall_bump", null)
+	_wav_assist_on = _cache.get("assist_on", null)
+	_wav_assist_off = _cache.get("assist_off", null)
+	_wav_door_open = _cache.get("door_open", null)
+	_wav_inv_pip = _cache.get("inv_pip", null)
 	_wav_star_chimes = [
 		_cache.get("star_chime_0", null),
 		_cache.get("star_chime_1", null),
@@ -424,37 +607,124 @@ static func _make_wav(samples: PackedFloat32Array, loop: bool = false) -> AudioS
 	return wav
 
 
-# Stone cavern footstep: low thump + crisp sole tap + subtle cave tail
-func _synth_step_walk() -> AudioStreamWAV:
+# Stone cavern footstep: 4 distinct natural variations (heel strike, sole impact, toe scuff, hollow rock)
+func _synth_step_walk(variant: int = 0) -> AudioStreamWAV:
 	var dur := 0.16
 	var count := int(dur * MIX_RATE)
 	var out := PackedFloat32Array()
 	out.resize(count)
 	var phase := 0.0
+	var f_start: float = [148.0, 162.0, 136.0, 175.0][clampi(variant, 0, 3)]
+	var f_end: float = [44.0, 52.0, 40.0, 56.0][clampi(variant, 0, 3)]
+	var decay: float = [26.0, 31.0, 24.0, 33.0][clampi(variant, 0, 3)]
+	var grit_freq: float = [880.0, 1150.0, 720.0, 1340.0][clampi(variant, 0, 3)]
 	for i in count:
 		var t: float = float(i) / MIX_RATE
-		var freq: float = lerpf(145.0, 48.0, clampf(t / 0.08, 0.0, 1.0))
+		var freq: float = lerpf(f_start, f_end, clampf(t / 0.08, 0.0, 1.0))
 		phase += TAU * freq / MIX_RATE
-		var thump: float = sin(phase) * exp(-t * 28.0)
-		var grit: float = randf_range(-1.0, 1.0) * exp(-t * 45.0) * sin(t * 900.0)
-		out[i] = (thump * 0.75 + grit * 0.35) * 0.85
+		var thump: float = sin(phase) * exp(-t * decay)
+		var grit: float = randf_range(-1.0, 1.0) * exp(-t * 48.0) * sin(t * grit_freq)
+		out[i] = (thump * 0.74 + grit * 0.36) * 0.85
 	return _make_wav(out)
 
 
-# Soft muffled sneak step
-func _synth_step_sneak() -> AudioStreamWAV:
+# Soft muffled sneak steps (3 subtle toe/sole variations)
+func _synth_step_sneak(variant: int = 0) -> AudioStreamWAV:
 	var dur := 0.11
 	var count := int(dur * MIX_RATE)
 	var out := PackedFloat32Array()
 	out.resize(count)
 	var phase := 0.0
+	var f_start: float = [94.0, 102.0, 86.0][clampi(variant, 0, 2)]
 	for i in count:
 		var t: float = float(i) / MIX_RATE
-		var freq: float = lerpf(95.0, 42.0, clampf(t / 0.07, 0.0, 1.0))
+		var freq: float = lerpf(f_start, 38.0, clampf(t / 0.065, 0.0, 1.0))
 		phase += TAU * freq / MIX_RATE
-		var soft: float = sin(phase) * exp(-t * 36.0)
-		var brush: float = randf_range(-1.0, 1.0) * exp(-t * 60.0) * 0.15
-		out[i] = (soft * 0.6 + brush) * 0.65
+		var soft: float = sin(phase) * exp(-t * 38.0)
+		var brush: float = randf_range(-1.0, 1.0) * exp(-t * 65.0) * 0.14
+		out[i] = (soft * 0.62 + brush) * 0.65
+	return _make_wav(out)
+
+
+# Hydrodynamic water wading footsteps (viscous water displacement surge + surface fluid slosh)
+func _synth_step_water(variant: int = 0) -> AudioStreamWAV:
+	var dur := 0.22
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	var p_low := 0.0
+	var f_base: float = [115.0, 100.0, 128.0][clampi(variant, 0, 2)]
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var f_low: float = f_base - 58.0 * clampf(t / 0.12, 0.0, 1.0)
+		p_low += TAU * f_low / MIX_RATE
+		var sub: float = sin(p_low) * exp(-t * 19.0) * 0.75
+		var splash: float = randf_range(-1.0, 1.0) * exp(-t * 42.0) * sin(t * 1950.0) * 0.45
+		var pop := 0.0
+		if t >= 0.045:
+			var tp: float = t - 0.045
+			pop = sin(TAU * (560.0 + 780.0 * (tp / 0.04)) * tp) * exp(-tp * 54.0) * 0.35
+		out[i] = tanh((sub + splash + pop) * 1.3) * 0.82
+	return _make_wav(out)
+
+
+# Seamless 8-second subterranean atmospheric air & tectonic pressure drone
+func _synth_abyssal_drone() -> AudioStreamWAV:
+	var dur := 8.0
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var lfo1: float = 0.55 + 0.45 * sin(TAU * 0.125 * t)
+		var lfo2: float = 0.50 + 0.50 * cos(TAU * 0.125 * t)
+		var lfo3: float = 0.50 + 0.50 * sin(TAU * 0.25 * t)
+
+		var sub1: float = sin(TAU * 48.0 * t) * 0.36 * lfo1
+		var sub2: float = sin(TAU * 72.0 * t) * 0.24 * lfo2
+		var air1: float = (sin(TAU * 120.0 * t) + sin(TAU * 120.125 * t)) * 0.08 * lfo3
+		var air2: float = sin(TAU * 144.0 * t) * 0.06 * lfo1
+
+		out[i] = tanh((sub1 + sub2 + air1 + air2) * 1.2) * 0.65
+	return _make_wav(out, true)
+
+
+# Subterranean stalactite water droplet plop
+func _synth_cave_droplet() -> AudioStreamWAV:
+	var dur := 0.24
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var att: float = minf(t / 0.002, 1.0) * exp(-t * 32.0)
+		var f: float = lerpf(680.0, 1420.0, clampf(t / 0.05, 0.0, 1.0))
+		var body: float = sin(TAU * f * t) * att * 0.72
+		var echo_drop := 0.0
+		if t >= 0.07:
+			var te: float = t - 0.07
+			var att_e: float = minf(te / 0.002, 1.0) * exp(-te * 42.0)
+			echo_drop = sin(TAU * 960.0 * te) * att_e * 0.26
+		out[i] = clampf(body + echo_drop, -1.0, 1.0)
+	return _make_wav(out)
+
+
+# Low slumbering guttural breathing for dormant Sleeper monsters
+func _synth_sleeper_snore() -> AudioStreamWAV:
+	var dur := 0.85
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	var p1 := 0.0
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var norm_t: float = t / dur
+		var env: float = sin(norm_t * PI) * (1.0 - 0.22 * norm_t)
+		var f: float = 52.0 + 8.0 * sin(TAU * 1.2 * t)
+		p1 += TAU * f / MIX_RATE
+		var cords: float = sin(p1) + 0.42 * sin(p1 * 2.0) + 0.22 * sin(p1 * 3.0)
+		var breath: float = randf_range(-1.0, 1.0) * exp(-absf(norm_t - 0.5) * 4.0) * 0.16
+		out[i] = (cords * 0.72 + breath) * env * 0.75
 	return _make_wav(out)
 
 
@@ -475,21 +745,22 @@ func _synth_enemy_step() -> AudioStreamWAV:
 	return _make_wav(out)
 
 
-# Bioluminescent sonar ping + cavern shimmer
+# Bioluminescent sonar ping + 44.1kHz Solfeggio shimmer and sub bloom
 func _synth_echo_ping() -> AudioStreamWAV:
-	var dur := 0.65
+	var dur := 0.68
 	var count := int(dur * MIX_RATE)
 	var out := PackedFloat32Array()
 	out.resize(count)
 	for i in count:
 		var t: float = float(i) / MIX_RATE
-		var env: float = minf(t / 0.008, 1.0) * exp(-t * 5.8)
-		var f1: float = 528.0
-		var f2: float = 792.0
-		var f3: float = 1056.0
-		var sig: float = sin(TAU * f1 * t) * 0.6 + sin(TAU * f2 * t) * 0.25 * exp(-t * 8.0) + sin(TAU * f3 * t) * 0.15 * exp(-t * 12.0)
-		var sub: float = sin(TAU * 132.0 * t) * exp(-t * 14.0) * 0.35
-		out[i] = (sig * env + sub) * 0.78
+		var env: float = minf(t / 0.006, 1.0) * exp(-t * 5.4)
+		var f1 := 528.0
+		var f2 := 792.0
+		var f3 := 1056.0
+		var f4 := 1584.0
+		var sig: float = sin(TAU * f1 * t) * 0.55 + sin(TAU * f2 * t) * 0.24 * exp(-t * 7.5) + sin(TAU * f3 * t) * 0.16 * exp(-t * 11.0) + sin(TAU * f4 * t) * 0.09 * exp(-t * 15.0)
+		var sub: float = sin(TAU * 132.0 * t) * exp(-t * 12.0) * 0.38
+		out[i] = clampf((sig * env + sub) * 0.85, -1.0, 1.0)
 	return _make_wav(out)
 
 
@@ -812,6 +1083,128 @@ func _synth_deny_tick() -> AudioStreamWAV:
 		var tick: float = sin(TAU * 950.0 * t) * exp(-t * 120.0) * 0.6
 		var sample: float = (thud * 0.7 + tick * 0.5) * env
 		out[i] = clampf(tanh(sample * 1.3) * 0.85, -1.0, 1.0)
+	return _make_wav(out)
+
+
+# Serene Tibetan singing bowl / crystal harmonic exit beacon pulse (528 Hz Solfeggio fundamental)
+func _synth_exit_beacon() -> AudioStreamWAV:
+	var dur := 1.25
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var env: float = minf(t / 0.018, 1.0) * exp(-t * 2.8)
+		# 528Hz fundamental + 1056Hz octave + 1584Hz 3rd harmonic + 132Hz warm deep undertone
+		var s1: float = sin(TAU * 528.0 * t) * 0.52
+		var s2: float = sin(TAU * 1056.0 * t) * 0.28
+		var s3: float = sin(TAU * 1584.0 * t) * 0.14
+		var sub: float = sin(TAU * 132.0 * t) * 0.18
+		out[i] = clampf((s1 + s2 + s3 + sub) * env * 0.92, -1.0, 1.0)
+	return _make_wav(out)
+
+
+# Crisp high-frequency acoustic reflection tap (reproducing human echolocation tongue-click reflection)
+func _synth_wall_echo() -> AudioStreamWAV:
+	var dur := 0.045
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var att: float = minf(t / 0.0012, 1.0)
+		var env: float = att * exp(-t * 95.0)
+		var body: float = sin(TAU * 1180.0 * t) * 0.75
+		var air: float = randf_range(-1.0, 1.0) * exp(-t * 130.0) * 0.35
+		out[i] = clampf((body + air) * env * 0.88, -1.0, 1.0)
+	return _make_wav(out)
+
+
+# Tactile acoustic cane feeler / proximity radar tick
+func _synth_cane_tap() -> AudioStreamWAV:
+	var dur := 0.048
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var att: float = minf(t / 0.0015, 1.0)
+		var env: float = att * exp(-t * 88.0)
+		var thud: float = sin(TAU * 240.0 * t) * exp(-t * 60.0) * 0.75
+		var click: float = sin(TAU * 880.0 * t) * exp(-t * 140.0) * 0.45
+		out[i] = clampf((thud + click) * env * 0.85, -1.0, 1.0)
+	return _make_wav(out)
+
+
+# Muffled physical impact thud when the player bumps against a solid cave wall
+func _synth_wall_bump() -> AudioStreamWAV:
+	var dur := 0.09
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var att: float = minf(t / 0.002, 1.0)
+		var env: float = att * exp(-t * 46.0)
+		var sub: float = sin(TAU * 110.0 * t) * exp(-t * 35.0) * 0.72
+		var snap: float = sin(TAU * 360.0 * t) * exp(-t * 75.0) * 0.42
+		out[i] = clampf((sub + snap) * env * 0.9, -1.0, 1.0)
+	return _make_wav(out)
+
+
+# Ascending (ON) or descending (OFF) two-tone chime for Blind Assist mode confirmation
+func _synth_assist_toggle(enabled: bool) -> AudioStreamWAV:
+	var dur := 0.28
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	var f1: float = 523.25 if enabled else 783.99
+	var f2: float = 783.99 if enabled else 523.25
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var s := 0.0
+		if t < 0.14:
+			var env1: float = minf(t / 0.008, 1.0) * exp(-t * 18.0)
+			s += (sin(TAU * f1 * t) + 0.3 * sin(TAU * f1 * 2.0 * t)) * env1
+		if t >= 0.11:
+			var t2: float = t - 0.11
+			var env2: float = minf(t2 / 0.008, 1.0) * exp(-t2 * 16.0)
+			s += (sin(TAU * f2 * t2) + 0.3 * sin(TAU * f2 * 2.0 * t2)) * env2
+		out[i] = clampf(s * 0.75, -1.0, 1.0)
+	return _make_wav(out)
+
+
+# Subterranean stone door sliding open: low cavern grinding rumble followed by latch release
+func _synth_door_open() -> AudioStreamWAV:
+	var dur := 0.65
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var env: float = minf(t / 0.03, 1.0) * exp(-t * 3.8)
+		var rumble: float = sin(TAU * 75.0 * t) * exp(-t * 2.5) * 0.55
+		var grind: float = randf_range(-1.0, 1.0) * exp(-t * 4.5) * 0.35
+		var latch: float = 0.0
+		if t >= 0.25:
+			var tl: float = t - 0.25
+			var latch_env: float = minf(tl / 0.005, 1.0) * exp(-tl * 25.0)
+			latch = sin(TAU * 880.0 * tl) * latch_env * 0.4
+		out[i] = clampf((rumble + grind + latch) * env * 0.85, -1.0, 1.0)
+	return _make_wav(out)
+
+
+# Bright crystalline inventory pip for stone count check
+func _synth_inv_pip() -> AudioStreamWAV:
+	var dur := 0.075
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var env: float = minf(t / 0.004, 1.0) * exp(-t * 45.0)
+		var tone: float = sin(TAU * 880.0 * t) + 0.32 * sin(TAU * 1760.0 * t)
+		out[i] = clampf(tone * env * 0.78, -1.0, 1.0)
 	return _make_wav(out)
 
 

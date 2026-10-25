@@ -26,10 +26,12 @@ var _stat_alerts_val: Label
 var _btn_retry: Button
 var _btn_select: Button
 var _btn_next: Button
+var _hms_sync_btn: Button
 
 var _is_open := false
 var _data: Dictionary = {}
 var _sfx_mgr: SfxManager
+var _cur_lvl_num: int = 1
 
 
 func _ready() -> void:
@@ -38,6 +40,7 @@ func _ready() -> void:
 	modulate.a = 0.0
 	_sync_viewport_size()
 	_build_ui()
+	HMSService.auth_status_changed.connect(func(_logged): _update_hms_button_state())
 
 
 func _notification(what: int) -> void:
@@ -89,7 +92,7 @@ func _build_ui() -> void:
 
 	# 3. Main Glassmorphic Card
 	_card = PanelContainer.new()
-	_card.custom_minimum_size = Vector2(580, 520)
+	_card.custom_minimum_size = Vector2(580, 555)
 	_card.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_card.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	var card_style := StyleBoxFlat.new()
@@ -263,6 +266,19 @@ func _build_ui() -> void:
 	_stat_alerts_val = a_box.get_node("Val")
 	stat_grid.add_child(a_box)
 
+	# --- Huawei Leaderboard / HMS Sync Bar ---
+	var hms_row := HBoxContainer.new()
+	hms_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	vbox.add_child(hms_row)
+
+	_hms_sync_btn = Button.new()
+	_hms_sync_btn.focus_mode = Control.FOCUS_NONE
+	_hms_sync_btn.custom_minimum_size = Vector2(420, 34)
+	_hms_sync_btn.pressed.connect(_on_hms_button_pressed)
+	_style_hms_button(_hms_sync_btn)
+	_update_hms_button_state()
+	hms_row.add_child(_hms_sync_btn)
+
 	# --- Action Buttons ---
 	var btn_hbox := HBoxContainer.new()
 	btn_hbox.add_theme_constant_override("separation", 12)
@@ -402,6 +418,11 @@ func show_debrief(data: Dictionary, sfx: SfxManager = null) -> void:
 	var is_swift: bool = bool(data.get("is_swift", false))
 	var run_stars: int = int(data.get("run_stars", 1))
 
+	_cur_lvl_num = lvl_num
+	HMSService.submit_sector_score(lvl_num, clear_time, pings, run_stars)
+	HMSService.check_sector_clear_achievement(lvl_num, pings, alerts, is_swift)
+	_update_hms_button_state()
+
 	# Format level title with sector name
 	if lvl_num == 0:
 		_title_lbl.text = "PROLOGUE CLEARED"
@@ -530,3 +551,52 @@ func _on_select() -> void:
 	_is_open = false
 	get_tree().paused = false
 	select_pressed.emit()
+
+
+func _style_hms_button(btn: Button) -> void:
+	var norm := StyleBoxFlat.new()
+	var hov := StyleBoxFlat.new()
+	var prs := StyleBoxFlat.new()
+	for sb in [norm, hov, prs]:
+		sb.set_corner_radius_all(10)
+		sb.content_margin_left = 14.0
+		sb.content_margin_right = 14.0
+		sb.content_margin_top = 6.0
+		sb.content_margin_bottom = 6.0
+
+	norm.bg_color = Color(0.12, 0.02, 0.04, 0.85)
+	norm.border_color = Color(0.85, 0.2, 0.25, 0.7)
+	norm.set_border_width_all(1)
+
+	hov.bg_color = Color(0.22, 0.04, 0.06, 0.95)
+	hov.border_color = Color(1.0, 0.35, 0.4, 0.95)
+	hov.set_border_width_all(1)
+
+	prs.bg_color = Color(0.32, 0.06, 0.08, 1.0)
+	prs.border_color = Color(1.0, 0.55, 0.6, 1.0)
+	prs.set_border_width_all(1)
+
+	btn.add_theme_stylebox_override("normal", norm)
+	btn.add_theme_stylebox_override("hover", hov)
+	btn.add_theme_stylebox_override("pressed", prs)
+	btn.add_theme_stylebox_override("focus", norm)
+	btn.add_theme_font_size_override("font_size", 12)
+	btn.add_theme_color_override("font_color", Color(1.0, 0.88, 0.9))
+
+
+func _update_hms_button_state() -> void:
+	if _hms_sync_btn == null:
+		return
+	if HMSService.is_logged_in:
+		var p_name: String = HMSService.get_player_name()
+		_hms_sync_btn.text = "🔴 HUAWEI ID: %s • SYNCED (VIEW LEADERBOARD)" % p_name
+		_hms_sync_btn.add_theme_color_override("font_color", Color(0.4, 1.0, 0.7))
+	else:
+		_hms_sync_btn.text = "🏆 JOIN GLOBAL SPEEDRUN RANKING (HUAWEI ID)"
+		_hms_sync_btn.add_theme_color_override("font_color", Color(1.0, 0.85, 0.4))
+
+
+func _on_hms_button_pressed() -> void:
+	var modal_script: GDScript = load("res://ui/HuaweiLeaderboardModal.gd") as GDScript
+	if modal_script != null:
+		modal_script.open_modal(self, _cur_lvl_num)

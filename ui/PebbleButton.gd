@@ -48,6 +48,10 @@ func _on_down() -> void:
 		_is_dragging = true
 		_drag_start = get_viewport().get_mouse_position()
 		_player.start_aim_pebble()
+		if GameState.blind_assist_mode:
+			var sfx := get_tree().get_first_node_in_group("sfx_manager") as SfxManager
+			if sfx != null and is_instance_valid(sfx):
+				sfx.play_inventory_pips(_player.pebbles)
 	var tw := create_tween()
 	tw.tween_property(self, "_press_scale", 0.92, 0.08).set_trans(Tween.TRANS_SINE)
 
@@ -177,10 +181,4 @@ func _draw() -> void:
 
 
 func _draw_pebble_icon(center: Vector2, col: Color, is_empty: bool) -> void:
-	# Scaled stone skip arc
-	draw_arc(center + Vector2(0, 7), 16.0, -PI * 0.85, -PI * 0.15, 16, Color(col, 0.45), 1.4)
-	var stone_pos := center + Vector2(1.5, -3.0)
-	draw_circle(stone_pos, 6.2, col)
-	draw_circle(stone_pos + Vector2(-1.8, -1.8), 2.2, Color.WHITE if not is_empty else Color(col, 0.5))
-	draw_circle(center + Vector2(-11.0, 4.5), 2.5, Color(col, 0.7))
-	draw_circle(center + Vector2(12.0, 6.0), 1.8, Color(col, 0.5))
+	UIIcons.draw_pebble(self, center, col, is_empty)

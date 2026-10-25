@@ -112,8 +112,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			_close_modal()
 			get_viewport().set_input_as_handled()
 		return
-	if (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT) or (event is InputEventScreenTouch and event.pressed):
-		_on_screen_tapped(event.position)
+	if (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT) or (event is InputEventScreenTouch and event.pressed) or event.is_action_pressed("ui_accept") or (event is InputEventKey and event.pressed and not event.echo and (event.keycode == KEY_SPACE or event.keycode == KEY_ENTER)):
+		_on_screen_tapped(Vector2(360, 640))
 		get_viewport().set_input_as_handled()
 
 
@@ -233,7 +233,7 @@ func _on_start_pressed() -> void:
 
 
 func _on_credits_pressed() -> void:
-	_open_modal("CREDITS", "ECHO: STAY SILENT")
+	_open_modal("CREDITS & ETHOS", "ECHO: STAY SILENT")
 
 	var desc := Label.new()
 	desc.text = "An atmospheric acoustic stealth survival experience.\nNavigate the abyss using only sound waves—where every echo illuminates the path, yet beckons what lurks in the dark."
@@ -242,6 +242,11 @@ func _on_credits_pressed() -> void:
 	desc.add_theme_color_override("font_color", Color(0.72, 0.86, 0.98, 0.9))
 	desc.add_theme_font_size_override("font_size", 13)
 	_modal_body.add_child(desc)
+
+	_add_divider()
+	_add_guide_row(Color(0.35, 0.95, 0.75), "CORE ETHOS", "Zero weapons, zero violence. A journey of overcoming inner panic and finding clarity in darkness.")
+	_add_guide_row(Color(0.35, 0.95, 0.75), "BLIND ACCESSIBILITY", "3D spatial exit beacons, acoustic wall reflection echoes, and obstacle proximity feelers enable full gameplay without sight.")
+	_add_guide_row(Color(1.0, 0.78, 0.28), "DEAF ACCESSIBILITY", "Visualized acoustic waves enable full competitive play for hearing-impaired players in pure silence.")
 
 	_add_divider()
 	_add_guide_row(Color(0.38, 0.88, 1.0), "GAME DESIGN", "Team ECHO")

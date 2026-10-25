@@ -54,6 +54,8 @@ func _on_player_sound(pos: Vector2, loudness: float, is_voice: bool, is_sneak: b
 	if _sfx != null:
 		if is_voice:
 			_sfx.play_echo_ping(loudness)
+		elif is_instance_valid(_player) and _player.get("water_count") != null and int(_player.water_count) > 0:
+			_sfx.play_step_water(is_sneak)
 		elif is_sneak or loudness <= 0.05:
 			_sfx.play_step_sneak()
 		else:

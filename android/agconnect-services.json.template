@@ -1,0 +1,22 @@
+{
+  "client": {
+    "cp_id": "890086000102030405",
+    "product_id": "10987654321",
+    "client_id": "10987654321",
+    "client_secret": "YOUR_HUAWEI_AGC_CLIENT_SECRET_HERE",
+    "project_id": "10987654321",
+    "app_id": "10987654321",
+    "api_key": "YOUR_HUAWEI_AGC_API_KEY_HERE",
+    "package_name": "com.echo.soundescape"
+  },
+  "service": {
+    "analytics": {
+      "channel_id": ""
+    },
+    "game": {
+      "app_id": "10987654321"
+    }
+  },
+  "region": "CN",
+  "configuration_version": "3.0"
+}

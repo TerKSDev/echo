@@ -80,6 +80,10 @@ var _wall_bump_normal := Vector2.UP
 var _wall_bump_alpha := 0.0
 var _stuck_timer := 0.0
 var _water_splash_timer := 0.0
+var _facing_dir := Vector2.DOWN
+var _cane_timer := 0.0
+var _wall_bump_sound_cooldown := 0.0
+var _last_touch_time := 0
 
 # Shake Camera
 func camera_shake(duration: float = 0.4, intensity: float = 8.0) -> void:
@@ -176,6 +180,25 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event is InputEventKey and event.keycode == KEY_ESCAPE and event.pressed:
 			cancel_aim_pebble()
 			return
+		if event is InputEventKey and event.pressed and (event.keycode == KEY_E or event.keycode == KEY_SPACE or event.is_action("ui_accept")):
+			finish_aim_pebble()
+			get_viewport().set_input_as_handled()
+			return
+		if event is InputEventKey and event.pressed:
+			var aim_dir := Vector2.ZERO
+			if event.keycode == KEY_W or event.keycode == KEY_UP:
+				aim_dir.y -= 1.0
+			elif event.keycode == KEY_S or event.keycode == KEY_DOWN:
+				aim_dir.y += 1.0
+			elif event.keycode == KEY_A or event.keycode == KEY_LEFT:
+				aim_dir.x -= 1.0
+			elif event.keycode == KEY_D or event.keycode == KEY_RIGHT:
+				aim_dir.x += 1.0
+			if aim_dir != Vector2.ZERO:
+				_facing_dir = aim_dir.normalized()
+				update_aim_pebble(global_position + _facing_dir * 200.0)
+				get_viewport().set_input_as_handled()
+				return
 		if event is InputEventMouseMotion:
 			update_aim_pebble(get_global_mouse_position())
 			return
@@ -195,12 +218,31 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 
+	# Mobile Multi-touch Accessibility: 3-finger tap on mobile toggles Blind Assist Mode
+	if event is InputEventScreenTouch and event.pressed and event.index == 2:
+		GameState.blind_assist_mode = not GameState.blind_assist_mode
+		GameState.save_settings()
+		var sfx_b := get_node_or_null("../SfxManager") as SfxManager
+		if sfx_b != null:
+			sfx_b.play_assist_toggle(GameState.blind_assist_mode)
+		Input.vibrate_handheld(80)
+		get_viewport().set_input_as_handled()
+		return
+
 	# Handle touch / mouse tap & drag steering
 	var pressed_pos = null
 	var is_new_tap := false
 	if event is InputEventScreenTouch and event.pressed:
 		pressed_pos = get_canvas_transform().affine_inverse() * event.position
 		is_new_tap = true
+		# Mobile double-tap detection for Fast Pulse Mode
+		if GameState.fast_pulse_mode and event.index == 0:
+			var now_ms: int = Time.get_ticks_msec()
+			if now_ms - _last_touch_time < 320:
+				make_sound(160.0, true)
+				_last_touch_time = 0
+			else:
+				_last_touch_time = now_ms
 	elif event is InputEventScreenDrag:
 		pressed_pos = get_canvas_transform().affine_inverse() * event.position
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
@@ -248,6 +290,21 @@ func _unhandled_input(event: InputEvent) -> void:
 		if mic != null:
 			mic.enabled = GameState.mic_enabled
 
+	# Hotkey [B]: Toggle Blind Assist Mode on the fly with audio chime confirmation
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_B:
+		GameState.blind_assist_mode = not GameState.blind_assist_mode
+		GameState.save_settings()
+		var sfx_b := get_node_or_null("../SfxManager") as SfxManager
+		if sfx_b != null:
+			sfx_b.play_assist_toggle(GameState.blind_assist_mode)
+		Input.vibrate_handheld(60)
+
+	# Hotkey [C]: Check Pebble Inventory via audio pips
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_C:
+		var sfx_c := get_node_or_null("../SfxManager") as SfxManager
+		if sfx_c != null:
+			sfx_c.play_inventory_pips(pebbles)
+
 # Handle Logic for Each Physics Frame
 func _physics_process(delta: float) -> void:
 	# Camera shake decay
@@ -289,7 +346,24 @@ func _physics_process(delta: float) -> void:
 	var speed: float = SNEAK_SPEED if sneaking else WALK_SPEED
 	if water_count > 0:
 		speed *= 0.55
-	if moving:
+
+	# Direct directional input (WASD / Arrow Keys)
+	var input_vec := Vector2.ZERO
+	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
+		input_vec.y -= 1.0
+	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
+		input_vec.y += 1.0
+	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):
+		input_vec.x -= 1.0
+	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
+		input_vec.x += 1.0
+
+	if input_vec != Vector2.ZERO:
+		moving = false
+		marker = move_toward(marker, 0.0, delta * 4.0)
+		_facing_dir = input_vec.normalized()
+		desired = _facing_dir * speed
+	elif moving:
 		marker = move_toward(marker, 1.0, delta * 8.0)
 		var to_target: Vector2 = target - global_position
 		var dist: float = to_target.length()
@@ -303,6 +377,7 @@ func _physics_process(delta: float) -> void:
 			var slow_dist: float = (speed * speed) / (2.0 * FRICTION)
 			var target_speed: float = speed * clampf(dist / slow_dist, 0.15, 1.0)
 			var move_dir: Vector2 = to_target.normalized()
+			_facing_dir = move_dir
 
 			# Corner-rounding / vertex slip assist in tight corridors (1-tile width):
 			# If the player is slightly clipped on a tile corner, cast orthogonal feelers
@@ -338,6 +413,25 @@ func _physics_process(delta: float) -> void:
 	velocity = velocity.move_toward(desired, rate * delta)
 	move_and_slide()
 
+	# Virtual Cane Proximity Radar for Blind / Visually Impaired navigation
+	_cane_timer -= delta
+	_wall_bump_sound_cooldown -= delta
+	if GameState.blind_assist_mode and (velocity.length() > 5.0 or desired != Vector2.ZERO):
+		var feel_dir: Vector2 = desired.normalized() if desired != Vector2.ZERO else _facing_dir
+		var space_state := get_world_2d().direct_space_state
+		var cane_query := PhysicsRayQueryParameters2D.create(global_position, global_position + feel_dir * 46.0)
+		cane_query.collision_mask = 1
+		cane_query.exclude = [get_rid()]
+		var cane_hit := space_state.intersect_ray(cane_query)
+		if not cane_hit.is_empty():
+			var hit_dist: float = global_position.distance_to(cane_hit.position)
+			if _cane_timer <= 0.0:
+				_cane_timer = lerpf(0.18, 0.44, hit_dist / 46.0)
+				Input.vibrate_handheld(25)
+				var sfx_node := get_node_or_null("../SfxManager") as SfxManager
+				if sfx_node != null:
+					sfx_node.play_cane_tap(hit_dist)
+
 	# Handle wall collision: allow sliding along walls, stop only on head-on obstacle or zero progress
 	if get_slide_collision_count() > 0:
 		var col := get_slide_collision(0)
@@ -349,6 +443,14 @@ func _physics_process(delta: float) -> void:
 				_wall_bump_alpha = 0.85
 
 			var heading_into_wall: float = desired.normalized().dot(normal)
+			if (moving or input_vec != Vector2.ZERO) and heading_into_wall < -0.7:
+				if _wall_bump_sound_cooldown <= 0.0:
+					_wall_bump_sound_cooldown = 0.38
+					var sfx_bump := get_node_or_null("../SfxManager") as SfxManager
+					if sfx_bump != null:
+						sfx_bump.play_wall_bump()
+					Input.vibrate_handheld(40)
+
 			if moving and velocity.length() < 6.0 and heading_into_wall < -0.82:
 				_stuck_timer += delta
 				if _stuck_timer > 0.14:
@@ -465,6 +567,7 @@ func make_sound(loudness: float, is_voice := false, force_sneak := false) -> voi
 		var tween := create_tween()
 		pulse_scale = 1.0 + loudness * 0.8
 		tween.tween_property(self, "pulse_scale", 1.0, 0.25).set_ease(Tween.EASE_OUT)
+		_emit_wall_echos(loudness)
 	else:
 		var ripple_r: float = (16.0 if sneaking else 30.0) * (1.45 if water_count > 0 else 1.0)
 		var ripple_a: float = (0.24 if sneaking else 0.46) * (1.35 if water_count > 0 else 1.0)
@@ -477,6 +580,41 @@ func make_sound(loudness: float, is_voice := false, force_sneak := false) -> voi
 		var step_tw := create_tween()
 		pulse_scale = 1.05 if sneaking else 1.13
 		step_tw.tween_property(self, "pulse_scale", 1.0, 0.18).set_ease(Tween.EASE_OUT)
+
+
+# Acoustic Echolocation Reflection: emits 8 directional sensory rays that reflect off nearby cave walls
+# with travel-time delays and 3D spatial panning (left ear / right ear) for blind navigation
+func _emit_wall_echos(loudness: float) -> void:
+	if not GameState.blind_assist_mode:
+		return
+	var space := get_world_2d().direct_space_state
+	var max_range: float = 120.0 + loudness * 550.0
+	var p_rid := get_rid()
+	var ray_dirs: Array[Vector2] = [
+		Vector2.RIGHT,
+		Vector2(0.7071, 0.7071),
+		Vector2.DOWN,
+		Vector2(-0.7071, 0.7071),
+		Vector2.LEFT,
+		Vector2(-0.7071, -0.7071),
+		Vector2.UP,
+		Vector2(0.7071, -0.7071),
+	]
+	for dir in ray_dirs:
+		var q := PhysicsRayQueryParameters2D.create(global_position, global_position + dir * max_range)
+		q.collision_mask = 1
+		q.exclude = [p_rid]
+		var hit: Dictionary = space.intersect_ray(q)
+		if not hit.is_empty():
+			var hit_pos: Vector2 = hit.position
+			var dist: float = global_position.distance_to(hit_pos)
+			var delay: float = dist / 1150.0 # Acoustic travel delay
+			get_tree().create_timer(delay).timeout.connect(func():
+				if is_instance_valid(self) and alive:
+					var sfx_node := get_node_or_null("../SfxManager") as SfxManager
+					if sfx_node != null:
+						sfx_node.play_wall_echo(hit_pos, dist, max_range)
+			)
 
 # Handle Sneak Toggle
 func toggle_sneak():
@@ -763,7 +901,7 @@ func start_aim_pebble() -> void:
 	if charging:
 		charging = false
 	is_aiming_pebble = true
-	var dir := velocity.normalized() if velocity.length() > 10.0 else Vector2.RIGHT
+	var dir: Vector2 = velocity.normalized() if velocity.length() > 10.0 else _facing_dir
 	pebble_aim_raw_pos = global_position + dir * 180.0
 	pebble_aim_target = get_clamped_pebble_target(pebble_aim_raw_pos)
 	queue_redraw()

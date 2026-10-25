@@ -23,6 +23,7 @@ var _sens_slider: HSlider
 var _sens_val: Label
 var _calib_btn: Button
 var _meter_canvas: Control
+var _blind_btn: Button
 
 
 func _ready() -> void:
@@ -59,6 +60,7 @@ func _ready() -> void:
 	_player = get_tree().get_first_node_in_group("player")
 	_update_mute_toggle_ui()
 	_update_mic_toggle_ui()
+	_refresh_blind_btn_ui()
 
 
 func _notification(what: int) -> void:
@@ -298,8 +300,46 @@ func _build_extra_ui() -> void:
 	vbox.add_child(hint_lbl)
 	vbox.move_child(hint_lbl, insert_idx)
 
-	# Category Header 3: EXPEDITION NAVIGATION
+	# Divider + Category Header: ACCESSIBILITY & BLIND NAVIGATION
 	var act_idx: int = $CenterContainer/Panel/VBox/Actions.get_index()
+	var assist_div := ColorRect.new()
+	assist_div.custom_minimum_size = Vector2(0, 1)
+	assist_div.color = Color(0.2, 0.45, 0.7, 0.45)
+	vbox.add_child(assist_div)
+	vbox.move_child(assist_div, act_idx)
+	act_idx += 1
+
+	var blind_row := HBoxContainer.new()
+	var blind_lbl := Label.new()
+	blind_lbl.text = "BLIND ASSIST / 视障声学导航"
+	blind_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	blind_lbl.add_theme_color_override("font_color", Color(0.65, 0.85, 1.0, 0.9))
+	blind_lbl.add_theme_font_size_override("font_size", 13)
+	blind_row.add_child(blind_lbl)
+
+	_blind_btn = Button.new()
+	_blind_btn.custom_minimum_size = Vector2(130, 32)
+	_blind_btn.focus_mode = Control.FOCUS_NONE
+	_blind_btn.theme = close_btn.theme
+	_blind_btn.add_theme_font_size_override("font_size", 12)
+	_refresh_blind_btn_ui()
+	_blind_btn.pressed.connect(func():
+		GameState.blind_assist_mode = not GameState.blind_assist_mode
+		GameState.save_settings()
+		_refresh_blind_btn_ui()
+		var sfx_mgr = get_tree().get_first_node_in_group("sfx_manager")
+		if sfx_mgr == null:
+			sfx_mgr = get_node_or_null("../SfxManager")
+		if sfx_mgr != null and sfx_mgr.has_method("play_assist_toggle"):
+			sfx_mgr.play_assist_toggle(GameState.blind_assist_mode)
+	)
+	_wire_btn_anim(_blind_btn)
+	blind_row.add_child(_blind_btn)
+	vbox.add_child(blind_row)
+	vbox.move_child(blind_row, act_idx)
+	act_idx += 1
+
+	# Category Header 3: EXPEDITION NAVIGATION
 	var act_lbl := Label.new()
 	act_lbl.text = "EXPEDITION NAVIGATION"
 	act_lbl.add_theme_color_override("font_color", Color(0.35, 0.78, 1.0, 0.95))
@@ -384,6 +424,7 @@ func open() -> void:
 		_sens_slider.value = GameState.mic_sensitivity
 	_update_mute_toggle_ui()
 	_update_mic_toggle_ui()
+	_refresh_blind_btn_ui()
 
 	var subtitle_lbl := get_node_or_null("CenterContainer/Panel/VBox/Header/Titles/Subtitle") as Label
 	if subtitle_lbl != null:
@@ -465,3 +506,14 @@ func _on_restart_pressed() -> void:
 
 func _on_menu_pressed() -> void:
 	GameState.go_to_level_select()
+
+
+func _refresh_blind_btn_ui() -> void:
+	if _blind_btn == null:
+		return
+	if GameState.blind_assist_mode:
+		_blind_btn.text = "ACTIVE"
+		_blind_btn.self_modulate = Color(0.35, 1.2, 1.8, 1.0)
+	else:
+		_blind_btn.text = "OFF"
+		_blind_btn.self_modulate = Color(0.7, 0.7, 0.7, 0.7)

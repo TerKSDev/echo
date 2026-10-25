@@ -4,10 +4,13 @@ const MIX_RATE := 22050
 const LEVEL_BUTTON_HEIGHT := 56.0
 const BOTTOM_BUTTON_HEIGHT := 56.0
 const TEST_LEVEL_PATH := "res://levels/level_test.tscn"
+const UIIcons = preload("res://ui/icons/UIIcons.gd")
+const MonsterDrawings = preload("res://ui/icons/MonsterDrawings.gd")
 
 @onready var scroll_container: ScrollContainer = $MainArea/ScrollContainer
 @onready var level_grid: GridContainer = $MainArea/ScrollContainer/GridMargin/LevelGrid
 @onready var depth_gauge: Control = $DepthGauge
+@onready var leaderboard_button: Button = $TopBar.get_node_or_null("LeaderboardButton")
 @onready var intel_button: Button = $TopBar/IntelButton
 @onready var settings_button: Button = $TopBar/SettingsButton
 @onready var status_pill: PanelContainer = $TopBar/StatusPill
@@ -106,6 +109,12 @@ func _ready() -> void:
 
 	_setup_intel_button()
 	_setup_settings_button()
+
+	if leaderboard_button != null:
+		_style_bottom_button(leaderboard_button)
+		_setup_leaderboard_button()
+		leaderboard_button.pressed.connect(_on_leaderboard_pressed)
+		_wire_button_Juice(leaderboard_button)
 
 	_create_level_buttons()
 
@@ -268,138 +277,61 @@ func _setup_settings_button() -> void:
 	center.add_child(gear)
 
 
+func _setup_leaderboard_button() -> void:
+	if leaderboard_button == null:
+		return
+	leaderboard_button.text = ""
+	leaderboard_button.custom_minimum_size = Vector2(56, 56)
+	for c in leaderboard_button.get_children():
+		c.queue_free()
+
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	leaderboard_button.add_child(center)
+
+	var trophy := Control.new()
+	trophy.custom_minimum_size = Vector2(26, 26)
+	trophy.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	trophy.draw.connect(_draw_trophy_icon.bind(trophy))
+	center.add_child(trophy)
+
+
+func _on_leaderboard_pressed() -> void:
+	if _wav_click != null:
+		_play_ui_sound(_wav_click, -4.0, 1.0)
+	var latest_sector := clampi(GameState.highest_unlocked_level, 1, 13)
+	var modal_script: GDScript = load("res://ui/HuaweiLeaderboardModal.gd") as GDScript
+	if modal_script != null:
+		modal_script.open_modal(self, latest_sector)
+
+
 # --------------------------------------------------
-# PROCEDURAL VECTOR ICONS (100% Cross-Platform)
+# PROCEDURAL VECTOR ICONS (Delegated to UIIcons)
 # --------------------------------------------------
+
+func _draw_trophy_icon(canvas: Control) -> void:
+	UIIcons.draw_trophy(canvas)
+
 
 func _draw_gear_icon(canvas: Control) -> void:
-	var c := canvas.size * 0.5
-	var r0 := 7.0
-	var r1 := 11.0
-	var num_teeth := 8
-	var pitch := TAU / float(num_teeth)
-	var w_base := pitch * 0.26
-	var w_tip := pitch * 0.14
-	var pts := PackedVector2Array()
-
-	for i in range(num_teeth):
-		var a := i * pitch
-		var a1 := a - w_base
-		pts.append(Vector2(c.x + cos(a1) * r0, c.y + sin(a1) * r0))
-		var a2 := a - w_tip
-		pts.append(Vector2(c.x + cos(a2) * r1, c.y + sin(a2) * r1))
-		var a3 := a + w_tip
-		pts.append(Vector2(c.x + cos(a3) * r1, c.y + sin(a3) * r1))
-		var a4 := a + w_base
-		pts.append(Vector2(c.x + cos(a4) * r0, c.y + sin(a4) * r0))
-		var a5 := a + pitch * 0.5
-		pts.append(Vector2(c.x + cos(a5) * (r0 - 0.2), c.y + sin(a5) * (r0 - 0.2)))
-
-	var col_fill := Color(0.78, 0.92, 1.0, 0.95)
-	var col_hole := Color(0.035, 0.09, 0.16, 1.0)
-	var col_rim := Color(0.25, 0.55, 0.85, 0.8)
-
-	# Solid gear teeth and body
-	canvas.draw_colored_polygon(pts, col_fill)
-	# Closed outline for crisp definition
-	var closed_pts := pts.duplicate()
-	closed_pts.append(pts[0])
-	canvas.draw_polyline(closed_pts, Color(col_fill.r, col_fill.g, col_fill.b, 0.9), 1.2)
-
-	# Axle center hole (knockout)
-	canvas.draw_circle(c, 3.6, col_hole)
-	canvas.draw_arc(c, 3.6, 0.0, TAU, 16, col_rim, 1.2)
-	# Subtle recessed mechanical groove ring
-	canvas.draw_arc(c, 5.5, 0.0, TAU, 20, Color(0.15, 0.35, 0.55, 0.65), 1.0)
+	UIIcons.draw_gear(canvas)
 
 
 func _draw_book_icon(canvas: Control) -> void:
-	var c := canvas.size * 0.5
-	var col := Color(0.78, 0.92, 1.0, 0.95)
-	var page_fill := Color(0.06, 0.16, 0.28, 0.95)
-
-	# Left page polygon: curved top, vertical outer edge, curved bottom, center spine
-	var left_poly := PackedVector2Array([
-		Vector2(c.x - 0.5, c.y - 7.0),
-		Vector2(c.x - 5.5, c.y - 8.5),
-		Vector2(c.x - 10.5, c.y - 7.0),
-		Vector2(c.x - 10.5, c.y + 6.5),
-		Vector2(c.x - 5.5, c.y + 5.0),
-		Vector2(c.x - 0.5, c.y + 6.5)
-	])
-	canvas.draw_colored_polygon(left_poly, page_fill)
-	var left_closed := left_poly.duplicate()
-	left_closed.append(left_poly[0])
-	canvas.draw_polyline(left_closed, col, 1.6)
-
-	# Right page polygon
-	var right_poly := PackedVector2Array([
-		Vector2(c.x + 0.5, c.y - 7.0),
-		Vector2(c.x + 5.5, c.y - 8.5),
-		Vector2(c.x + 10.5, c.y - 7.0),
-		Vector2(c.x + 10.5, c.y + 6.5),
-		Vector2(c.x + 5.5, c.y + 5.0),
-		Vector2(c.x + 0.5, c.y + 6.5)
-	])
-	canvas.draw_colored_polygon(right_poly, page_fill)
-	var right_closed := right_poly.duplicate()
-	right_closed.append(right_poly[0])
-	canvas.draw_polyline(right_closed, col, 1.6)
-
-	# Center book spine
-	canvas.draw_line(Vector2(c.x, c.y - 7.0), Vector2(c.x, c.y + 7.5), Color(0.35, 0.85, 1.0, 0.95), 2.0)
-
-	# Left page text lines
-	var line_col := Color(col.r, col.g, col.b, 0.75)
-	canvas.draw_line(Vector2(c.x - 8.5, c.y - 3.0), Vector2(c.x - 2.5, c.y - 3.8), line_col, 1.4)
-	canvas.draw_line(Vector2(c.x - 8.5, c.y + 0.5), Vector2(c.x - 2.5, c.y - 0.3), line_col, 1.4)
-	canvas.draw_line(Vector2(c.x - 8.5, c.y + 4.0), Vector2(c.x - 3.5, c.y + 3.2), line_col, 1.4)
-
-	# Right page text lines
-	canvas.draw_line(Vector2(c.x + 2.5, c.y - 3.8), Vector2(c.x + 8.5, c.y - 3.0), line_col, 1.4)
-	canvas.draw_line(Vector2(c.x + 2.5, c.y - 0.3), Vector2(c.x + 8.5, c.y + 0.5), line_col, 1.4)
-	canvas.draw_line(Vector2(c.x + 3.5, c.y + 3.2), Vector2(c.x + 8.5, c.y + 4.0), line_col, 1.4)
-
-	# Bottom cover spine base ridge
-	var ridge := PackedVector2Array([
-		Vector2(c.x - 10.5, c.y + 8.0),
-		Vector2(c.x, c.y + 9.5),
-		Vector2(c.x + 10.5, c.y + 8.0)
-	])
-	canvas.draw_polyline(ridge, Color(col.r, col.g, col.b, 0.5), 1.5)
+	UIIcons.draw_book(canvas)
 
 
 func _draw_beacon_icon(canvas: Control) -> void:
-	var c := canvas.size * 0.5
-	var col := Color(0.35, 0.95, 1.0)
-	canvas.draw_circle(c, 3.2, col)
-	canvas.draw_arc(c, 5.8, 0.0, TAU, 16, Color(col.r, col.g, col.b, 0.6), 1.8)
+	UIIcons.draw_beacon(canvas)
 
 
 func _draw_check_icon(canvas: Control) -> void:
-	var col := Color(0.35, 0.95, 0.65)
-	var cy := canvas.size.y * 0.5
-	# Visual baseline alignment with 13px uppercase font:
-	# Bottom vertex sits right on the baseline, top vertex at cap height
-	var p1 := Vector2(1.5, cy + 0.8)
-	var p2 := Vector2(4.8, cy + 4.8)
-	var p3 := Vector2(12.0, cy - 3.2)
-	canvas.draw_line(p1, p2, col, 2.2)
-	canvas.draw_line(p2, p3, col, 2.2)
+	UIIcons.draw_check(canvas)
 
 
 func _draw_lock_icon(canvas: Control) -> void:
-	var col := Color(0.55, 0.70, 0.85, 0.92)
-	var cx := canvas.size.x * 0.5
-	var cy := canvas.size.y * 0.5
-	# Shackle
-	canvas.draw_arc(Vector2(cx, cy - 2.5), 3.2, PI, TAU, 12, col, 1.6)
-	canvas.draw_line(Vector2(cx - 3.2, cy - 2.5), Vector2(cx - 3.2, cy), col, 1.6)
-	canvas.draw_line(Vector2(cx + 3.2, cy - 2.5), Vector2(cx + 3.2, cy), col, 1.6)
-	# Padlock Body
-	canvas.draw_rect(Rect2(cx - 5.0, cy, 10.0, 6.5), col, true)
-	# Keyhole center dot
-	canvas.draw_circle(Vector2(cx, cy + 3.0), 1.0, Color(0.04, 0.08, 0.12))
+	UIIcons.draw_lock(canvas)
 
 
 # --------------------------------------------------
@@ -1219,6 +1151,17 @@ func _on_intel_pressed() -> void:
 		"Minimize voice and sonar usage; extract swiftly."
 	)
 
+	_add_divider()
+	_add_section_header("CORE ETHOS • 核心正向价值与非暴力生存")
+	_add_guide_row(Color(0.35, 0.95, 0.75), "NON-VIOLENCE", "ECHO contains zero weapons and zero violence. Survival is achieved through mindfulness, calmness, and acoustic deflection rather than destruction.")
+	_add_guide_row(Color(0.45, 0.82, 1.0), "INNER RESILIENCE", "The subterranean ascent represents overcoming mental darkness, anxiety, and panic. Silence is your shield; resonance is your compass.")
+
+	_add_divider()
+	_add_section_header("UNIVERSAL ACCESSIBILITY • 双向无障碍设计")
+	_add_guide_row(Color(0.35, 0.95, 0.75), "BLIND PLAYABLE", "Full 3D binaural audio & haptic blind navigation: periodic exit beacons, acoustic wall reflection echoes, obstacle cane feelers, and directional keyboard controls enable players to navigate and complete sectors purely by ear.")
+	_add_guide_row(Color(1.0, 0.78, 0.28), "DEAF INCLUSIVE", "100% of spatial sounds are translated into visual acoustic waveforms and off-screen indicators. Hearing-impaired players can achieve S-Rank mastery in pure silence.")
+	_add_guide_row(Color(0.85, 0.70, 1.0), "TACTILE & SPEECH", "Full touch alternatives for voice input allow seamless play in public spaces or for players with vocal/speech considerations.")
+
 
 func _add_bestiary_card(
 	monster_type: String,
@@ -1555,177 +1498,7 @@ func _on_bestiary_entity_clicked(entry: Dictionary) -> void:
 
 
 func _draw_monster_preview(canvas: Control, entry: Dictionary) -> void:
-	var shake: float = float(entry.get("shake", 0.0))
-	var jitter := Vector2.ZERO
-	if shake > 0.01:
-		jitter = Vector2(sin(_time * 50.0), cos(_time * 43.0)) * shake
-	var c := canvas.size * 0.5 + jitter
-
-	# 1. Subtle radar containment reticle background
-	canvas.draw_arc(c, 40.0, 0.0, TAU, 32, Color(0.14, 0.28, 0.42, 0.22), 1.0)
-	canvas.draw_arc(c, 24.0, 0.0, TAU, 24, Color(0.14, 0.28, 0.42, 0.16), 1.0)
-	canvas.draw_line(c + Vector2(-42, 0), c + Vector2(-34, 0), Color(0.2, 0.45, 0.65, 0.35), 1.0)
-	canvas.draw_line(c + Vector2(34, 0), c + Vector2(42, 0), Color(0.2, 0.45, 0.65, 0.35), 1.0)
-	canvas.draw_line(c + Vector2(0, -42), c + Vector2(0, -34), Color(0.2, 0.45, 0.65, 0.35), 1.0)
-	canvas.draw_line(c + Vector2(0, 34), c + Vector2(0, 42), Color(0.2, 0.45, 0.65, 0.35), 1.0)
-
-	# 2. Expanding shockwave rings (Screamer screech / Roar / Listener Alarm)
-	for sw in entry.get("shockwaves", []):
-		var r: float = float(sw.get("r", 0.0))
-		var max_r: float = float(sw.get("max_r", 80.0))
-		if r > 0.0:
-			var frac := clampf(1.0 - r / max_r, 0.0, 1.0)
-			var base_col: Color = sw.get("col", Color(1, 1, 1, 1))
-			var col := Color(base_col.r, base_col.g, base_col.b, base_col.a * frac)
-			canvas.draw_arc(c, r, 0.0, TAU, 36, col, 2.2)
-
-	# 3. Monster specimen rendering
-	var m_type: String = str(entry.get("type", ""))
-	var stage: int = int(entry.get("stage", 0))
-	var base_col: Color = entry.get("color", Color.WHITE)
-
-	match m_type:
-		"screamer":
-			_draw_preview_screamer(canvas, c, stage, base_col)
-		"sleeper":
-			_draw_preview_sleeper(canvas, c, stage, base_col)
-		"patroller":
-			_draw_preview_patroller(canvas, c, stage, base_col)
-		"chaser":
-			_draw_preview_chaser(canvas, c, stage, base_col)
-		"listener":
-			_draw_preview_listener(canvas, c, stage, base_col, int(entry.get("pips", 0)))
-
-
-func _draw_preview_screamer(canvas: Control, c: Vector2, stage: int, col: Color) -> void:
-	if stage == 2:
-		var pulse := 1.0 + 0.16 * sin(_time * 24.0)
-		for i in 4:
-			var ang := i * PI * 0.5 + PI * 0.25
-			canvas.draw_line(c, c + Vector2.from_angle(ang) * (34.0 * pulse), Color(1.0, 0.3, 0.6, 0.95), 3.2)
-		canvas.draw_circle(c, 13.0, Color(1.0, 0.1, 0.35, 1.0))
-		canvas.draw_circle(c, 5.0, Color(1.0, 1.0, 1.0, 1.0))
-		var w_r := 18.0 + fmod(_time * 45.0, 30.0)
-		canvas.draw_arc(c, w_r, 0.0, TAU, 24, Color(1.0, 0.2, 0.45, 0.65), 1.8)
-	else:
-		var pulse_freq: float = 20.0 if stage == 1 else 2.5
-		var pulse: float = 1.0 + (0.22 if stage == 1 else 0.12) * sin(_time * pulse_freq)
-		var r: float = 16.0 * pulse
-		canvas.draw_arc(c, r, 0.0, TAU, 24, col, 2.2)
-		canvas.draw_circle(c, r * 0.72, Color(col.r, col.g, col.b, 0.38))
-		if stage == 1:
-			var flash := Color(1.0, 0.25, 0.45, 0.95)
-			canvas.draw_line(c + Vector2(-10, -10), c + Vector2(10, 10), flash, 2.2)
-			canvas.draw_line(c + Vector2(10, -10), c + Vector2(-10, 10), flash, 2.2)
-			canvas.draw_line(c + Vector2(-3, -12), c + Vector2(2, 12), Color(1.0, 0.4, 0.6, 0.85), 1.6)
-			canvas.draw_circle(c, 5.5, flash)
-		else:
-			canvas.draw_circle(c, 4.5, Color(0.2, 0.05, 0.15, 0.9))
-
-
-func _draw_preview_sleeper(canvas: Control, c: Vector2, stage: int, col: Color) -> void:
-	if stage == 2:
-		var barb_count := 8
-		for i in barb_count:
-			var ang := i * TAU / float(barb_count) + _time * 4.0
-			var p_base := c + Vector2.from_angle(ang) * 14.0
-			var spike_len := 25.0 + sin(_time * 40.0 + i) * 5.0
-			var p_tip := c + Vector2.from_angle(ang) * spike_len
-			canvas.draw_line(p_base, p_tip, Color(col.r, col.g * 0.6, col.b * 0.6, 0.95), 2.6)
-		canvas.draw_circle(c, 15.0, Color(col, 0.95))
-		canvas.draw_circle(c, 7.0, Color(1.0, 1.0, 1.0, 1.0))
-		var pupil_dir := Vector2.DOWN * 8.0
-		canvas.draw_line(c - pupil_dir, c + pupil_dir, Color(0.1, 0.0, 0.0, 1.0), 3.2)
-		canvas.draw_circle(c, 2.5, Color(1.0, 0.2, 0.2, 1.0))
-		var r_wave := 16.0 + fmod(_time * 42.0, 28.0)
-		canvas.draw_arc(c, r_wave, 0.0, TAU, 24, Color(col, 0.6), 1.8)
-	elif stage == 1:
-		canvas.draw_arc(c, 21.0 + 3.0 * sin(_time * 8.0), 0.0, TAU, 24, Color(col, 0.5), 1.8)
-		canvas.draw_circle(c, 15.0, col)
-		canvas.draw_circle(c, 7.0, Color(1.0, 0.92, 1.0))
-		var gaze := Vector2(cos(_time * 2.5), sin(_time * 2.5)) * 3.0
-		canvas.draw_circle(c + gaze, 3.5, Color(0.18, 0.05, 0.3))
-	else:
-		var breathe := 0.5 + 0.5 * sin(_time * 1.8)
-		canvas.draw_circle(c, 16.0 + 4.0 * breathe, Color(col, 0.18))
-		canvas.draw_circle(c, 15.0, Color(col, 0.65))
-		canvas.draw_line(c + Vector2(-11, 0), c + Vector2(11, 0), Color(0.18, 0.05, 0.3, 0.95), 2.8)
-
-
-func _draw_preview_patroller(canvas: Control, c: Vector2, stage: int, col: Color) -> void:
-	if stage == 2:
-		var barb_count := 8
-		for i in barb_count:
-			var ang := i * TAU / float(barb_count) + _time * 4.0
-			var p_base := c + Vector2.from_angle(ang) * 14.0
-			var spike_len := 25.0 + sin(_time * 40.0 + i) * 5.0
-			var p_tip := c + Vector2.from_angle(ang) * spike_len
-			canvas.draw_line(p_base, p_tip, Color(1.0, 0.5, 0.2, 0.95), 2.6)
-		canvas.draw_circle(c, 15.0, Color(1.0, 0.6, 0.2, 0.95))
-		canvas.draw_circle(c, 6.0, Color(1.0, 1.0, 1.0, 1.0))
-	else:
-		canvas.draw_circle(c, 14.0, col)
-		canvas.draw_circle(c + Vector2(2, 0), 6.0, Color(1.0, 0.95, 0.85))
-		var orbit_r := 22.0
-		var orbit_speed: float = 7.0 if stage == 1 else 3.2
-		canvas.draw_arc(c, orbit_r, 0.0, TAU, 28, Color(col, 0.4), 1.4)
-		for i in 3:
-			var ang := _time * orbit_speed + i * TAU / 3.0
-			canvas.draw_circle(c + Vector2.from_angle(ang) * orbit_r, 3.4, Color(1.0, 0.95, 0.5, 1.0))
-		if stage == 1:
-			var sweep_ang: float = _time * 3.2
-			canvas.draw_arc(c, 30.0, sweep_ang - 0.55, sweep_ang + 0.55, 16, Color(col, 0.75), 2.2)
-			canvas.draw_arc(c, 38.0, sweep_ang - 0.38, sweep_ang + 0.38, 14, Color(col, 0.45), 1.6)
-
-
-func _draw_preview_chaser(canvas: Control, c: Vector2, stage: int, col: Color) -> void:
-	if stage == 2:
-		var barb_count := 8
-		for i in barb_count:
-			var ang := i * TAU / float(barb_count) + _time * 5.0
-			var p_base := c + Vector2.from_angle(ang) * 14.0
-			var spike_len := 27.0 + sin(_time * 45.0 + i) * 6.0
-			var p_tip := c + Vector2.from_angle(ang) * spike_len
-			canvas.draw_line(p_base, p_tip, Color(1.0, 0.15, 0.15, 0.95), 2.8)
-		canvas.draw_circle(c, 15.0, Color(1.0, 0.15, 0.15, 1.0))
-		canvas.draw_circle(c, 6.0, Color(1.0, 0.9, 0.9, 1.0))
-		var pupil_dir := Vector2.UP * 8.0
-		canvas.draw_line(c - pupil_dir, c + pupil_dir, Color(0.1, 0.0, 0.0, 1.0), 3.2)
-	else:
-		var spike_count := 6
-		var spin: float = 6.0 if stage == 1 else 1.8
-		var vib: float = sin(_time * 30.0) * (3.5 if stage == 1 else 1.2)
-		var core_r := 14.0
-		for i in spike_count:
-			var ang := i * TAU / float(spike_count) + _time * spin
-			var p_base := c + Vector2.from_angle(ang) * core_r
-			var p_tip := c + Vector2.from_angle(ang) * (core_r + 10.0 + vib)
-			canvas.draw_line(p_base, p_tip, Color(1.0, 0.25, 0.25, 0.95), 2.6)
-		if stage == 1:
-			for tr in 3:
-				var tr_ang := _time * spin - (tr + 1) * 0.22
-				canvas.draw_circle(c + Vector2.from_angle(tr_ang) * 12.0, 8.0 - tr * 2.0, Color(1.0, 0.1, 0.1, 0.25 - tr * 0.07))
-		canvas.draw_circle(c, core_r, col)
-		var slit_dir := Vector2.UP * 7.0
-		canvas.draw_line(c - slit_dir, c + slit_dir, Color(0.1, 0.0, 0.0, 0.95), 3.0)
-		canvas.draw_circle(c, 2.5, Color(1.0, 0.8, 0.8, 1.0))
-
-
-func _draw_preview_listener(canvas: Control, c: Vector2, stage: int, col: Color, pips: int) -> void:
-	canvas.draw_arc(c, 18.0, -PI * 0.8, PI * 0.8, 28, col, 2.8)
-	canvas.draw_circle(c, 9.5, Color(col, 0.45))
-	for i in 5:
-		var ang := -PI * 0.72 + i * (PI * 1.44 / 4.0)
-		var pip_pos := c + Vector2.from_angle(ang) * 28.0
-		if pips > i:
-			var flare: float = 1.0 + (0.35 * sin(_time * 20.0) if pips == 5 else 0.0)
-			canvas.draw_circle(pip_pos, 4.8 * flare, Color(0.2, 1.0, 0.7, 1.0))
-			canvas.draw_circle(pip_pos, 2.2 * flare, Color(1.0, 1.0, 1.0, 1.0))
-		else:
-			canvas.draw_circle(pip_pos, 3.2, Color(col, 0.28))
-	if stage == 2:
-		var a_r := 22.0 + fmod(_time * 50.0, 32.0)
-		canvas.draw_arc(c, a_r, 0.0, TAU, 28, Color(0.2, 1.0, 0.7, 0.7), 2.0)
+	MonsterDrawings.draw_monster_preview(canvas, entry, _time)
 
 
 func _draw_menu_mic_meter(canvas: Control) -> void:
@@ -1955,6 +1728,17 @@ func _unhandled_input(event: InputEvent) -> void:
 		else:
 			_on_back_pressed()
 		get_viewport().set_input_as_handled()
+		return
+	if not _is_modal_open and (event.is_action_pressed("ui_accept") or (event is InputEventKey and event.pressed and not event.echo and (event.keycode == KEY_SPACE or event.keycode == KEY_ENTER))):
+		_launch_ready_level()
+		get_viewport().set_input_as_handled()
+
+
+func _launch_ready_level() -> void:
+	var playable_levels := _get_playable_levels()
+	var cur_lvl := clampi(GameState.highest_unlocked_level, 1, playable_levels.size())
+	_play_ui_sound(_wav_start, -2.0, 1.0)
+	_on_level_selected(cur_lvl)
 
 
 func _create_section_header(title: String) -> Control:
@@ -2374,7 +2158,7 @@ func _synth_tone(
 func _play_ui_sound(
 	stream: AudioStreamWAV,
 	vol_db: float,
-	pitch: float
+	pitch: float = 1.0
 ) -> void:
 	if stream == null:
 		return

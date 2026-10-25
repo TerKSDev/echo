@@ -75,11 +75,4 @@ func _draw() -> void:
 	draw_string(ThemeDB.fallback_font, Vector2(0.0, 127.0), "[SHIFT]", HORIZONTAL_ALIGNMENT_CENTER, int(size.x), 9, Color(lbl_col, 0.45))
 
 func _draw_stealth_icon(center: Vector2, col: Color) -> void:
-	# Stylized Sound Dampener: 3 curved horizontal stealth ripples with a center mute bar
-	# Top arc
-	draw_arc(center + Vector2(0, -9), 10.0, PI * 0.2, PI * 0.8, 12, Color(col, 0.5), 1.6)
-	# Middle arc
-	draw_arc(center, 15.0, PI * 0.15, PI * 0.85, 16, col, 2.0)
-	# Center silent footstep core
-	draw_circle(center + Vector2(0, 4), 3.5, col)
-	draw_arc(center + Vector2(0, 4), 8.0, -PI * 0.8, -PI * 0.2, 12, col, 1.8)
+	UIIcons.draw_stealth(self, center, col)

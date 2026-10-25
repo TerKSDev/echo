@@ -24,6 +24,7 @@ driver/enable_input=true
 [autoload]
 
 GameState="*res://autoload/GameState.gd"
+HMSService="*res://autoload/HMSService.gd"
 
 [display]
 

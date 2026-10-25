@@ -58,6 +58,28 @@ func get_level_depth_str(lvl: int) -> String:
 		return "~" + raw.replace("-", "").strip_edges()
 	return "~0 M"
 
+# Evocative philosophical explorer recovery logs (convey positive psychological resilience & mindfulness)
+const SECTOR_LOGS: Dictionary = {
+	1: "In deepest dark, silence is not emptiness—it is your canvas.",
+	2: "Sound travels far down straight halls, but calmness travels further.",
+	3: "Move gently. The abyss reflects only what you project.",
+	4: "A quiet diversion overcomes sheer brute force.",
+	5: "Patience unmasks every wall; panic only builds more.",
+	6: "Listen closely: every obstacle has an echo that reveals the path forward.",
+	7: "Walk with care. Subterranean pressure turns rough stone into steadfast resolve.",
+	8: "Seek shelter before the scream hits. Protection is never weakness.",
+	9: "Still your waters. Inner peace disarms the raging tempest.",
+	10: "In the crystalline cold, clarity shines through the dark.",
+	11: "Step past dormant fears; they only awaken if you tread in haste.",
+	12: "The hardest chasm is crossed not by speed, but by unwavering focus.",
+	13: "Listen closely: the sound of wind returning. The light awaits.",
+}
+
+func get_sector_log(lvl: int) -> String:
+	if SECTOR_LOGS.has(lvl):
+		return str(SECTOR_LOGS[lvl])
+	return "Stay calm. Stay silent. Follow the light."
+
 # Level Par Benchmarks: { level_number: { "par_time": float, "par_pings": int } }
 const LEVEL_PARS: Dictionary = {
 	0: { "par_time": 20.0, "par_pings": 6 },    # Tutorial
@@ -95,6 +117,7 @@ var mic_push_to_talk := false
 var sneak_hold_mode := false      # false = Toggle Sneak, true = Hold to Sneak
 var fast_pulse_mode := false      # Double-tap / fast ping support
 var sound_indicator_enabled := true # Off-screen directional sound pulse visualizer
+var blind_assist_mode := true     # Visually impaired acoustic navigation (exit beacon, wall echoes, obstacle cane radar)
 
 # Display & Graphics Settings
 var fullscreen_enabled := false
@@ -120,6 +143,21 @@ func _ready() -> void:
 
 
 func _init_audio_buses() -> void:
+	# 1. Master Bus Studio Limiter (prevents digital clipping/harshness during loud acoustic bursts)
+	var master_idx := AudioServer.get_bus_index("Master")
+	if master_idx != -1:
+		var has_limiter := false
+		for eff_i in AudioServer.get_bus_effect_count(master_idx):
+			if AudioServer.get_bus_effect(master_idx, eff_i) is AudioEffectLimiter:
+				has_limiter = true
+				break
+		if not has_limiter:
+			var limiter := AudioEffectLimiter.new()
+			limiter.ceiling_db = -0.5
+			limiter.threshold_db = 0.0
+			AudioServer.add_bus_effect(master_idx, limiter)
+
+	# 2. BGM Bus
 	var bgm_idx := AudioServer.get_bus_index("BGM")
 	if bgm_idx == -1:
 		AudioServer.add_bus()
@@ -127,12 +165,29 @@ func _init_audio_buses() -> void:
 		AudioServer.set_bus_name(bgm_idx, "BGM")
 		AudioServer.set_bus_send(bgm_idx, "Master")
 
+	# 3. SFX Bus + Environmental Subterranean Cavern Reverb
 	var sfx_idx := AudioServer.get_bus_index("SFX")
 	if sfx_idx == -1:
 		AudioServer.add_bus()
 		sfx_idx = AudioServer.bus_count - 1
 		AudioServer.set_bus_name(sfx_idx, "SFX")
 		AudioServer.set_bus_send(sfx_idx, "Master")
+
+	var has_reverb := false
+	for eff_i in AudioServer.get_bus_effect_count(sfx_idx):
+		if AudioServer.get_bus_effect(sfx_idx, eff_i) is AudioEffectReverb:
+			has_reverb = true
+			break
+	if not has_reverb:
+		var reverb := AudioEffectReverb.new()
+		reverb.room_size = 0.46       # Medium-large subterranean cavern
+		reverb.damping = 0.42         # Natural limestone absorption
+		reverb.spread = 0.88          # Stereo immersion
+		reverb.hipass = 0.12          # Retain clean punchy sub-bass
+		reverb.predelay_msec = 22.0   # 22ms early reflection gap
+		reverb.dry = 0.88             # Crisp direct acoustic attack
+		reverb.wet = 0.16             # Delicate, lush subterranean acoustic tail
+		AudioServer.add_bus_effect(sfx_idx, reverb)
 
 	apply_audio_settings()
 
@@ -196,6 +251,7 @@ func save_settings() -> void:
 	cfg.set_value("controls", "sneak_hold_mode", sneak_hold_mode)
 	cfg.set_value("controls", "fast_pulse_mode", fast_pulse_mode)
 	cfg.set_value("controls", "sound_indicator_enabled", sound_indicator_enabled)
+	cfg.set_value("controls", "blind_assist_mode", blind_assist_mode)
 
 	cfg.set_value("display", "fullscreen_enabled", fullscreen_enabled)
 	cfg.set_value("display", "screen_shake_intensity", screen_shake_intensity)
@@ -228,6 +284,7 @@ func load_settings() -> void:
 	sneak_hold_mode = bool(cfg.get_value("controls", "sneak_hold_mode", false))
 	fast_pulse_mode = bool(cfg.get_value("controls", "fast_pulse_mode", false))
 	sound_indicator_enabled = bool(cfg.get_value("controls", "sound_indicator_enabled", true))
+	blind_assist_mode = bool(cfg.get_value("controls", "blind_assist_mode", true))
 
 	fullscreen_enabled = bool(cfg.get_value("display", "fullscreen_enabled", false))
 	screen_shake_intensity = clampf(float(cfg.get_value("display", "screen_shake_intensity", 1.0)), 0.0, 1.0)

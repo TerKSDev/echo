@@ -1,6 +1,10 @@
 # Godot 4+ specific ignores
 .godot/
-/android/
+/android/*
+!/android/plugins
+!/android/plugins/**
+!/android/agconnect-services.json.template
+!/android/build.gradle.snippet
 addons/
 keys/
 *.keystore

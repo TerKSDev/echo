@@ -93,6 +93,7 @@ var speed_boost_timer := 0.0
 var speed_boost_mult := 1.0
 var is_in_water := false
 var is_investigating_decoy := false
+var _snore_timer := 2.5
 
 # Data for EnemyVisual & AI steering
 var trail_points: Array[Vector2] = []
@@ -547,6 +548,18 @@ func _run_state(delta: float, cur_patrol: float, cur_chase: float) -> void:
 	match state:
 		State.SLEEP:
 			velocity = velocity.move_toward(Vector2.ZERO, 600.0 * delta)
+			if enemy_type == EnemyType.SLEEPER:
+				_snore_timer -= delta
+				if _snore_timer <= 0.0:
+					_snore_timer = randf_range(3.6, 5.4)
+					var p_node := get_tree().get_first_node_in_group("player")
+					if p_node != null and is_instance_valid(p_node):
+						if global_position.distance_to(p_node.global_position) <= 240.0:
+							var sfx_mgr := get_tree().get_first_node_in_group("sfx_manager") as SfxManager
+							if sfx_mgr == null:
+								sfx_mgr = get_node_or_null("../../SfxManager") as SfxManager
+							if sfx_mgr != null and sfx_mgr.has_method("play_sleeper_snore"):
+								sfx_mgr.play_sleeper_snore(global_position, is_wall_occluded)
 		State.PATROL:
 			if patrol_points.size() < 2:
 				velocity = velocity.move_toward(Vector2.ZERO, 600.0 * delta)

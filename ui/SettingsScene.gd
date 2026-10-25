@@ -344,6 +344,24 @@ func _build_controls_panel() -> VBoxContainer:
 		ind_btn
 	))
 
+	# Visually Impaired (Blind) Echolocation & Navigation Mode
+	var blind_btn := Button.new()
+	blind_btn.custom_minimum_size = Vector2(136, 32)
+	blind_btn.focus_mode = Control.FOCUS_NONE
+	_refresh_toggle_btn(blind_btn, GameState.blind_assist_mode, "ENABLED", "DISABLED")
+	blind_btn.pressed.connect(func():
+		_play_ui_sound(_wav_click, -5.0, 1.0)
+		GameState.blind_assist_mode = not GameState.blind_assist_mode
+		GameState.save_settings()
+		_refresh_toggle_btn(blind_btn, GameState.blind_assist_mode, "ENABLED", "DISABLED")
+	)
+	_wire_juice(blind_btn)
+	root.add_child(_create_setting_row(
+		"BLIND NAVIGATION ASSIST (视障辅助)",
+		"Emits periodic 3D spatial exit beacons, acoustic wall reflection echoes, obstacle cane radar, and inventory pips [C]. (Hotkey [B] in-game)",
+		blind_btn
+	))
+
 	return root
 
 

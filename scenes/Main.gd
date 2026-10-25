@@ -31,6 +31,7 @@ var _echo_features_dirty := true
 var _level_time := 0.0
 var _sonar_pings := 0
 var _enemies_alerted := 0
+var _exit_beacon_timer := 0.6
 
 
 func _ready() -> void:
@@ -73,16 +74,14 @@ func _on_enemy_alert(_enemy: Enemy) -> void:
 func _play_entry_sequence() -> void:
 	sfx.play_level_intro()
 
-	# Format level title & subtitle banner (uses sector name directly)
+	# Format level title & evocative philosophical subtitle banner
 	var cur_lvl := GameState.current_level
 	var title_text: String = GameState.get_level_name(cur_lvl)
-	var subtitle_text := "Stay calm. Stay silent."
+	var subtitle_text: String = GameState.get_sector_log(cur_lvl)
 
 	if _level_root != null:
 		if _level_root.level_name != "" and _level_root.level_name != "UNTITLED" and _level_root.level_name != "未命名":
 			title_text = _level_root.level_name
-		if _level_root.hint != "":
-			subtitle_text = _level_root.hint
 
 	hud.play_level_intro(title_text, subtitle_text)
 
@@ -92,11 +91,13 @@ func _play_entry_sequence() -> void:
 		p_tw.tween_property(player, "pulse_scale", 1.35, 0.28).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		p_tw.tween_property(player, "pulse_scale", 1.0, 0.35).set_trans(Tween.TRANS_SINE)
 
-	# Emit a safe visual-only awakening echo wave at 0.22s so the player sees their spawn surroundings
+	# Emit a safe visual and acoustic awakening echo wave at 0.22s so the player senses their spawn surroundings
 	get_tree().create_timer(0.22).timeout.connect(func():
 		if is_instance_valid(player) and is_instance_valid(echo_layer):
 			var exclude: Array[RID] = [player.get_rid()]
 			echo_layer.emit_echo(player.global_position, 220.0, exclude, true)
+			if GameState.blind_assist_mode and player.has_method("_emit_wall_echos"):
+				player._emit_wall_echos(0.35)
 	)
 
 
@@ -203,6 +204,21 @@ func _physics_process(delta: float) -> void:
 
 	_level_time += delta
 
+	# Periodic spatial exit beacon pulse only when approaching the exit zone (< 380px)
+	if has_exit and not _changing and is_instance_valid(player) and bool(player.get("alive")):
+		var exit_pos := cell_to_world(exit_cell)
+		var dist: float = player.global_position.distance_to(exit_pos)
+		var max_beacon_dist: float = 380.0 if GameState.blind_assist_mode else 280.0
+		if dist <= max_beacon_dist:
+			_exit_beacon_timer -= delta
+			if _exit_beacon_timer <= 0.0:
+				_exit_beacon_timer = lerpf(1.8, 3.0, clampf(dist / max_beacon_dist, 0.0, 1.0))
+				var is_near: bool = dist < 110.0
+				if sfx != null:
+					sfx.play_exit_beacon(exit_pos, is_near, dist, max_beacon_dist)
+		else:
+			_exit_beacon_timer = 0.4
+
 	var c: Vector2i = _level_root.walls.local_to_map(_level_root.walls.to_local(player.global_position))
 	if "water_count" in player:
 		player.water_count = 1 if water_cells.has(c) else 0
@@ -245,6 +261,8 @@ func _press_switch(cell: Vector2i) -> void:
 		if is_instance_valid(body) and not body.has_meta("open"):
 			body.set_meta("open", true)
 			body.get_child(0).set_deferred("disabled", true)
+			if sfx != null:
+				sfx.play_door_open(body.global_position)
 	if sfx != null:
 		sfx.play_sneak_toggle(false)
 	if player != null and player.has_method("make_sound"):

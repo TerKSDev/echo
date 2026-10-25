@@ -146,6 +146,13 @@ layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
 
+[node name="LeaderboardButton" type="Button" parent="TopBar" unique_id=123987456]
+custom_minimum_size = Vector2(56, 56)
+layout_mode = 2
+size_flags_horizontal = 4
+focus_mode = 0
+theme_override_font_sizes/font_size = 18
+
 [node name="IntelButton" type="Button" parent="TopBar" unique_id=987123456]
 custom_minimum_size = Vector2(56, 56)
 layout_mode = 2
