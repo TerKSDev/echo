@@ -147,18 +147,29 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.keycode == KEY_E:
 		if event.pressed and not event.echo:
 			if not is_aiming_pebble:
-				start_aim_pebble()
-				update_aim_pebble(get_global_mouse_position())
+				if pebbles <= 0 or _stun_timer > 0.0:
+					_trigger_pebble_deny()
+				else:
+					start_aim_pebble()
+					update_aim_pebble(get_global_mouse_position())
 			else:
 				finish_aim_pebble()
 		return
 
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT:
 		if event.pressed:
-			start_aim_pebble()
-			update_aim_pebble(get_global_mouse_position())
+			if is_aiming_pebble:
+				cancel_aim_pebble()
+				return
+			else:
+				if pebbles <= 0 or _stun_timer > 0.0:
+					_trigger_pebble_deny()
+					return
+				start_aim_pebble()
+				update_aim_pebble(get_global_mouse_position())
 		else:
-			finish_aim_pebble()
+			if is_aiming_pebble:
+				finish_aim_pebble()
 		return
 
 	if is_aiming_pebble:
@@ -481,6 +492,8 @@ func toggle_sneak():
 func start_charge():
 	if not alive or _stun_timer > 0.0:
 		return
+	if is_aiming_pebble:
+		cancel_aim_pebble()
 	charging = true
 	charge = 0.0
 	was_full = false
@@ -736,9 +749,19 @@ func get_clamped_pebble_target(target_world_pos: Vector2) -> Vector2:
 	return traj.back()
 
 
+func _trigger_pebble_deny() -> void:
+	var hud_node := get_parent().get_node_or_null("Hud")
+	if hud_node != null and hud_node.has_node("PebbleBtn"):
+		var p_btn = hud_node.get_node("PebbleBtn")
+		if p_btn.has_method("play_empty_feedback"):
+			p_btn.play_empty_feedback()
+
+
 func start_aim_pebble() -> void:
 	if pebbles <= 0 or not alive or _stun_timer > 0.0:
 		return
+	if charging:
+		charging = false
 	is_aiming_pebble = true
 	var dir := velocity.normalized() if velocity.length() > 10.0 else Vector2.RIGHT
 	pebble_aim_raw_pos = global_position + dir * 180.0

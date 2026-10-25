@@ -6,6 +6,7 @@ var _press_scale := 1.0
 var _anim_time := 0.0
 var _is_dragging := false
 var _drag_start := Vector2.ZERO
+var _empty_flash := 0.0
 
 
 func _ready() -> void:
@@ -17,11 +18,28 @@ func _ready() -> void:
 	_player = get_tree().get_first_node_in_group("player")
 
 
+func play_empty_feedback() -> void:
+	_empty_flash = 1.0
+	Input.vibrate_handheld(45)
+	var sfx := get_tree().get_first_node_in_group("sfx_manager") as SfxManager
+	if sfx != null and is_instance_valid(sfx):
+		sfx.play_deny_tick()
+	var orig_x := position.x
+	var tw := create_tween()
+	tw.tween_property(self, "position:x", orig_x - 4.0, 0.04)
+	tw.tween_property(self, "position:x", orig_x + 4.0, 0.04)
+	tw.tween_property(self, "position:x", orig_x - 2.5, 0.04)
+	tw.tween_property(self, "position:x", orig_x + 2.5, 0.04)
+	tw.tween_property(self, "position:x", orig_x, 0.04)
+
+
 func _on_down() -> void:
 	if _player != null and is_instance_valid(_player):
 		if "_stun_timer" in _player and float(_player._stun_timer) > 0.0:
+			play_empty_feedback()
 			return
 		if "pebbles" in _player and int(_player.pebbles) <= 0:
+			play_empty_feedback()
 			return
 		if _player.is_aiming_pebble:
 			_player.cancel_aim_pebble()
@@ -71,6 +89,8 @@ func _process(delta: float) -> void:
 	if _player == null or not is_instance_valid(_player):
 		_player = get_tree().get_first_node_in_group("player")
 	_anim_time += delta
+	if _empty_flash > 0.0:
+		_empty_flash = maxf(0.0, _empty_flash - delta * 4.0)
 	scale = Vector2(_press_scale, _press_scale)
 	queue_redraw()
 
@@ -135,10 +155,14 @@ func _draw() -> void:
 	var badge_pos := center + Vector2(18.0, -16.0)
 	var badge_bg := Color(0.08, 0.06, 0.02, 0.92 * empty_alpha_mult) if not is_empty else Color(0.10, 0.10, 0.12, 0.5)
 	var badge_border := col_rim
+	if _empty_flash > 0.01:
+		badge_bg = badge_bg.lerp(Color(0.45, 0.06, 0.08, 0.95), _empty_flash)
+		badge_border = badge_border.lerp(Color(1.0, 0.35, 0.45, 1.0), _empty_flash)
+
 	draw_circle(badge_pos, 8.5, badge_bg)
 	draw_arc(badge_pos, 8.5, 0.0, TAU, 20, badge_border, 1.2)
 	var count_str := str(pebbles_left)
-	draw_string(ThemeDB.fallback_font, badge_pos + Vector2(-3.5, 3.5), count_str, HORIZONTAL_ALIGNMENT_CENTER, 7, 10, icon_col)
+	draw_string(ThemeDB.fallback_font, badge_pos + Vector2(-8.0, 3.5), count_str, HORIZONTAL_ALIGNMENT_CENTER, 16, 10, icon_col)
 
 	# 6. Micro Label Below
 	var label_text := "STUNNED" if is_stunned else ("AIMING..." if is_aiming else ("EMPTY" if is_empty else "PEBBLE"))

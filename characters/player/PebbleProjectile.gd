@@ -89,8 +89,8 @@ func _process(delta: float) -> void:
 func _on_bounce_wall(wall_pos: Vector2) -> void:
 	var sb := get_tree().get_first_node_in_group("sound_bus") as SoundBus
 	if sb != null and is_instance_valid(sb):
-		# Emits smaller acoustic clink wave on wall impact
-		sb.emit_decoy_sound(wall_pos, 0.22, 140.0)
+		# Emits sharp acoustic stone clink wave on wall impact
+		sb.emit_decoy_sound(wall_pos, 0.24, 150.0, true)
 
 	# Spawn wall spark chips
 	for i in 4:

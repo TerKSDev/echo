@@ -42,6 +42,8 @@ var _wav_sneak_toggle: AudioStreamWAV
 var _wav_charge_loop: AudioStreamWAV
 var _wav_star_chimes: Array[AudioStreamWAV] = []
 var _wav_pebble_clatter: AudioStreamWAV
+var _wav_pebble_clink: AudioStreamWAV
+var _wav_deny_tick: AudioStreamWAV
 
 var _charge_player: AudioStreamPlayer
 var _player_ref: Node2D
@@ -149,6 +151,15 @@ func play_star_chime(index: int) -> void:
 func play_pebble_clatter(pos: Vector2) -> void:
 	_suppress_mic(0.3)
 	_play_spatial(_wav_pebble_clatter, pos, 2.0, randf_range(0.95, 1.08), 650.0)
+
+
+func play_pebble_clink(pos: Vector2) -> void:
+	_suppress_mic(0.2)
+	_play_spatial(_wav_pebble_clink, pos, 2.2, randf_range(0.96, 1.08), 580.0)
+
+
+func play_deny_tick() -> void:
+	_play_non_spatial(_wav_deny_tick, -6.0, 1.0)
 
 
 func play_sneak_toggle(entering_sneak: bool) -> void:
@@ -359,6 +370,10 @@ func _build_all_streams() -> void:
 
 	if not _cache.has("pebble_clatter"):
 		_cache["pebble_clatter"] = _synth_pebble_clatter()
+	if not _cache.has("pebble_clink"):
+		_cache["pebble_clink"] = _synth_pebble_clink()
+	if not _cache.has("deny_tick"):
+		_cache["deny_tick"] = _synth_deny_tick()
 
 	_wav_step_walk = _cache.get("step_walk", null)
 	_wav_step_sneak = _cache.get("step_sneak", null)
@@ -380,6 +395,8 @@ func _build_all_streams() -> void:
 	_wav_victory_fanfare = _cache.get("victory_fanfare", null)
 	_wav_sneak_toggle = _cache.get("sneak_toggle", null)
 	_wav_pebble_clatter = _cache.get("pebble_clatter", null)
+	_wav_pebble_clink = _cache.get("pebble_clink", null)
+	_wav_deny_tick = _cache.get("deny_tick", null)
 	_wav_star_chimes = [
 		_cache.get("star_chime_0", null),
 		_cache.get("star_chime_1", null),
@@ -760,6 +777,41 @@ func _synth_pebble_clatter() -> AudioStreamWAV:
 				var clack: float = randf_range(-1.0, 1.0) * exp(-dt * 85.0)
 				sample += (ping * 0.72 + clack * 0.48) * env * amps[k]
 		out[i] = clampf(tanh(sample * 1.35) * 0.88, -1.0, 1.0)
+	return _make_wav(out)
+
+
+# Sharp high-frequency pebble impact against hard wall rock
+func _synth_pebble_clink() -> AudioStreamWAV:
+	var dur := 0.09
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var att: float = minf(t / 0.0012, 1.0)
+		var env: float = att * exp(-t * 68.0)
+		var ping: float = sin(TAU * 1420.0 * t) * exp(-t * 42.0)
+		var ping2: float = sin(TAU * 2360.0 * t) * exp(-t * 85.0) * 0.45
+		var crack: float = randf_range(-1.0, 1.0) * exp(-t * 115.0)
+		var sample: float = (ping * 0.85 + ping2 + crack * 0.55) * env
+		out[i] = clampf(tanh(sample * 1.45) * 0.88, -1.0, 1.0)
+	return _make_wav(out)
+
+
+# Tactile hollow dry click for unavailable / empty action denial
+func _synth_deny_tick() -> AudioStreamWAV:
+	var dur := 0.06
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var att: float = minf(t / 0.0015, 1.0)
+		var env: float = att * exp(-t * 90.0)
+		var thud: float = sin(TAU * 160.0 * t) * exp(-t * 60.0)
+		var tick: float = sin(TAU * 950.0 * t) * exp(-t * 120.0) * 0.6
+		var sample: float = (thud * 0.7 + tick * 0.5) * env
+		out[i] = clampf(tanh(sample * 1.3) * 0.85, -1.0, 1.0)
 	return _make_wav(out)
 
 

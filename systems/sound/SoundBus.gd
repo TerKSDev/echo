@@ -71,9 +71,12 @@ func _on_player_sound(pos: Vector2, loudness: float, is_voice: bool, is_sneak: b
 
 # Decoy Pebble clatter: emits an amber acoustic ripple that bounces off walls,
 # reveals the area, and distracts nearby enemies toward the impact point without ruining ghost rating.
-func emit_decoy_sound(pos: Vector2, loudness: float = 0.38, radius: float = 260.0) -> void:
+func emit_decoy_sound(pos: Vector2, loudness: float = 0.38, radius: float = 260.0, is_wall_clink: bool = false) -> void:
 	if _sfx != null:
-		_sfx.play_pebble_clatter(pos)
+		if is_wall_clink:
+			_sfx.play_pebble_clink(pos)
+		else:
+			_sfx.play_pebble_clatter(pos)
 	var exclude: Array[RID] = []
 	if is_instance_valid(_player):
 		exclude.append(_player.get_rid())
