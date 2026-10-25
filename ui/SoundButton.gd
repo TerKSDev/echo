@@ -71,7 +71,7 @@ func _draw() -> void:
 			var pulse := 0.5 + 0.5 * sin(_ripple_time * 16.0)
 			draw_arc(center, radius * 0.82, 0.0, TAU, 36, Color(1.0, 1.0, 1.0, 0.4 * pulse), 2.0)
 
-	# 5. Concentric Echo Icon (( · ))
+	# 5. Concentric Echo Icons (( · ))
 	var icon_col := Color(0.85, 0.94, 1.0, 0.92) if not charging else Color.WHITE
 	if is_stunned:
 		icon_col = Color(1.0, 0.45, 0.6, 0.45)

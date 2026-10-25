@@ -65,19 +65,19 @@ func flash_death() -> void:
 	tw.tween_property(mat, "shader_parameter/vignette_color", Color(0.65, 0.05, 0.08, 0.95), 0.08)
 	tw.tween_property(mat, "shader_parameter/vignette_color", Color(0.28, 0.02, 0.04, 0.85), 0.6)
 
-func set_gameplay_buttons_visible(show: bool) -> void:
+func set_gameplay_buttons_visible(is_visible: bool) -> void:
 	if has_node("PauseBtn"):
-		$PauseBtn.visible = show
+		$PauseBtn.visible = is_visible
 	if has_node("SneakBtn"):
-		$SneakBtn.visible = show
+		$SneakBtn.visible = is_visible
 	if has_node("SoundBtn"):
-		$SoundBtn.visible = show
+		$SoundBtn.visible = is_visible
 	if has_node("PebbleBtn"):
-		$PebbleBtn.visible = show
+		$PebbleBtn.visible = is_visible
 	if has_node("MicIndicator"):
-		$MicIndicator.visible = show
+		$MicIndicator.visible = is_visible
 	if _sector_badge != null:
-		_sector_badge.visible = show
+		_sector_badge.visible = is_visible
 
 
 func show_death_screen(killer_type: int = -1) -> void:

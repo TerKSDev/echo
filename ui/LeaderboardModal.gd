@@ -1,5 +1,5 @@
 extends Control
-class_name HuaweiLeaderboardModal
+class_name LeaderboardModal
 ## Huawei Game Service Leaderboard & Challenge Mode Modal for ECHO.
 ## Displays global speedrun rankings, sector par times, and on-demand HUAWEI ID login.
 
@@ -31,13 +31,13 @@ func _ready() -> void:
 
 
 static func open_modal(parent: Node, default_sector: int = 1) -> Control:
-	var existing = parent.get_node_or_null("HuaweiLeaderboardModal")
+	var existing = parent.get_node_or_null("LeaderboardModal")
 	if existing != null:
 		existing.open(default_sector)
 		return existing
-	var script: GDScript = load("res://ui/HuaweiLeaderboardModal.gd") as GDScript
+	var script: GDScript = load("res://ui/LeaderboardModal.gd") as GDScript
 	var modal := script.new() as Control
-	modal.name = "HuaweiLeaderboardModal"
+	modal.name = "LeaderboardModal"
 	parent.add_child(modal)
 	modal.open(default_sector)
 	return modal
@@ -416,7 +416,7 @@ func _build_leaderboard_row(rank: int, data: Dictionary) -> PanelContainer:
 	time_lbl.custom_minimum_size = Vector2(70, 0)
 	time_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	var t_val: float = float(data.get("time", 0.0))
-	var mins := int(t_val) / 60
+	var mins := floori(t_val / 60.0)
 	var secs := int(t_val) % 60
 	var frac := int((t_val - floorf(t_val)) * 100.0)
 	time_lbl.text = "%02d:%02d.%02d" % [mins, secs, frac]

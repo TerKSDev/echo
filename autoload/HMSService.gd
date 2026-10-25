@@ -65,7 +65,7 @@ func _on_native_sign_in_success(p_display_name: String, p_huawei_id: String) -> 
 	show_hms_toast("Welcome back, %s!" % display_name, "HUAWEI Game Service Connected")
 
 
-func _on_native_sign_in_failed(code: int, msg: String) -> void:
+func _on_native_sign_in_failed(code: int, _msg: String) -> void:
 	is_logged_in = false
 	auth_status_changed.emit(false)
 	show_hms_toast("Login cancelled or unavailable (%d)" % code, "HUAWEI ID")
@@ -101,7 +101,7 @@ func _save_auth_state() -> void:
 
 ## Called only when the player chooses to participate in Challenge Mode / Leaderboards.
 ## Casual players are NEVER forced to sign in.
-func login_huawei(on_success: Callable = Callable(), on_fail: Callable = Callable()) -> void:
+func login_huawei(on_success: Callable = Callable(), _on_fail: Callable = Callable()) -> void:
 	if is_logged_in:
 		if on_success.is_valid():
 			on_success.call(display_name)
@@ -142,7 +142,7 @@ func logout_huawei() -> void:
 
 # --- Game Service: Leaderboards ----------------------------------------------
 
-func submit_sector_score(sector_idx: int, escape_time: float, pings: int, stars: int) -> void:
+func submit_sector_score(sector_idx: int, escape_time: float, _pings: int, stars: int) -> void:
 	if not is_logged_in:
 		# Player chosen not to sign in - local records only, no remote submission
 		return
@@ -260,7 +260,7 @@ func _save_leaderboards_to_disk() -> void:
 
 # --- Game Service: Achievements ----------------------------------------------
 
-func check_sector_clear_achievement(sector_idx: int, pings: int, alerts: int, is_swift: bool = false) -> void:
+func check_sector_clear_achievement(sector_idx: int, _pings: int, alerts: int, is_swift: bool = false) -> void:
 	if not is_logged_in:
 		return
 	unlock_achievement("ACH_SECTOR_%02d" % sector_idx, "Sector %02d Cleared" % sector_idx)
@@ -310,7 +310,7 @@ func show_hms_toast(header: String, body_text: String) -> void:
 	hbox.add_theme_constant_override("separation", 12)
 	pill.add_child(hbox)
 
-	# Huawei Red Badge Icon
+	# Huawei Red Badge Icons
 	var icon_box := CenterContainer.new()
 	icon_box.custom_minimum_size = Vector2(28, 28)
 	var red_bg := ColorRect.new()

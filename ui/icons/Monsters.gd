@@ -1,4 +1,4 @@
-class_name MonsterDrawings
+class_name Monsters
 ## Procedural Monster Specimen & Shockwave Preview Renderer for ECHO Bestiary.
 ## Offloaded from LevelSelect to keep UI controllers lean and modular.
 
@@ -23,8 +23,8 @@ static func draw_monster_preview(canvas: Control, entry: Dictionary, time: float
 		var max_r: float = float(sw.get("max_r", 80.0))
 		if r > 0.0:
 			var frac := clampf(1.0 - r / max_r, 0.0, 1.0)
-			var base_col: Color = sw.get("col", Color(1, 1, 1, 1))
-			var col := Color(base_col.r, base_col.g, base_col.b, base_col.a * frac)
+			var sw_col: Color = sw.get("col", Color(1, 1, 1, 1))
+			var col := Color(sw_col.r, sw_col.g, sw_col.b, sw_col.a * frac)
 			canvas.draw_arc(c, r, 0.0, TAU, 36, col, 2.2)
 
 	# 3. Monster specimen rendering
@@ -150,9 +150,9 @@ static func draw_preview_chaser(canvas: Control, c: Vector2, stage: int, col: Co
 			var p_tip := c + Vector2.from_angle(ang) * (core_r + 10.0 + vib)
 			canvas.draw_line(p_base, p_tip, Color(1.0, 0.25, 0.25, 0.95), 2.6)
 		if stage == 1:
-			for tr in 3:
-				var tr_ang := time * spin - (tr + 1) * 0.22
-				canvas.draw_circle(c + Vector2.from_angle(tr_ang) * 12.0, 8.0 - tr * 2.0, Color(1.0, 0.1, 0.1, 0.25 - tr * 0.07))
+			for trail_idx in 3:
+				var tr_ang := time * spin - (trail_idx + 1) * 0.22
+				canvas.draw_circle(c + Vector2.from_angle(tr_ang) * 12.0, 8.0 - trail_idx * 2.0, Color(1.0, 0.1, 0.1, 0.25 - trail_idx * 0.07))
 		canvas.draw_circle(c, core_r, col)
 		var slit_dir := Vector2.UP * 7.0
 		canvas.draw_line(c - slit_dir, c + slit_dir, Color(0.1, 0.0, 0.0, 0.95), 3.0)

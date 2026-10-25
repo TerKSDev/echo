@@ -35,7 +35,7 @@ func _draw() -> void:
 	# 3. Outer Rim
 	draw_arc(center, radius, 0.0, TAU, 36, Color(0.26, 0.54, 0.82, 0.65), 1.6)
 
-	# 4. Pause Bars Icon (Two sleek vertical rounded capsules)
+	# 4. Pause Bars Icons (Two sleek vertical rounded capsules)
 	var bar_w := 3.2
 	var bar_h := 14.0
 	var bar_gap := 4.5

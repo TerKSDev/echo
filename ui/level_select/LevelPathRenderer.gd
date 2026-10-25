@@ -1,0 +1,158 @@
+class_name LevelPathRenderer
+## Procedural Bezier Conduit & Animated Sonar Pulse Renderer for Level Select.
+## Connects cavern sectors with biome-specific conduit paths and energy surges.
+
+const CONNECTIONS: Dictionary = {
+	1:  {"a_exit": "right", "a_frac": 0.45, "b_entry": "bottom", "b_frac": 0.30}, # Level 1 (Left): exits right side -> enters bottom of Level 2
+	2:  {"a_exit": "top",   "a_frac": 0.30, "b_entry": "bottom", "b_frac": 0.70}, # Level 2 (Right): exits top -> enters bottom of Level 3
+	3:  {"a_exit": "top",   "a_frac": 0.65, "b_entry": "left",   "b_frac": 0.65}, # Level 3 (Left): exits top -> enters left side of Level 4
+	4:  {"a_exit": "left",  "a_frac": 0.40, "b_entry": "bottom", "b_frac": 0.68}, # Level 4 (Right): exits left side -> enters bottom of Level 5
+	5:  {"a_exit": "right", "a_frac": 0.50, "b_entry": "bottom", "b_frac": 0.35}, # Level 5 (Left): exits right side -> enters bottom of Level 6
+	6:  {"a_exit": "top",   "a_frac": 0.35, "b_entry": "bottom", "b_frac": 0.60}, # Level 6 (Right): exits top -> enters bottom of Level 7
+	7:  {"a_exit": "top",   "a_frac": 0.70, "b_entry": "left",   "b_frac": 0.55}, # Level 7 (Left): exits top -> enters left side of Level 8
+	8:  {"a_exit": "left",  "a_frac": 0.35, "b_entry": "bottom", "b_frac": 0.75}, # Level 8 (Right): exits left side -> enters bottom of Level 9
+	9:  {"a_exit": "right", "a_frac": 0.45, "b_entry": "bottom", "b_frac": 0.25}, # Level 9 (Left): exits right side -> enters bottom of Level 10
+	10: {"a_exit": "top",   "a_frac": 0.25, "b_entry": "right",  "b_frac": 0.65}, # Level 10 (Right): exits top -> enters right side of Level 11
+	11: {"a_exit": "right", "a_frac": 0.40, "b_entry": "bottom", "b_frac": 0.40}, # Level 11 (Left): exits right side -> enters bottom of Level 12
+	12: {"a_exit": "top",   "a_frac": 0.45, "b_entry": "bottom", "b_frac": 0.55}, # Level 12 (Right): exits top -> enters bottom of Level 13 (Surface Breach)
+}
+
+
+static func get_connection_spec(lvl: int) -> Dictionary:
+	if CONNECTIONS.has(lvl):
+		return CONNECTIONS[lvl]
+	return {"a_exit": "top", "a_frac": 0.5, "b_entry": "bottom", "b_frac": 0.5}
+
+
+static func get_dock_point(btn: Button, side: String, frac: float) -> Vector2:
+	var pos := btn.position
+	var sz := btn.size
+	match side:
+		"top":
+			return Vector2(pos.x + sz.x * frac, pos.y)
+		"bottom":
+			return Vector2(pos.x + sz.x * frac, pos.y + sz.y)
+		"left":
+			return Vector2(pos.x, pos.y + sz.y * frac)
+		"right":
+			return Vector2(pos.x + sz.x, pos.y + sz.y * frac)
+		_:
+			return pos + sz * 0.5
+
+
+static func eval_curved_path_point(pts: PackedVector2Array, t: float) -> Vector2:
+	if pts.is_empty():
+		return Vector2.ZERO
+	if pts.size() == 1 or t <= 0.0:
+		return pts[0]
+	if t >= 1.0:
+		return pts[pts.size() - 1]
+	var max_idx := pts.size() - 1
+	var float_idx := clampf(t, 0.0, 1.0) * float(max_idx)
+	var base_idx := int(floor(float_idx))
+	var frac := float_idx - float(base_idx)
+	if base_idx >= max_idx:
+		return pts[max_idx]
+	return pts[base_idx].lerp(pts[base_idx + 1], frac)
+
+
+static func draw_level_path(
+	canvas: Control,
+	level_buttons: Dictionary,
+	total_levels: int,
+	highest: int,
+	time: float
+) -> void:
+	for lvl in range(1, total_levels):
+		var btn_a: Button = level_buttons.get(lvl)
+		var btn_b: Button = level_buttons.get(lvl + 1)
+		if btn_a == null or btn_b == null:
+			continue
+		if not is_instance_valid(btn_a) or not is_instance_valid(btn_b):
+			continue
+
+		var is_unlocked_path := (lvl + 1) <= highest
+		var is_discovery_path := (lvl == highest)
+
+		# Keep distant locked sectors uncluttered and dark
+		if not is_unlocked_path and not is_discovery_path:
+			continue
+
+		var spec := get_connection_spec(lvl)
+		var a_exit: String = spec["a_exit"]
+		var a_frac: float = spec["a_frac"]
+		var b_entry: String = spec["b_entry"]
+		var b_frac: float = spec["b_frac"]
+
+		# Multi-edge docking points
+		var start_pt := get_dock_point(btn_a, a_exit, a_frac)
+		var end_pt := get_dock_point(btn_b, b_entry, b_frac)
+
+		var dx := end_pt.x - start_pt.x
+		var dy := absf(start_pt.y - end_pt.y)
+
+		# Perpendicular tangent control handles matching dock geometry
+		var cp1: Vector2
+		match a_exit:
+			"top":
+				cp1 = start_pt + Vector2(dx * 0.12, -dy * 0.50)
+			"bottom":
+				cp1 = start_pt + Vector2(dx * 0.12, dy * 0.50)
+			"right":
+				# Exits rightward horizontally into the chasm
+				cp1 = start_pt + Vector2(absf(dx) * 0.45, -dy * 0.08)
+			"left":
+				# Exits leftward horizontally into the chasm
+				cp1 = start_pt + Vector2(-absf(dx) * 0.45, -dy * 0.08)
+			_:
+				cp1 = start_pt + Vector2(dx * 0.20, -dy * 0.50)
+
+		var cp2: Vector2
+		match b_entry:
+			"bottom":
+				# Enters from below upward into the bottom
+				cp2 = end_pt + Vector2(-dx * 0.10, dy * 0.50)
+			"top":
+				# Enters from above downward into the top
+				cp2 = end_pt + Vector2(-dx * 0.10, -dy * 0.50)
+			"left":
+				# Enters from the left horizontally into the card
+				cp2 = end_pt + Vector2(-absf(dx) * 0.45, dy * 0.08)
+			"right":
+				# Enters from the right horizontally into the card
+				cp2 = end_pt + Vector2(absf(dx) * 0.45, dy * 0.08)
+			_:
+				cp2 = end_pt + Vector2(-dx * 0.20, dy * 0.50)
+
+		# Sample smooth Bezier points
+		var segments := 28
+		var pts: PackedVector2Array = []
+		pts.resize(segments + 1)
+		for s in range(segments + 1):
+			var t := float(s) / float(segments)
+			pts[s] = start_pt.bezier_interpolate(cp1, cp2, end_pt, t)
+
+		# Connection terminal nodes on card edges
+		var node_col := Color(0.35, 0.88, 1.0, 0.95) if is_unlocked_path else Color(0.28, 0.55, 0.75, 0.55)
+		canvas.draw_circle(start_pt, 3.2, node_col)
+		canvas.draw_circle(start_pt, 6.0, Color(node_col.r, node_col.g, node_col.b, 0.25))
+		canvas.draw_circle(end_pt, 3.2, node_col)
+		canvas.draw_circle(end_pt, 6.0, Color(node_col.r, node_col.g, node_col.b, 0.25))
+
+		if is_unlocked_path:
+			# Solid Line with bioluminescent glow for cleared/unlocked sectors
+			canvas.draw_polyline(pts, Color(0.12, 0.45, 0.75, 0.30), 5.5)
+			canvas.draw_polyline(pts, Color(0.35, 0.90, 1.0, 0.95), 2.4)
+
+			# Traveling sonar acoustic pulse along the curve
+			var pulse_t := fmod(time * 0.55 + float(lvl) * 0.35, 1.0)
+			var pulse_pt := eval_curved_path_point(pts, pulse_t)
+			canvas.draw_circle(pulse_pt, 4.0, Color(0.90, 0.98, 1.0, 0.98))
+			canvas.draw_circle(pulse_pt, 8.5, Color(0.25, 0.75, 1.0, 0.35))
+		elif is_discovery_path:
+			# Subtle dashed discovery trail leading into the next locked sector
+			var pulse_a := 0.35 + 0.3 * sin(time * 3.0)
+			var col := Color(0.35, 0.75, 1.0, pulse_a)
+			for p in range(pts.size() - 1):
+				if p % 2 == 0:
+					canvas.draw_line(pts[p], pts[p + 1], col, 1.8)

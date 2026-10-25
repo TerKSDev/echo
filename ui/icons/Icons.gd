@@ -1,5 +1,5 @@
-class_name UIIcons
-## Centralized Procedural Vector Icon Renderer for ECHO.
+class_name Icons
+## Centralized Procedural Vector Icons Renderer for ECHO.
 ## Draws high-DPI resolution-independent vector icons using Godot CanvasItem draw calls.
 
 static func draw_trophy(canvas: Control) -> void:
@@ -212,3 +212,40 @@ static func draw_stealth(canvas: CanvasItem, center: Vector2, col: Color) -> voi
 	# Center silent footstep core
 	canvas.draw_circle(center + Vector2(0, 4), 3.5, col)
 	canvas.draw_arc(center + Vector2(0, 4), 8.0, -PI * 0.8, -PI * 0.2, 12, col, 1.8)
+
+
+# --------------------------------------------------
+# ALIASES WITH _ICON SUFFIX
+# --------------------------------------------------
+
+static func draw_trophy_icon(canvas: Control) -> void:
+	draw_trophy(canvas)
+
+
+static func draw_gear_icon(canvas: Control) -> void:
+	draw_gear(canvas)
+
+
+static func draw_book_icon(canvas: Control) -> void:
+	draw_book(canvas)
+
+
+static func draw_beacon_icon(canvas: Control) -> void:
+	draw_beacon(canvas)
+
+
+static func draw_check_icon(canvas: Control) -> void:
+	draw_check(canvas)
+
+
+static func draw_lock_icon(canvas: Control) -> void:
+	draw_lock(canvas)
+
+
+static func draw_back_arrow_icon(canvas: Control) -> void:
+	draw_back_arrow(canvas)
+
+
+static func draw_headphone_icon(canvas: Control) -> void:
+	draw_headphone(canvas)
+

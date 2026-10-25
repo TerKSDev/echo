@@ -1,5 +1,7 @@
 extends Button
 
+const Icons = preload("res://ui/icons/Icons.gd")
+
 var _player: Node = null
 var _press_scale := 1.0
 var _timer := 0.0
@@ -60,7 +62,7 @@ func _draw() -> void:
 		rim_col = Color(1.0, 0.28, 0.5, 0.75)
 	draw_arc(center, radius, 0.0, TAU, 40, rim_col, lerpf(1.6, 2.2, b))
 
-	# Center Icon
+	# Center Icons
 	var icon_col: Color = Color(0.7, 0.85, 0.98, 0.6).lerp(Color(0.5, 0.95, 1.0, 1.0), b)
 	if is_stunned:
 		icon_col = Color(1.0, 0.45, 0.6, 0.45)
@@ -75,4 +77,4 @@ func _draw() -> void:
 	draw_string(ThemeDB.fallback_font, Vector2(0.0, 127.0), "[SHIFT]", HORIZONTAL_ALIGNMENT_CENTER, int(size.x), 9, Color(lbl_col, 0.45))
 
 func _draw_stealth_icon(center: Vector2, col: Color) -> void:
-	UIIcons.draw_stealth(self, center, col)
+	Icons.draw_stealth(self, center, col)

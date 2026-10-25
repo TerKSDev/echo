@@ -1,6 +1,8 @@
 extends Button
 class_name PebbleButton
 
+const Icons = preload("res://ui/icons/Icons.gd")
+
 var _player: Node = null
 var _press_scale := 1.0
 var _anim_time := 0.0
@@ -146,7 +148,7 @@ func _draw() -> void:
 			var p_tick := center + Vector2.from_angle(ang) * (radius - 2.5)
 			draw_circle(p_tick, 1.8, Color(1.0, 0.95, 0.6))
 
-	# 4. Stylized Pebble Icon (Smooth stone with skip arc & motion spark)
+	# 4. Stylized Pebble Icons (Smooth stone with skip arc & motion spark)
 	var icon_col := Color(1.0, 0.88, 0.6, 0.9 * empty_alpha_mult) if not is_empty else Color(0.6, 0.65, 0.75, 0.25)
 	if is_aiming:
 		icon_col = Color.WHITE
@@ -181,4 +183,4 @@ func _draw() -> void:
 
 
 func _draw_pebble_icon(center: Vector2, col: Color, is_empty: bool) -> void:
-	UIIcons.draw_pebble(self, center, col, is_empty)
+	Icons.draw_pebble(self, center, col, is_empty)

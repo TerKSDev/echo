@@ -430,7 +430,7 @@ func show_debrief(data: Dictionary, sfx: SfxManager = null) -> void:
 		_title_lbl.text = "%s CLEARED" % GameState.get_level_name(lvl_num)
 
 	# Update telemetry stats
-	var mins := int(clear_time) / 60
+	var mins := floori(clear_time / 60.0)
 	var secs := int(clear_time) % 60
 	var ms := int((clear_time - int(clear_time)) * 10.0)
 	var time_str := "%02d:%02d.%d" % [mins, secs, ms]
@@ -597,6 +597,6 @@ func _update_hms_button_state() -> void:
 
 
 func _on_hms_button_pressed() -> void:
-	var modal_script: GDScript = load("res://ui/HuaweiLeaderboardModal.gd") as GDScript
+	var modal_script: GDScript = load("res://ui/LeaderboardModal.gd") as GDScript
 	if modal_script != null:
 		modal_script.open_modal(self, _cur_lvl_num)
