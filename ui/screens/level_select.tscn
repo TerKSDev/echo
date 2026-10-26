@@ -247,7 +247,7 @@ size_flags_horizontal = 3
 theme_override_constants/margin_left = 12
 theme_override_constants/margin_top = 14
 theme_override_constants/margin_right = 12
-theme_override_constants/margin_bottom = 56
+theme_override_constants/margin_bottom = 12
 
 [node name="LevelGrid" type="GridContainer" parent="MainArea/ScrollContainer/GridMargin" unique_id=560705883]
 layout_mode = 2

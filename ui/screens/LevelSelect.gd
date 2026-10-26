@@ -408,12 +408,12 @@ func _create_level_buttons() -> void:
 				level_grid.add_child(spacer)
 				level_grid.add_child(button)
 
-		# Bottom padding
+		# Bottom padding (compact so the bottom-most level card sits down close to the screen bottom)
 		var bot_pad_a := Control.new()
-		bot_pad_a.custom_minimum_size = Vector2(0, 56)
+		bot_pad_a.custom_minimum_size = Vector2(0, 8)
 		bot_pad_a.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var bot_pad_b := Control.new()
-		bot_pad_b.custom_minimum_size = Vector2(0, 56)
+		bot_pad_b.custom_minimum_size = Vector2(0, 8)
 		bot_pad_b.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		level_grid.add_child(bot_pad_a)
 		level_grid.add_child(bot_pad_b)
@@ -506,10 +506,10 @@ func _create_level_buttons() -> void:
 			level_grid.add_child(spacer_bot)
 
 		var bot_pad_a := Control.new()
-		bot_pad_a.custom_minimum_size = Vector2(0, 56)
+		bot_pad_a.custom_minimum_size = Vector2(0, 8)
 		bot_pad_a.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var bot_pad_b := Control.new()
-		bot_pad_b.custom_minimum_size = Vector2(0, 56)
+		bot_pad_b.custom_minimum_size = Vector2(0, 8)
 		bot_pad_b.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		level_grid.add_child(bot_pad_a)
 		level_grid.add_child(bot_pad_b)

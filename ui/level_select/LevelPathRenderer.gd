@@ -5,25 +5,26 @@ extends RefCounted
 
 static func get_connection_spec(lvl: int, is_left: bool = true) -> Dictionary:
 	# Consistent, regular conduit topology:
-	# - Left card exits right edge at center (0.50) -> connects to the bottom of the right card.
-	# - Right card exits left edge at center (0.50) -> connects to the bottom of the left card.
-	# - The entry point on the bottom edge has slight deterministic jitter (+/- 0.08) so it feels organic
+	# - Left card exits right edge at center (0.50) -> connects to the bottom center of the next card.
+	# - Right card exits left edge at center (0.50) -> connects to the bottom center of the next card.
+	# - The entry point on the bottom edge is centered (0.50) with subtle organic micro-jitter (+/- 0.04)
 	var seed_val := float((lvl * 9301 + 49297) % 233280) / 233280.0
-	var jitter := (seed_val - 0.5) * 0.16 # Range [-0.08, +0.08]
+	var jitter := (seed_val - 0.5) * 0.08 # Range [-0.04, +0.04]
+	var center_dock := clampf(0.50 + jitter, 0.46, 0.54)
 
 	if is_left:
 		return {
 			"a_exit": "right",
 			"a_frac": 0.50,
 			"b_entry": "bottom",
-			"b_frac": clampf(0.38 + jitter, 0.28, 0.48)
+			"b_frac": center_dock
 		}
 	else:
 		return {
 			"a_exit": "left",
 			"a_frac": 0.50,
 			"b_entry": "bottom",
-			"b_frac": clampf(0.62 + jitter, 0.52, 0.72)
+			"b_frac": center_dock
 		}
 
 
