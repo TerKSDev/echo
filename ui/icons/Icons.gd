@@ -47,6 +47,27 @@ static func draw_trophy(canvas: Control) -> void:
 	canvas.draw_circle(Vector2(c.x, c.y - 3.5), 1.6, star_col)
 
 
+static func draw_star(canvas: Control) -> void:
+	var c := canvas.size * 0.5
+	var r_out := 7.0
+	var r_in := 3.2
+	var pts := PackedVector2Array()
+	for i in range(10):
+		var r := r_out if i % 2 == 0 else r_in
+		var ang := -PI * 0.5 + float(i) * TAU / 10.0
+		pts.append(Vector2(c.x + cos(ang) * r, c.y + sin(ang) * r))
+
+	# Subtle gold glow halo
+	canvas.draw_circle(c, 9.5, Color(1.0, 0.75, 0.20, 0.18))
+	# Star body
+	var gold_fill := Color(1.0, 0.82, 0.28, 0.98)
+	canvas.draw_colored_polygon(pts, gold_fill)
+	# Closed outline for crisp definition
+	var closed := pts.duplicate()
+	closed.append(pts[0])
+	canvas.draw_polyline(closed, Color(1.0, 0.95, 0.65, 0.95), 1.2)
+
+
 static func draw_gear(canvas: Control) -> void:
 	var c := canvas.size * 0.5
 	var is_hovered := false

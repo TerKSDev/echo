@@ -62,7 +62,7 @@ func _ready() -> void:
 	# Two columns create the left-right staggered vertical ascent map
 	level_grid.columns = 2
 	level_grid.add_theme_constant_override("h_separation", 16)
-	level_grid.add_theme_constant_override("v_separation", 30)
+	level_grid.add_theme_constant_override("v_separation", 44)
 
 	# Wire level grid path drawing
 	level_grid.draw.connect(_draw_level_path)
@@ -72,10 +72,22 @@ func _ready() -> void:
 		depth_gauge.draw.connect(_draw_depth_gauge)
 		depth_gauge.gui_input.connect(_on_depth_gauge_gui_input)
 
-	# Status star display: completely frameless & blends into the cavern atmosphere
+	# Status star display: subtle, cohesive translucent glass pill
 	if status_pill != null:
-		var empty_sb := StyleBoxEmpty.new()
-		status_pill.add_theme_stylebox_override("panel", empty_sb)
+		var pill_style := StyleBoxFlat.new()
+		pill_style.bg_color = Color(0.04, 0.10, 0.18, 0.55)
+		pill_style.border_color = Color(0.35, 0.65, 0.90, 0.25)
+		pill_style.set_border_width_all(1)
+		pill_style.set_corner_radius_all(14)
+		pill_style.content_margin_left = 10.0
+		pill_style.content_margin_right = 14.0
+		pill_style.content_margin_top = 3.0
+		pill_style.content_margin_bottom = 3.0
+		status_pill.add_theme_stylebox_override("panel", pill_style)
+
+		var star_icon := status_pill.get_node_or_null("StatusBox/StarIcon") as Control
+		if star_icon != null:
+			star_icon.draw.connect(func(): Icons.draw_star(star_icon))
 
 	_setup_mode_toggle()
 	_setup_intel_button()
@@ -103,15 +115,15 @@ func _apply_safe_area() -> void:
 	var vp_sz := get_viewport_rect().size
 	if screen_sz.y > 0 and safe.position.y > 0:
 		var top_pad := (float(safe.position.y) / float(screen_sz.y)) * vp_sz.y
-		var target_top := maxf(top_pad + 8.0, 45.0)
+		var target_top := maxf(top_pad + 6.0, 26.0)
 		if has_node("TopBar"):
 			$TopBar.position.y = target_top
 		if has_node("MainArea"):
 			var main := $MainArea as Control
-			main.offset_top = target_top + 83.0
+			main.offset_top = target_top + 72.0
 		if has_node("DepthGauge"):
 			var gauge := $DepthGauge as Control
-			gauge.offset_top = target_top + 87.0
+			gauge.offset_top = target_top + 76.0
 
 
 # --------------------------------------------------
@@ -385,7 +397,7 @@ func _create_level_buttons() -> void:
 			_level_buttons[level_number] = button
 
 			var spacer := Control.new()
-			spacer.custom_minimum_size = Vector2(0, 60)
+			spacer.custom_minimum_size = Vector2(0, 78)
 			spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
@@ -398,10 +410,10 @@ func _create_level_buttons() -> void:
 
 		# Bottom padding
 		var bot_pad_a := Control.new()
-		bot_pad_a.custom_minimum_size = Vector2(0, 32)
+		bot_pad_a.custom_minimum_size = Vector2(0, 56)
 		bot_pad_a.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var bot_pad_b := Control.new()
-		bot_pad_b.custom_minimum_size = Vector2(0, 32)
+		bot_pad_b.custom_minimum_size = Vector2(0, 56)
 		bot_pad_b.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		level_grid.add_child(bot_pad_a)
 		level_grid.add_child(bot_pad_b)
@@ -424,7 +436,7 @@ func _create_level_buttons() -> void:
 			_level_buttons[level_number] = button
 
 			var spacer := Control.new()
-			spacer.custom_minimum_size = Vector2(0, 60)
+			spacer.custom_minimum_size = Vector2(0, 78)
 			spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
@@ -494,10 +506,10 @@ func _create_level_buttons() -> void:
 			level_grid.add_child(spacer_bot)
 
 		var bot_pad_a := Control.new()
-		bot_pad_a.custom_minimum_size = Vector2(0, 24)
+		bot_pad_a.custom_minimum_size = Vector2(0, 56)
 		bot_pad_a.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var bot_pad_b := Control.new()
-		bot_pad_b.custom_minimum_size = Vector2(0, 24)
+		bot_pad_b.custom_minimum_size = Vector2(0, 56)
 		bot_pad_b.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		level_grid.add_child(bot_pad_a)
 		level_grid.add_child(bot_pad_b)
@@ -549,9 +561,9 @@ func _update_header_and_mode_ui() -> void:
 	for i in range(1, total_levels + 1):
 		total_stars += GameState.get_level_stars(i)
 	if progress_label != null:
-		progress_label.text = "★ %d" % total_stars
-		progress_label.add_theme_color_override("font_color", Color(1.0, 0.84, 0.28, 0.98))
-		progress_label.add_theme_font_size_override("font_size", 17)
+		progress_label.text = str(total_stars)
+		progress_label.add_theme_color_override("font_color", Color(1.0, 0.92, 0.72, 1.0))
+		progress_label.add_theme_font_size_override("font_size", 15)
 
 	if depth_gauge != null and is_instance_valid(depth_gauge):
 		depth_gauge.queue_redraw()

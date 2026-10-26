@@ -111,22 +111,38 @@ mouse_filter = 2
 [node name="TopBar" type="HBoxContainer" parent="." unique_id=336351312]
 layout_mode = 0
 offset_left = 25.0
-offset_top = 45.0
+offset_top = 26.0
 offset_right = 695.0
-offset_bottom = 105.0
-theme_override_constants/separation = 14
+offset_bottom = 78.0
+theme_override_constants/separation = 22
 
 [node name="StatusPill" type="PanelContainer" parent="TopBar" unique_id=1501365221]
-custom_minimum_size = Vector2(0, 48)
+custom_minimum_size = Vector2(0, 36)
 layout_mode = 2
 size_flags_horizontal = 4
 size_flags_vertical = 4
 mouse_filter = 2
 
-[node name="StatusBox" type="VBoxContainer" parent="TopBar/StatusPill"]
+[node name="StatusBox" type="HBoxContainer" parent="TopBar/StatusPill"]
 layout_mode = 2
-theme_override_constants/separation = 2
+theme_override_constants/separation = 6
 alignment = 1
+
+[node name="StarIcon" type="Control" parent="TopBar/StatusPill/StatusBox"]
+custom_minimum_size = Vector2(18, 18)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+
+[node name="ProgressLabel" type="Label" parent="TopBar/StatusPill/StatusBox" unique_id=998877665]
+layout_mode = 2
+size_flags_vertical = 4
+theme_override_colors/font_color = Color(1, 0.92, 0.72, 1)
+theme_override_colors/font_shadow_color = Color(0.18, 0.12, 0.02, 0.8)
+theme_override_constants/shadow_offset_y = 1
+theme_override_font_sizes/font_size = 15
+text = "0"
+vertical_alignment = 1
 
 [node name="SectorLabel" type="Label" parent="TopBar/StatusPill/StatusBox"]
 visible = false
@@ -135,15 +151,6 @@ theme_override_colors/font_color = Color(0.78, 0.92, 1, 1)
 theme_override_font_sizes/font_size = 12
 text = "ESCAPE DIRECTORY"
 horizontal_alignment = 1
-
-[node name="ProgressLabel" type="Label" parent="TopBar/StatusPill/StatusBox" unique_id=998877665]
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.84, 0.28, 0.98)
-theme_override_colors/font_shadow_color = Color(0.18, 0.12, 0.02, 0.8)
-theme_override_constants/shadow_offset_y = 1
-theme_override_font_sizes/font_size = 17
-text = "★ 0"
-vertical_alignment = 1
 
 [node name="ModeToggle" type="Button" parent="TopBar" unique_id=778899112]
 custom_minimum_size = Vector2(148, 48)
@@ -192,7 +199,7 @@ anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 26.0
-offset_top = 128.0
+offset_top = 98.0
 offset_right = -58.0
 offset_bottom = -22.0
 grow_horizontal = 2
@@ -240,13 +247,13 @@ size_flags_horizontal = 3
 theme_override_constants/margin_left = 12
 theme_override_constants/margin_top = 14
 theme_override_constants/margin_right = 12
-theme_override_constants/margin_bottom = 24
+theme_override_constants/margin_bottom = 56
 
 [node name="LevelGrid" type="GridContainer" parent="MainArea/ScrollContainer/GridMargin" unique_id=560705883]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/h_separation = 16
-theme_override_constants/v_separation = 30
+theme_override_constants/v_separation = 44
 columns = 2
 
 [node name="DepthGauge" type="Control" parent="." unique_id=443322110]
@@ -256,7 +263,7 @@ anchor_left = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = -72.0
-offset_top = 132.0
+offset_top = 102.0
 offset_right = -6.0
 offset_bottom = -25.0
 grow_horizontal = 0

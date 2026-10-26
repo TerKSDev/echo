@@ -3,30 +3,28 @@ extends RefCounted
 ## Procedural Bezier Conduit & Animated Sonar Pulse Renderer for Level Select.
 ## Connects cavern sectors with biome-specific conduit paths and energy surges.
 
-const CONNECTIONS: Dictionary = {
-	1:  {"a_exit": "right", "a_frac": 0.45, "b_entry": "bottom", "b_frac": 0.30}, # Level 1 (Left): exits right side -> enters bottom of Level 2
-	2:  {"a_exit": "top",   "a_frac": 0.30, "b_entry": "bottom", "b_frac": 0.70}, # Level 2 (Right): exits top -> enters bottom of Level 3
-	3:  {"a_exit": "top",   "a_frac": 0.65, "b_entry": "left",   "b_frac": 0.65}, # Level 3 (Left): exits top -> enters left side of Level 4
-	4:  {"a_exit": "left",  "a_frac": 0.40, "b_entry": "bottom", "b_frac": 0.68}, # Level 4 (Right): exits left side -> enters bottom of Level 5
-	5:  {"a_exit": "right", "a_frac": 0.50, "b_entry": "bottom", "b_frac": 0.35}, # Level 5 (Left): exits right side -> enters bottom of Level 6
-	6:  {"a_exit": "top",   "a_frac": 0.35, "b_entry": "bottom", "b_frac": 0.60}, # Level 6 (Right): exits top -> enters bottom of Level 7
-	7:  {"a_exit": "top",   "a_frac": 0.70, "b_entry": "left",   "b_frac": 0.55}, # Level 7 (Left): exits top -> enters left side of Level 8
-	8:  {"a_exit": "left",  "a_frac": 0.35, "b_entry": "bottom", "b_frac": 0.75}, # Level 8 (Right): exits left side -> enters bottom of Level 9
-	9:  {"a_exit": "right", "a_frac": 0.45, "b_entry": "bottom", "b_frac": 0.25}, # Level 9 (Left): exits right side -> enters bottom of Level 10
-	10: {"a_exit": "top",   "a_frac": 0.25, "b_entry": "right",  "b_frac": 0.65}, # Level 10 (Right): exits top -> enters right side of Level 11
-	11: {"a_exit": "right", "a_frac": 0.40, "b_entry": "bottom", "b_frac": 0.40}, # Level 11 (Left): exits right side -> enters bottom of Level 12
-	12: {"a_exit": "top",   "a_frac": 0.45, "b_entry": "bottom", "b_frac": 0.55}, # Level 12 (Right): exits top -> enters bottom of Level 13 (Surface Breach)
-}
+static func get_connection_spec(lvl: int, is_left: bool = true) -> Dictionary:
+	# Consistent, regular conduit topology:
+	# - Left card exits right edge at center (0.50) -> connects to the bottom of the right card.
+	# - Right card exits left edge at center (0.50) -> connects to the bottom of the left card.
+	# - The entry point on the bottom edge has slight deterministic jitter (+/- 0.08) so it feels organic
+	var seed_val := float((lvl * 9301 + 49297) % 233280) / 233280.0
+	var jitter := (seed_val - 0.5) * 0.16 # Range [-0.08, +0.08]
 
-
-static func get_connection_spec(lvl: int) -> Dictionary:
-	if CONNECTIONS.has(lvl):
-		return CONNECTIONS[lvl]
-	# Alternating conduit curvature for extended levels beyond 12
-	if lvl % 2 == 1:
-		return {"a_exit": "right", "a_frac": 0.45, "b_entry": "bottom", "b_frac": 0.35}
+	if is_left:
+		return {
+			"a_exit": "right",
+			"a_frac": 0.50,
+			"b_entry": "bottom",
+			"b_frac": clampf(0.38 + jitter, 0.28, 0.48)
+		}
 	else:
-		return {"a_exit": "top", "a_frac": 0.35, "b_entry": "bottom", "b_frac": 0.65}
+		return {
+			"a_exit": "left",
+			"a_frac": 0.50,
+			"b_entry": "bottom",
+			"b_frac": clampf(0.62 + jitter, 0.52, 0.72)
+		}
 
 
 static func get_dock_point(btn: Button, side: String, frac: float) -> Vector2:
@@ -83,7 +81,8 @@ static func draw_level_path(
 		if not is_unlocked_path and not is_discovery_path:
 			continue
 
-		var spec := get_connection_spec(lvl)
+		var is_left := btn_a.position.x < btn_b.position.x
+		var spec := get_connection_spec(lvl, is_left)
 		var a_exit: String = spec["a_exit"]
 		var a_frac: float = spec["a_frac"]
 		var b_entry: String = spec["b_entry"]
