@@ -166,11 +166,13 @@ static func build_level_card(
 	var display_subtitle: String = depth_str
 
 	if not is_unlocked:
-		# Conceal locked level names with ??? for mystery, but hint King Sector
+		# Conceal locked level names and depths for unprobed sectors
 		if is_king_sector:
 			display_title = "👑 KING SECTOR"
+			display_subtitle = "---"
 		else:
 			display_title = "???"
+			display_subtitle = "---"
 
 	# Style the card frame
 	if is_king_sector:

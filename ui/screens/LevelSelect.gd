@@ -112,7 +112,10 @@ func _apply_safe_area() -> void:
 			$TopBar.position.y = target_top
 		if has_node("MainArea"):
 			var main := $MainArea as Control
-			main.offset_top = target_top + 68.0
+			main.offset_top = target_top + 103.0
+		if has_node("DepthGauge"):
+			var gauge := $DepthGauge as Control
+			gauge.offset_top = target_top + 107.0
 
 
 # --------------------------------------------------
@@ -212,13 +215,14 @@ func _on_mode_toggle_pressed() -> void:
 
 
 func _setup_intel_button() -> void:
-	intel_button.custom_minimum_size = Vector2(56, 56)
-	var n_sb: StyleBoxFlat = LevelCardBuilder.make_button_style(Color(0.04, 0.12, 0.22, 0.85), Color(0.28, 0.72, 0.95, 0.8), 2, 12)
-	var h_sb: StyleBoxFlat = LevelCardBuilder.make_button_style(Color(0.08, 0.22, 0.38, 0.95), Color(0.5, 0.92, 1.0, 1.0), 2, 12)
-	var p_sb: StyleBoxFlat = LevelCardBuilder.make_button_style(Color(0.12, 0.30, 0.50, 1.0), Color(0.7, 1.0, 1.0, 1.0), 2, 12)
-	intel_button.add_theme_stylebox_override("normal", n_sb)
-	intel_button.add_theme_stylebox_override("hover", h_sb)
-	intel_button.add_theme_stylebox_override("pressed", p_sb)
+	intel_button.custom_minimum_size = Vector2(48, 48)
+	intel_button.flat = true
+	intel_button.focus_mode = Control.FOCUS_NONE
+	var empty_sb := StyleBoxEmpty.new()
+	intel_button.add_theme_stylebox_override("normal", empty_sb)
+	intel_button.add_theme_stylebox_override("hover", empty_sb)
+	intel_button.add_theme_stylebox_override("pressed", empty_sb)
+	intel_button.add_theme_stylebox_override("focus", empty_sb)
 
 	var icon_canvas := Control.new()
 	icon_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -231,13 +235,14 @@ func _setup_intel_button() -> void:
 
 
 func _setup_settings_button() -> void:
-	settings_button.custom_minimum_size = Vector2(56, 56)
-	var n_sb: StyleBoxFlat = LevelCardBuilder.make_button_style(Color(0.04, 0.12, 0.22, 0.85), Color(0.28, 0.72, 0.95, 0.8), 2, 12)
-	var h_sb: StyleBoxFlat = LevelCardBuilder.make_button_style(Color(0.08, 0.22, 0.38, 0.95), Color(0.5, 0.92, 1.0, 1.0), 2, 12)
-	var p_sb: StyleBoxFlat = LevelCardBuilder.make_button_style(Color(0.12, 0.30, 0.50, 1.0), Color(0.7, 1.0, 1.0, 1.0), 2, 12)
-	settings_button.add_theme_stylebox_override("normal", n_sb)
-	settings_button.add_theme_stylebox_override("hover", h_sb)
-	settings_button.add_theme_stylebox_override("pressed", p_sb)
+	settings_button.custom_minimum_size = Vector2(48, 48)
+	settings_button.flat = true
+	settings_button.focus_mode = Control.FOCUS_NONE
+	var empty_sb := StyleBoxEmpty.new()
+	settings_button.add_theme_stylebox_override("normal", empty_sb)
+	settings_button.add_theme_stylebox_override("hover", empty_sb)
+	settings_button.add_theme_stylebox_override("pressed", empty_sb)
+	settings_button.add_theme_stylebox_override("focus", empty_sb)
 
 	var icon_canvas := Control.new()
 	icon_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -250,13 +255,14 @@ func _setup_settings_button() -> void:
 
 
 func _setup_leaderboard_button() -> void:
-	leaderboard_button.custom_minimum_size = Vector2(56, 56)
-	var n_sb: StyleBoxFlat = LevelCardBuilder.make_button_style(Color(0.04, 0.12, 0.22, 0.85), Color(0.28, 0.72, 0.95, 0.8), 2, 12)
-	var h_sb: StyleBoxFlat = LevelCardBuilder.make_button_style(Color(0.08, 0.22, 0.38, 0.95), Color(0.5, 0.92, 1.0, 1.0), 2, 12)
-	var p_sb: StyleBoxFlat = LevelCardBuilder.make_button_style(Color(0.12, 0.30, 0.50, 1.0), Color(0.7, 1.0, 1.0, 1.0), 2, 12)
-	leaderboard_button.add_theme_stylebox_override("normal", n_sb)
-	leaderboard_button.add_theme_stylebox_override("hover", h_sb)
-	leaderboard_button.add_theme_stylebox_override("pressed", p_sb)
+	leaderboard_button.custom_minimum_size = Vector2(48, 48)
+	leaderboard_button.flat = true
+	leaderboard_button.focus_mode = Control.FOCUS_NONE
+	var empty_sb := StyleBoxEmpty.new()
+	leaderboard_button.add_theme_stylebox_override("normal", empty_sb)
+	leaderboard_button.add_theme_stylebox_override("hover", empty_sb)
+	leaderboard_button.add_theme_stylebox_override("pressed", empty_sb)
+	leaderboard_button.add_theme_stylebox_override("focus", empty_sb)
 
 	var icon_canvas := Control.new()
 	icon_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE

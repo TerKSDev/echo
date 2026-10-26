@@ -155,24 +155,27 @@ size_flags_horizontal = 3
 mouse_filter = 2
 
 [node name="LeaderboardButton" type="Button" parent="TopBar" unique_id=123987456]
-custom_minimum_size = Vector2(56, 56)
+custom_minimum_size = Vector2(48, 48)
 layout_mode = 2
 size_flags_horizontal = 4
 focus_mode = 0
+flat = true
 theme_override_font_sizes/font_size = 18
 
 [node name="IntelButton" type="Button" parent="TopBar" unique_id=987123456]
-custom_minimum_size = Vector2(56, 56)
+custom_minimum_size = Vector2(48, 48)
 layout_mode = 2
 size_flags_horizontal = 4
 focus_mode = 0
+flat = true
 theme_override_font_sizes/font_size = 15
 
 [node name="SettingsButton" type="Button" parent="TopBar" unique_id=654321987]
-custom_minimum_size = Vector2(56, 56)
+custom_minimum_size = Vector2(48, 48)
 layout_mode = 2
 size_flags_horizontal = 4
 focus_mode = 0
+flat = true
 theme_override_font_sizes/font_size = 20
 
 [node name="MainArea" type="VBoxContainer" parent="." unique_id=2067062267]
@@ -181,7 +184,7 @@ anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 26.0
-offset_top = 118.0
+offset_top = 148.0
 offset_right = -58.0
 offset_bottom = -22.0
 grow_horizontal = 2
@@ -245,7 +248,7 @@ anchor_left = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = -72.0
-offset_top = 125.0
+offset_top = 152.0
 offset_right = -6.0
 offset_bottom = -25.0
 grow_horizontal = 0
