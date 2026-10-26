@@ -273,6 +273,8 @@ func _setup_leaderboard_button() -> void:
 	leaderboard_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	leaderboard_button.flat = true
 	leaderboard_button.focus_mode = Control.FOCUS_NONE
+	# Leaderboard is exclusive to Challenge Mode
+	leaderboard_button.visible = (GameState.current_mode == GameState.GameMode.CHALLENGE)
 	var empty_sb := StyleBoxEmpty.new()
 	leaderboard_button.add_theme_stylebox_override("normal", empty_sb)
 	leaderboard_button.add_theme_stylebox_override("hover", empty_sb)
@@ -408,16 +410,6 @@ func _create_level_buttons() -> void:
 				level_grid.add_child(spacer)
 				level_grid.add_child(button)
 
-		# Bottom padding (compact so the bottom-most level card sits down close to the screen bottom)
-		var bot_pad_a := Control.new()
-		bot_pad_a.custom_minimum_size = Vector2(0, 8)
-		bot_pad_a.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var bot_pad_b := Control.new()
-		bot_pad_b.custom_minimum_size = Vector2(0, 8)
-		bot_pad_b.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		level_grid.add_child(bot_pad_a)
-		level_grid.add_child(bot_pad_b)
-
 	else:
 		# Story Mode:
 		# Iterate from total_levels (Level 21: Surface Breach) down to 1 (Level 1: First Steps / Training)
@@ -505,15 +497,6 @@ func _create_level_buttons() -> void:
 			level_grid.add_child(rift_btn)
 			level_grid.add_child(spacer_bot)
 
-		var bot_pad_a := Control.new()
-		bot_pad_a.custom_minimum_size = Vector2(0, 8)
-		bot_pad_a.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var bot_pad_b := Control.new()
-		bot_pad_b.custom_minimum_size = Vector2(0, 8)
-		bot_pad_b.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		level_grid.add_child(bot_pad_a)
-		level_grid.add_child(bot_pad_b)
-
 
 func _update_header_and_mode_ui() -> void:
 	var is_challenge := GameState.current_mode == GameState.GameMode.CHALLENGE
@@ -553,6 +536,10 @@ func _update_header_and_mode_ui() -> void:
 			mode_toggle.visible = GameState.is_story_completed()
 			mode_toggle.text = "◈ STORY"
 			_style_mode_toggle(mode_toggle, false)
+
+	# Leaderboard is exclusive to Challenge Mode
+	if leaderboard_button != null:
+		leaderboard_button.visible = is_challenge
 
 	# Update Top Status Bar: cleanly display current total star count without clutter
 	var playable_levels := _get_playable_levels()

@@ -167,6 +167,7 @@ size_flags_horizontal = 3
 mouse_filter = 2
 
 [node name="LeaderboardButton" type="Button" parent="TopBar" unique_id=123987456]
+visible = false
 custom_minimum_size = Vector2(48, 48)
 layout_mode = 2
 size_flags_horizontal = 4
@@ -201,7 +202,7 @@ anchor_bottom = 1.0
 offset_left = 26.0
 offset_top = 98.0
 offset_right = -58.0
-offset_bottom = -22.0
+offset_bottom = -12.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 16
@@ -247,7 +248,7 @@ size_flags_horizontal = 3
 theme_override_constants/margin_left = 12
 theme_override_constants/margin_top = 14
 theme_override_constants/margin_right = 12
-theme_override_constants/margin_bottom = 12
+theme_override_constants/margin_bottom = 2
 
 [node name="LevelGrid" type="GridContainer" parent="MainArea/ScrollContainer/GridMargin" unique_id=560705883]
 layout_mode = 2

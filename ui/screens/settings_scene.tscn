@@ -149,11 +149,11 @@ layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
 offset_left = 24.0
-offset_top = 88.0
+offset_top = 96.0
 offset_right = -24.0
-offset_bottom = 132.0
+offset_bottom = 140.0
 grow_horizontal = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 14
 
 [node name="TabGeneral" type="Button" parent="TabBar"]
 layout_mode = 2
@@ -188,7 +188,7 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_top = 144.0
+offset_top = 152.0
 grow_horizontal = 2
 grow_vertical = 2
 

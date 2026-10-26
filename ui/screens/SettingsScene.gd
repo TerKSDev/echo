@@ -72,10 +72,10 @@ func _apply_safe_area() -> void:
 		if has_node("TopBar"):
 			$TopBar.position.y = target_top
 		if has_node("TabBar"):
-			$TabBar.position.y = target_top + 62.0
+			$TabBar.position.y = target_top + 70.0
 		if has_node("MainArea"):
 			var main := $MainArea as Control
-			main.offset_top = target_top + 118.0
+			main.offset_top = target_top + 126.0
 
 
 func _unhandled_input(event: InputEvent) -> void:
