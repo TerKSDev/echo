@@ -1,5 +1,4 @@
 extends Control
-class_name SettingsScene
 
 const Icons = preload("res://ui/icons/Icons.gd")
 const SettingsUIFactory = preload("res://ui/settings/SettingsUIFactory.gd")
@@ -93,13 +92,12 @@ func _setup_top_bar() -> void:
 		back_button.text = ""
 		back_button.custom_minimum_size = Vector2(44, 44)
 		back_button.focus_mode = Control.FOCUS_NONE
-		var n_sb := SettingsUIFactory.make_button_style(Color(0.035, 0.09, 0.16, 0.88), Color(0.18, 0.45, 0.7, 0.8), 1, 10)
-		var h_sb := SettingsUIFactory.make_button_style(Color(0.06, 0.18, 0.29, 0.98), Color(0.35, 0.85, 1.0, 1.0), 2, 10)
-		var p_sb := SettingsUIFactory.make_button_style(Color(0.08, 0.24, 0.36, 1.0), Color(0.55, 0.95, 1.0, 1.0), 2, 10)
-		back_button.add_theme_stylebox_override("normal", n_sb)
-		back_button.add_theme_stylebox_override("hover", h_sb)
-		back_button.add_theme_stylebox_override("pressed", p_sb)
-		back_button.add_theme_stylebox_override("focus", n_sb)
+		var empty_sb := StyleBoxEmpty.new()
+		back_button.add_theme_stylebox_override("normal", empty_sb)
+		back_button.add_theme_stylebox_override("hover", empty_sb)
+		back_button.add_theme_stylebox_override("pressed", empty_sb)
+		back_button.add_theme_stylebox_override("focus", empty_sb)
+		back_button.add_theme_stylebox_override("disabled", empty_sb)
 		back_button.draw.connect(func(): Icons.draw_back_arrow(back_button))
 		back_button.mouse_entered.connect(func(): back_button.queue_redraw())
 		back_button.mouse_exited.connect(func(): back_button.queue_redraw())
@@ -147,6 +145,7 @@ func _switch_tab(tab_idx: int) -> void:
 		btn.add_theme_stylebox_override("hover", style)
 		btn.add_theme_stylebox_override("pressed", style)
 		btn.add_theme_stylebox_override("focus", style)
+		btn.add_theme_font_size_override("font_size", 13)
 
 	for i in _panels.size():
 		var p := _panels[i]

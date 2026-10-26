@@ -1,5 +1,4 @@
 extends Control
-class_name LeaderboardModal
 ## Huawei Game Service Leaderboard & Challenge Mode Modal for ECHO.
 ## Displays global speedrun rankings, sector par times, and on-demand HUAWEI ID login.
 
@@ -70,7 +69,8 @@ func open(default_sector: int = 1) -> void:
 	if _is_open:
 		return
 	_is_open = true
-	_current_sector = clampi(default_sector, 1, 13)
+	var max_sec := GameState.LEVELS.size()
+	_current_sector = clampi(default_sector, 1, max_sec)
 	visible = true
 	_sync_viewport_size()
 	_refresh_view()
@@ -241,7 +241,8 @@ func _build_ui() -> void:
 	_prev_sector_btn.custom_minimum_size = Vector2(36, 28)
 	_prev_sector_btn.focus_mode = Control.FOCUS_NONE
 	_prev_sector_btn.pressed.connect(func():
-		_current_sector = 13 if _current_sector <= 1 else _current_sector - 1
+		var max_sec := GameState.LEVELS.size()
+		_current_sector = max_sec if _current_sector <= 1 else _current_sector - 1
 		_refresh_view()
 	)
 	sec_toolbar.add_child(_prev_sector_btn)
@@ -259,7 +260,8 @@ func _build_ui() -> void:
 	_next_sector_btn.custom_minimum_size = Vector2(36, 28)
 	_next_sector_btn.focus_mode = Control.FOCUS_NONE
 	_next_sector_btn.pressed.connect(func():
-		_current_sector = 1 if _current_sector >= 13 else _current_sector + 1
+		var max_sec := GameState.LEVELS.size()
+		_current_sector = 1 if _current_sector >= max_sec else _current_sector + 1
 		_refresh_view()
 	)
 	sec_toolbar.add_child(_next_sector_btn)

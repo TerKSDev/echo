@@ -1,5 +1,4 @@
 extends Control
-class_name DebriefModal
 ## Post-mission evaluation & debrief screen for ECHO.
 ## Displays level completion time, sonar pulses emitted, and monster detection count.
 ## Evaluates and animates the 3-star "Ghost Rating" with procedural sound chimes.

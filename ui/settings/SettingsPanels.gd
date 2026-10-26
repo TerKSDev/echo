@@ -1,4 +1,4 @@
-class_name SettingsPanels
+extends RefCounted
 ## Tab Panel Construction for ECHO Settings System.
 ## Modularly builds General, Controls, Display, and Advanced options.
 
@@ -23,13 +23,13 @@ static func update_palette_btn(btn: Button, chip: ColorRect) -> void:
 	chip.color = GameState.get_sonar_color()
 	match GameState.sonar_palette:
 		"cyan":
-			btn.text = "BIOLUMINESCENT CYAN"
+			btn.text = "CYAN"
 		"emerald":
-			btn.text = "DEEP EMERALD"
+			btn.text = "EMERALD"
 		"amber":
-			btn.text = "SUB-CRUST AMBER"
+			btn.text = "AMBER"
 		"white":
-			btn.text = "PURE HIGH-CONTRAST"
+			btn.text = "WHITE"
 		_:
 			btn.text = GameState.sonar_palette.to_upper()
 
@@ -119,7 +119,7 @@ static func build_general_panel(scene: Control) -> VBoxContainer:
 	var calib_btn := Button.new()
 	calib_btn.custom_minimum_size = Vector2(136, 32)
 	calib_btn.focus_mode = Control.FOCUS_NONE
-	calib_btn.add_theme_font_size_override("font_size", 12)
+	calib_btn.add_theme_font_size_override("font_size", 13)
 	calib_btn.text = "CALIBRATE ROOM"
 	SettingsUIFactory.style_action_button(calib_btn, Color(0.28, 0.65, 0.95, 0.8), Color(0.04, 0.12, 0.22, 0.85))
 	calib_btn.pressed.connect(func():
@@ -138,7 +138,7 @@ static func build_general_panel(scene: Control) -> VBoxContainer:
 
 	var hint_lbl := Label.new()
 	hint_lbl.text = "SPEAK TO TEST  •  YELLOW LINE = TRIGGER THRESHOLD  •  KEY [M] = QUICK MUTE"
-	hint_lbl.add_theme_font_size_override("font_size", 11)
+	hint_lbl.add_theme_font_size_override("font_size", 12)
 	hint_lbl.add_theme_color_override("font_color", Color(0.42, 0.65, 0.85, 0.65))
 	calib_container.add_child(hint_lbl)
 
@@ -318,8 +318,9 @@ static func build_advanced_panel(scene: Control) -> VBoxContainer:
 	palette_box.add_child(preview_chip)
 
 	var palette_btn := Button.new()
-	palette_btn.custom_minimum_size = Vector2(170, 32)
+	palette_btn.custom_minimum_size = Vector2(136, 32)
 	palette_btn.focus_mode = Control.FOCUS_NONE
+	palette_btn.add_theme_font_size_override("font_size", 13)
 	update_palette_btn(palette_btn, preview_chip)
 	palette_btn.pressed.connect(func():
 		scene.call("play_click")
@@ -369,13 +370,13 @@ static func build_advanced_panel(scene: Control) -> VBoxContainer:
 
 	var lvl_lbl := Label.new()
 	lvl_lbl.text = "FURTHEST SECTOR UNLOCKED:  %s" % GameState.get_level_name(GameState.highest_unlocked_level)
-	lvl_lbl.add_theme_font_size_override("font_size", 12)
+	lvl_lbl.add_theme_font_size_override("font_size", 13)
 	lvl_lbl.add_theme_color_override("font_color", Color(0.5, 0.85, 1.0, 0.95))
 	diag_box.add_child(lvl_lbl)
 
 	var floor_lbl := Label.new()
 	floor_lbl.text = "CALIBRATED AMBIENT NOISE FLOOR:  %.1f dB" % GameState.mic_noise_floor_db
-	floor_lbl.add_theme_font_size_override("font_size", 11)
+	floor_lbl.add_theme_font_size_override("font_size", 12)
 	floor_lbl.add_theme_color_override("font_color", Color(0.4, 0.65, 0.85, 0.75))
 	diag_box.add_child(floor_lbl)
 
@@ -391,7 +392,7 @@ static func build_advanced_panel(scene: Control) -> VBoxContainer:
 	var reset_btn := Button.new()
 	reset_btn.custom_minimum_size = Vector2(170, 36)
 	reset_btn.focus_mode = Control.FOCUS_NONE
-	reset_btn.add_theme_font_size_override("font_size", 12)
+	reset_btn.add_theme_font_size_override("font_size", 13)
 	if has_cleared_adv:
 		reset_btn.text = "RETURN TO ABYSS"
 		SettingsUIFactory.style_action_button(reset_btn, Color(0.92, 0.28, 0.35, 0.95), Color(0.20, 0.04, 0.06, 0.90))

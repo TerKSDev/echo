@@ -1,4 +1,4 @@
-class_name ResetConfirmModal
+extends RefCounted
 ## Irreversible Data Reset Confirmation Modal Dialog.
 ## Warns user before wiping cavern sector progress, records, and stars.
 
@@ -45,14 +45,14 @@ static func show_modal(
 
 	var title := Label.new()
 	title.text = "RETURN TO ABYSS?"
-	title.add_theme_font_size_override("font_size", 22)
+	title.add_theme_font_size_override("font_size", 24)
 	title.add_theme_color_override("font_color", Color(1.0, 0.35, 0.40, 1.0))
 	vbox.add_child(title)
 
 	var desc := Label.new()
 	desc.text = "WARNING: This action is completely IRREVERSIBLE.\n\nAll unlocked sector progression, speedrun records, and collected stars will be permanently erased. You will be placed back at Sector 01 (Abyss Origin)."
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	desc.add_theme_font_size_override("font_size", 12)
+	desc.add_theme_font_size_override("font_size", 13)
 	desc.add_theme_color_override("font_color", Color(0.95, 0.82, 0.85, 0.95))
 	vbox.add_child(desc)
 
@@ -63,6 +63,7 @@ static func show_modal(
 	cancel_btn.text = "CANCEL"
 	cancel_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	cancel_btn.custom_minimum_size = Vector2(0, 42)
+	cancel_btn.add_theme_font_size_override("font_size", 13)
 	SettingsUIFactory.style_action_button(cancel_btn, Color(0.3, 0.5, 0.7, 0.7), Color(0.05, 0.12, 0.2, 0.9))
 	cancel_btn.pressed.connect(func():
 		modal.queue_free()
@@ -77,6 +78,7 @@ static func show_modal(
 	confirm_btn.text = "CONFIRM: RETURN TO ABYSS"
 	confirm_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	confirm_btn.custom_minimum_size = Vector2(0, 42)
+	confirm_btn.add_theme_font_size_override("font_size", 13)
 	SettingsUIFactory.style_action_button(confirm_btn, Color(0.95, 0.3, 0.35, 1.0), Color(0.28, 0.05, 0.08, 0.95))
 	confirm_btn.add_theme_color_override("font_color", Color(1.0, 0.75, 0.8, 1.0))
 	confirm_btn.pressed.connect(func():

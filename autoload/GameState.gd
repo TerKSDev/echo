@@ -510,10 +510,10 @@ func load_progress() -> void:
 	highest_unlocked_level = clampi(
 		int(cfg.get_value("progress", "highest_unlocked_level", 1)),
 		1,
-		13
+		LEVELS.size()
 	)
 
-	for i in range(1, 14):
+	for i in range(1, LEVELS.size() + 1):
 		var sec := "level_%02d" % i
 		if cfg.has_section(sec):
 			level_records[i] = {
@@ -622,13 +622,11 @@ func record_level_clear(level_number: int, clear_time: float, pings: int, alerts
 
 
 func complete_level(level_number: int) -> void:
-	# 只接受正式关卡 1 到 13。
-	if level_number < 1 or level_number > 13:
+	if level_number < 1 or level_number > LEVELS.size():
 		return
 
-	# 完成当前关卡后开放下一关。
-	# 完成第 13 关时，仍然记录最高解锁关卡为 13。
-	var next_unlocked := mini(level_number + 1, 13)
+	# 完成当前关卡后开放下一关
+	var next_unlocked := mini(level_number + 1, LEVELS.size())
 
 	if next_unlocked > highest_unlocked_level:
 		highest_unlocked_level = next_unlocked

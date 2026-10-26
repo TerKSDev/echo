@@ -1,10 +1,9 @@
-class_name LevelCardBuilder
+extends RefCounted
 ## Modular Sector Button Card Builder for Level Select.
 ## Constructs high-contrast glassmorphic level cards, star indicators,
 ## telemetry subtitles, procedural radar scanlines, and tactile haptic feedback.
 
 const Icons = preload("res://ui/icons/Icons.gd")
-const SECTORS: Array[Dictionary] = GameState.SECTORS
 
 
 static func make_button_style(
@@ -119,9 +118,9 @@ static func build_level_card(
 	var sec_idx := level_number - 1
 	var sector_name := "CAVERN SECTOR %02d" % level_number
 	var raw_depth := "-%d M" % (level_number * 160)
-	if sec_idx >= 0 and sec_idx < SECTORS.size():
-		sector_name = SECTORS[sec_idx]["name"]
-		raw_depth = SECTORS[sec_idx]["depth"]
+	if sec_idx >= 0 and sec_idx < GameState.SECTORS.size():
+		sector_name = GameState.SECTORS[sec_idx]["name"]
+		raw_depth = GameState.SECTORS[sec_idx]["depth"]
 
 	# Format depth string to '~2,680 M' without extra clutter
 	var depth_str := "~" + raw_depth.replace("-", "").strip_edges()

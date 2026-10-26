@@ -98,9 +98,9 @@ func play_level_exit_transition(on_complete: Callable) -> void:
 	on_complete.call()
 
 
-var _debrief_modal: DebriefModal = null
+var _debrief_modal: Control = null
 
-func _get_or_create_debrief() -> DebriefModal:
+func _get_or_create_debrief() -> Control:
 	if _debrief_modal == null or not is_instance_valid(_debrief_modal):
 		_debrief_modal = DebriefModal.new()
 		add_child(_debrief_modal)
@@ -187,7 +187,7 @@ func show_victory_screen() -> void:
 	vbox.add_child(sep)
 
 	var desc := Label.new()
-	desc.text = "You kept your calm and stayed silent in the pitch-black abyss.\nGuided only by acoustic echoes across 13 subterranean sectors,\nyou silenced every terror and emerged back into the sun."
+	desc.text = "You kept your calm and stayed silent in the pitch-black abyss.\nGuided only by acoustic echoes across %d subterranean sectors,\nyou silenced every terror and emerged back into the sun." % GameState.LEVELS.size()
 	desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	desc.add_theme_color_override("font_color", Color(0.78, 0.88, 0.98, 0.88))
 	desc.add_theme_font_size_override("font_size", 13)
@@ -200,7 +200,7 @@ func show_victory_screen() -> void:
 
 	var replay_btn := Button.new()
 	replay_btn.custom_minimum_size = Vector2(160.0, 44.0)
-	replay_btn.text = "REPLAY %s" % GameState.get_level_name(13)
+	replay_btn.text = "REPLAY %s" % GameState.get_level_name(GameState.LEVELS.size())
 	replay_btn.focus_mode = Control.FOCUS_NONE
 	replay_btn.pressed.connect(func():
 		GameState.restart_level()

@@ -1,4 +1,4 @@
-class_name SettingsUIFactory
+extends RefCounted
 ## UI Component Factory for ECHO Settings System.
 ## Procedurally constructs responsive sliders, toggle chips, section headers,
 ## category dividers, and action buttons.
@@ -39,7 +39,7 @@ static func create_section_header(title: String) -> Control:
 	var lbl := Label.new()
 	lbl.text = title
 	lbl.add_theme_color_override("font_color", Color(0.48, 0.84, 1.0, 0.95))
-	lbl.add_theme_font_size_override("font_size", 12)
+	lbl.add_theme_font_size_override("font_size", 14)
 	hbox.add_child(lbl)
 	return hbox
 
@@ -66,14 +66,14 @@ static func create_setting_row(title_text: String, desc_text: String, action_con
 	var title_lbl := Label.new()
 	title_lbl.text = title_text
 	title_lbl.add_theme_color_override("font_color", Color(0.88, 0.96, 1.0, 1.0))
-	title_lbl.add_theme_font_size_override("font_size", 14)
+	title_lbl.add_theme_font_size_override("font_size", 16)
 	vbox.add_child(title_lbl)
 
 	var desc_lbl := Label.new()
 	desc_lbl.text = desc_text
 	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	desc_lbl.add_theme_color_override("font_color", Color(0.55, 0.72, 0.88, 0.75))
-	desc_lbl.add_theme_font_size_override("font_size", 11)
+	desc_lbl.add_theme_font_size_override("font_size", 13)
 	vbox.add_child(desc_lbl)
 
 	hbox.add_child(vbox)
@@ -103,14 +103,14 @@ static func create_slider_row(
 	var title_lbl := Label.new()
 	title_lbl.text = title_text
 	title_lbl.add_theme_color_override("font_color", Color(0.88, 0.96, 1.0, 1.0))
-	title_lbl.add_theme_font_size_override("font_size", 14)
+	title_lbl.add_theme_font_size_override("font_size", 16)
 	vbox.add_child(title_lbl)
 
 	var desc_lbl := Label.new()
 	desc_lbl.text = desc_text
 	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	desc_lbl.add_theme_color_override("font_color", Color(0.55, 0.72, 0.88, 0.75))
-	desc_lbl.add_theme_font_size_override("font_size", 11)
+	desc_lbl.add_theme_font_size_override("font_size", 13)
 	vbox.add_child(desc_lbl)
 
 	hbox.add_child(vbox)
@@ -135,7 +135,7 @@ static func create_slider_row(
 	val_lbl.custom_minimum_size = Vector2(45, 0)
 	val_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	val_lbl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	val_lbl.add_theme_font_size_override("font_size", 12)
+	val_lbl.add_theme_font_size_override("font_size", 14)
 	val_lbl.add_theme_color_override("font_color", Color(0.48, 0.84, 1.0, 0.95))
 	if is_percent:
 		val_lbl.text = "%d%%" % int(cur_val * 100.0)
@@ -181,7 +181,7 @@ static func refresh_toggle_btn(btn: Button, active: bool, on_text: String, off_t
 	btn.add_theme_stylebox_override("hover", sb)
 	btn.add_theme_stylebox_override("pressed", sb)
 	btn.add_theme_stylebox_override("focus", sb)
-	btn.add_theme_font_size_override("font_size", 12)
+	btn.add_theme_font_size_override("font_size", 13)
 
 
 static func style_action_button(btn: Button, border_col: Color, bg_col: Color) -> void:
@@ -198,6 +198,7 @@ static func style_action_button(btn: Button, border_col: Color, bg_col: Color) -
 	btn.add_theme_stylebox_override("hover", sb)
 	btn.add_theme_stylebox_override("pressed", sb)
 	btn.add_theme_stylebox_override("focus", sb)
+	btn.add_theme_font_size_override("font_size", 13)
 
 
 static func style_disabled_button(btn: Button) -> void:
@@ -212,3 +213,4 @@ static func style_disabled_button(btn: Button) -> void:
 	sb.set_border_width_all(1)
 	btn.add_theme_stylebox_override("disabled", sb)
 	btn.add_theme_color_override("font_disabled_color", Color(0.35, 0.45, 0.55, 0.6))
+	btn.add_theme_font_size_override("font_size", 13)

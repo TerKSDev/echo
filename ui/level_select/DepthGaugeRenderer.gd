@@ -1,4 +1,4 @@
-class_name DepthGaugeRenderer
+extends RefCounted
 ## Dynamic Subterranean Altimeter & Drag Scrubber for Level Select.
 ## Displays elevation milestones (0M to -2680M) and tracks live depth cursor.
 
@@ -26,8 +26,9 @@ static func draw_depth_gauge(
 		return
 
 	var vbar := scroll_container.get_v_scroll_bar()
-	var max_scroll := maxf(1.0, vbar.max_value - scroll_container.size.y)
-	# scroll_ratio: 0.0 at top (Surface Breach), 1.0 at bottom (Abyss Origin)
+	var page := vbar.page if vbar.page > 0.0 else scroll_container.size.y
+	var max_scroll := maxf(1.0, vbar.max_value - page)
+	# scroll_ratio: 0.0 at top (Surface Breach 0M), 1.0 at bottom (Abyss Origin -2680M)
 	var scroll_ratio := clampf(float(scroll_container.scroll_vertical) / max_scroll, 0.0, 1.0)
 
 	# Main vertical guideline axis (right-aligned)
@@ -42,7 +43,7 @@ static func draw_depth_gauge(
 	# Minimal Reference Milestones: 0M, -1300M, -2680M
 	var milestones = [
 		{"label": "0M", "ratio": 0.0},
-		{"label": "-1,300M", "ratio": 0.5},
+		{"label": "-1,300M", "ratio": 1300.0 / 2680.0},
 		{"label": "-2,680M", "ratio": 1.0},
 	]
 
@@ -55,15 +56,15 @@ static func draw_depth_gauge(
 			Color(0.35, 0.68, 0.9, 0.6),
 			1.5
 		)
-		# Compact label left of the tick
+		# Compact label left of the tick (enlarged to 12)
 		depth_gauge.draw_string(
 			ThemeDB.fallback_font,
-			Vector2(0.0, my + 4.0),
+			Vector2(0.0, my + 4.5),
 			str(ms["label"]),
 			HORIZONTAL_ALIGNMENT_RIGHT,
 			int(x_axis - 7.0),
-			10,
-			Color(0.5, 0.72, 0.9, 0.6)
+			12,
+			Color(0.58, 0.78, 0.95, 0.75)
 		)
 
 	# Subtle minor graduation ticks (every 10%)
@@ -82,7 +83,7 @@ static func draw_depth_gauge(
 	# Live Depth Cursor Tracking (Only displayed during active dragging / scrolling)
 	if depth_tag_alpha > 0.01:
 		var cur_y := lerpf(20.0, h - 20.0, scroll_ratio)
-		var cur_meters := int(round(lerpf(-40.0, -2680.0, scroll_ratio)))
+		var cur_meters := int(round(lerpf(0.0, -2680.0, scroll_ratio)))
 		var depth_str := format_depth_meters(cur_meters)
 
 		# Bright live indicator tick & glowing bead on axis
@@ -132,6 +133,7 @@ static func scrub_to_position(pos_y: float, depth_gauge: Control, scroll_contain
 		return
 	var ratio := clampf((pos_y - 20.0) / (h - 40.0), 0.0, 1.0)
 	var vbar := scroll_container.get_v_scroll_bar()
-	var max_scroll := maxf(0.0, vbar.max_value - scroll_container.size.y)
-	scroll_container.scroll_vertical = int(ratio * max_scroll)
+	var page := vbar.page if vbar.page > 0.0 else scroll_container.size.y
+	var max_scroll := maxf(1.0, vbar.max_value - page)
+	scroll_container.scroll_vertical = int(round(ratio * max_scroll))
 	depth_gauge.queue_redraw()

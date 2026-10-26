@@ -1,4 +1,4 @@
-class_name Icons
+extends RefCounted
 ## Centralized Procedural Vector Icons Renderer for ECHO.
 ## Draws high-DPI resolution-independent vector icons using Godot CanvasItem draw calls.
 
@@ -173,14 +173,20 @@ static func draw_lock(canvas: Control) -> void:
 
 static func draw_back_arrow(canvas: Control) -> void:
 	var c := canvas.size * 0.5
-	var col := Color(0.78, 0.92, 1.0, 0.95)
-	var tip := Vector2(c.x - 7.0, c.y)
-	var wing_top := Vector2(c.x - 1.0, c.y - 6.0)
-	var wing_bot := Vector2(c.x - 1.0, c.y + 6.0)
-	var stem_end := Vector2(c.x + 7.0, c.y)
-	canvas.draw_line(wing_top, tip, col, 2.2, true)
-	canvas.draw_line(wing_bot, tip, col, 2.2, true)
-	canvas.draw_line(tip, stem_end, col, 2.2, true)
+	var is_hovered: bool = false
+	if canvas is BaseButton:
+		var btn := canvas as BaseButton
+		is_hovered = btn.is_hovered() or btn.button_pressed
+	var col := Color(0.92, 0.98, 1.0, 1.0) if is_hovered else Color(0.68, 0.86, 1.0, 0.90)
+	if is_hovered:
+		canvas.draw_circle(c, 16.0, Color(0.20, 0.65, 1.0, 0.16))
+	var tip := Vector2(c.x - 8.0, c.y)
+	var wing_top := Vector2(c.x - 1.0, c.y - 7.0)
+	var wing_bot := Vector2(c.x - 1.0, c.y + 7.0)
+	var stem_end := Vector2(c.x + 8.0, c.y)
+	canvas.draw_line(wing_top, tip, col, 2.4, true)
+	canvas.draw_line(wing_bot, tip, col, 2.4, true)
+	canvas.draw_line(tip, stem_end, col, 2.4, true)
 
 
 static func draw_headphone(canvas: Control) -> void:
@@ -249,4 +255,3 @@ static func draw_back_arrow_icon(canvas: Control) -> void:
 
 static func draw_headphone_icon(canvas: Control) -> void:
 	draw_headphone(canvas)
-

@@ -1,4 +1,4 @@
-class_name LevelPathRenderer
+extends RefCounted
 ## Procedural Bezier Conduit & Animated Sonar Pulse Renderer for Level Select.
 ## Connects cavern sectors with biome-specific conduit paths and energy surges.
 
@@ -21,7 +21,11 @@ const CONNECTIONS: Dictionary = {
 static func get_connection_spec(lvl: int) -> Dictionary:
 	if CONNECTIONS.has(lvl):
 		return CONNECTIONS[lvl]
-	return {"a_exit": "top", "a_frac": 0.5, "b_entry": "bottom", "b_frac": 0.5}
+	# Alternating conduit curvature for extended levels beyond 12
+	if lvl % 2 == 1:
+		return {"a_exit": "right", "a_frac": 0.45, "b_entry": "bottom", "b_frac": 0.35}
+	else:
+		return {"a_exit": "top", "a_frac": 0.35, "b_entry": "bottom", "b_frac": 0.65}
 
 
 static func get_dock_point(btn: Button, side: String, frac: float) -> Vector2:

@@ -1,4 +1,4 @@
-class_name Monsters
+extends RefCounted
 ## Procedural Monster Specimen & Shockwave Preview Renderer for ECHO Bestiary.
 ## Offloaded from LevelSelect to keep UI controllers lean and modular.
 

@@ -178,7 +178,7 @@ offset_right = -58.0
 offset_bottom = -22.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/separation = 12
+theme_override_constants/separation = 24
 
 [node name="HeaderBox" type="VBoxContainer" parent="MainArea"]
 layout_mode = 2
@@ -219,9 +219,9 @@ horizontal_scroll_mode = 0
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/margin_left = 12
-theme_override_constants/margin_top = 4
+theme_override_constants/margin_top = 16
 theme_override_constants/margin_right = 12
-theme_override_constants/margin_bottom = 4
+theme_override_constants/margin_bottom = 24
 
 [node name="LevelGrid" type="GridContainer" parent="MainArea/ScrollContainer/GridMargin" unique_id=560705883]
 layout_mode = 2
@@ -236,7 +236,7 @@ anchors_preset = 11
 anchor_left = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -64.0
+offset_left = -72.0
 offset_top = 125.0
 offset_right = -6.0
 offset_bottom = -25.0

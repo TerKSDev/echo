@@ -1,5 +1,4 @@
 extends Button
-class_name PebbleButton
 
 const Icons = preload("res://ui/icons/Icons.gd")
 

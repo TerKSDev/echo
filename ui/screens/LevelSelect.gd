@@ -1,5 +1,4 @@
 extends Control
-class_name LevelSelect
 
 const TEST_LEVEL_PATH := "res://levels/level_test.tscn"
 const Icons = preload("res://ui/icons/Icons.gd")
@@ -125,21 +124,7 @@ func _apply_safe_area() -> void:
 # --------------------------------------------------
 
 func _get_playable_levels() -> Array[String]:
-	return [
-		"res://levels/level_01.tscn",
-		"res://levels/level_02.tscn",
-		"res://levels/level_03.tscn",
-		"res://levels/level_04.tscn",
-		"res://levels/level_05.tscn",
-		"res://levels/level_06.tscn",
-		"res://levels/level_07.tscn",
-		"res://levels/level_08.tscn",
-		"res://levels/level_09.tscn",
-		"res://levels/level_10.tscn",
-		"res://levels/level_11.tscn",
-		"res://levels/level_12.tscn",
-		"res://levels/level_13.tscn",
-	]
+	return GameState.LEVELS
 
 
 func _on_scroll_container_gui_input(event: InputEvent) -> void:
@@ -246,10 +231,10 @@ func _create_level_buttons() -> void:
 
 	# Top padding in the grid (at top of cavern ascent, near surface)
 	var top_pad_a := Control.new()
-	top_pad_a.custom_minimum_size = Vector2(0, 20)
+	top_pad_a.custom_minimum_size = Vector2(0, 28)
 	top_pad_a.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var top_pad_b := Control.new()
-	top_pad_b.custom_minimum_size = Vector2(0, 20)
+	top_pad_b.custom_minimum_size = Vector2(0, 28)
 	top_pad_b.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	level_grid.add_child(top_pad_a)
 	level_grid.add_child(top_pad_b)
@@ -300,7 +285,8 @@ func _scroll_to_current_level() -> void:
 	if btn != null and is_instance_valid(btn):
 		var target_y := btn.position.y - 120.0
 		var vbar := scroll_container.get_v_scroll_bar()
-		var max_scroll := maxf(0.0, vbar.max_value - scroll_container.size.y)
+		var page := vbar.page if vbar.page > 0.0 else scroll_container.size.y
+		var max_scroll := maxf(0.0, vbar.max_value - page)
 		var final_y := clampf(target_y, 0.0, max_scroll)
 		var tw := create_tween()
 		tw.tween_property(scroll_container, "scroll_vertical", int(final_y), 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)

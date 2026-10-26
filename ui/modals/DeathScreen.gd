@@ -1,5 +1,4 @@
 extends Control
-class_name DeathScreen
 ## Atmospheric "SILENCED" death overlay with a live flatlining acoustic waveform,
 ## killer monster identification + survival tip, and Try Again / Main Menu actions.
 

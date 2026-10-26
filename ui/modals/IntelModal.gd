@@ -1,5 +1,4 @@
 extends Control
-class_name IntelModal
 
 const Monsters = preload("res://ui/icons/Monsters.gd")
 ## Survival Intel & Acoustic Bestiary Modal for ECHO.

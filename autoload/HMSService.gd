@@ -161,7 +161,7 @@ func submit_sector_score(sector_idx: int, escape_time: float, _pings: int, stars
 
 ## Automatically synchronizes all offline cleared sector records to HMS upon user sign-in.
 func _sync_offline_records_to_hms() -> void:
-	for lvl in range(1, 14):
+	for lvl in range(1, GameState.LEVELS.size() + 1):
 		var stars: int = GameState.get_level_stars(lvl)
 		if stars > 0:
 			var best_t: float = GameState.get_level_best_time(lvl)
@@ -233,7 +233,7 @@ func _init_leaderboard_data() -> void:
 			return
 
 	# Pre-populate with evocative global explorers
-	for sec in range(1, 14):
+	for sec in range(1, GameState.LEVELS.size() + 1):
 		_leaderboards[sec] = _generate_default_board(sec)
 	_save_leaderboards_to_disk()
 

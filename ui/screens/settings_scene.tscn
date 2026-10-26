@@ -135,13 +135,13 @@ alignment = 1
 [node name="Title" type="Label" parent="TopBar/TitleBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.88, 0.96, 1, 1)
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 22
 text = "SYSTEM SETTINGS"
 
 [node name="Subtitle" type="Label" parent="TopBar/TitleBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.45, 0.76, 1, 0.78)
-theme_override_font_sizes/font_size = 11
+theme_override_font_sizes/font_size = 12
 text = "EXPEDITION SUIT & ACOUSTIC SENSORS"
 
 [node name="TabBar" type="HBoxContainer" parent="."]
@@ -159,28 +159,28 @@ theme_override_constants/separation = 8
 layout_mode = 2
 size_flags_horizontal = 3
 focus_mode = 0
-theme_override_font_sizes/font_size = 12
+theme_override_font_sizes/font_size = 13
 text = "GENERAL"
 
 [node name="TabControls" type="Button" parent="TabBar"]
 layout_mode = 2
 size_flags_horizontal = 3
 focus_mode = 0
-theme_override_font_sizes/font_size = 12
+theme_override_font_sizes/font_size = 13
 text = "CONTROLS"
 
 [node name="TabDisplay" type="Button" parent="TabBar"]
 layout_mode = 2
 size_flags_horizontal = 3
 focus_mode = 0
-theme_override_font_sizes/font_size = 12
+theme_override_font_sizes/font_size = 13
 text = "DISPLAY"
 
 [node name="TabAdvanced" type="Button" parent="TabBar"]
 layout_mode = 2
 size_flags_horizontal = 3
 focus_mode = 0
-theme_override_font_sizes/font_size = 12
+theme_override_font_sizes/font_size = 13
 text = "ADVANCED"
 
 [node name="MainArea" type="Control" parent="."]
