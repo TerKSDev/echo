@@ -63,6 +63,12 @@ script = ExtResource("3_lpedq")
 kind = 3
 link_id = "a"
 
+[node name="Switch_exit_1" type="Marker2D" parent="Markers" unique_id=308656973]
+position = Vector2(848, 816)
+script = ExtResource("3_lpedq")
+kind = 3
+link_id = "exit"
+
 [node name="EnemyChaser" parent="." unique_id=860476369 instance=ExtResource("4_voxu1")]
 position = Vector2(77, 849)
 

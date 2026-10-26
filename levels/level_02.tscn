@@ -27,6 +27,12 @@ kind = 0
 position = Vector2(1104, 400)
 script = ExtResource("3_gia0r")
 
+[node name="Switch_exit_1" type="Marker2D" parent="Markers" unique_id=1105973215]
+position = Vector2(208, 432)
+script = ExtResource("3_gia0r")
+kind = 3
+link_id = "exit"
+
 [node name="EnemySleeper" parent="." unique_id=1214264447 instance=ExtResource("5_didps")]
 position = Vector2(786, 185)
 

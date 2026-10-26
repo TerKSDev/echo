@@ -1,6 +1,14 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene format=3 uid="uid://dikpqlh7ntbn2"]
 
 [ext_resource type="PackedScene" uid="uid://bpvejuifgqmxp" path="res://characters/enemy/enemy.tscn" id="1_base"]
 
-[node name="EnemyPatroller" instance=ExtResource("1_base")]
-enemy_type = 1
+[node name="EnemyPatroller" unique_id=1871760580 instance=ExtResource("1_base")]
+
+[node name="Path01" parent="EnemyPath" parent_id_path=PackedInt32Array(1682322632) index="0" unique_id=1578674210]
+position = Vector2(0, -1)
+
+[node name="Path02" parent="EnemyPath" parent_id_path=PackedInt32Array(1682322632) index="1" unique_id=724839177]
+position = Vector2(-202, 2)
+
+[node name="Path03" parent="EnemyPath" parent_id_path=PackedInt32Array(1682322632) index="2" unique_id=1298936269]
+position = Vector2(200, -1)

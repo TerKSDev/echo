@@ -14,6 +14,10 @@ const WATER_COLOR := Color(0.35, 0.68, 1.0)
 const SWITCH_COLOR := Color(1.0, 0.72, 0.18)
 const DOOR_COLOR := Color(1.0, 0.85, 0.22)
 const MAX_MOTE_PARTICLES := 180
+const SHOW_STATIC_ICONS := false  # false = icons only appear when an echo sweeps them
+const ICON_KEY: Texture2D = preload("res://assets/icons/key.svg")
+const ICON_DOOR_CLOSED: Texture2D = preload("res://assets/icons/door-closed.svg")
+const ICON_DOOR_OPEN: Texture2D = preload("res://assets/icons/door-open.svg")
 
 var points: Array = []
 var waves: Array = []
@@ -262,6 +266,9 @@ func _reveal_features(space: PhysicsDirectSpaceState2D, origin: Vector2, max_dis
 						existing["age"] = minf(existing["age"], new_age)
 					existing["strength"] = maxf(float(existing["strength"]), s)
 					existing["pressed"] = is_pressed
+					existing["open"] = bool(f.get("open", false))
+					existing["locked"] = bool(f.get("locked", false))
+					existing["color"] = f.get("color", Color.WHITE)
 					updated = true
 					break
 			if not updated:
@@ -270,7 +277,10 @@ func _reveal_features(space: PhysicsDirectSpaceState2D, origin: Vector2, max_dis
 					"pos": f_pos,
 					"age": new_age,
 					"strength": s,
-					"pressed": is_pressed
+					"pressed": is_pressed,
+					"open": bool(f.get("open", false)),
+					"locked": bool(f.get("locked", false)),
+					"color": f.get("color", Color.WHITE)
 				})
 	if marks.size() > MAX_MARKS:
 		marks = marks.slice(marks.size() - MAX_MARKS)
@@ -282,6 +292,9 @@ func _process(delta):
 	if not is_active:
 		if _was_active:
 			_was_active = false
+			queue_redraw()
+		elif SHOW_STATIC_ICONS:
+			# Static icons need a redraw when the camera moves or a door opens.
 			queue_redraw()
 		return
 	_was_active = true
@@ -426,6 +439,29 @@ func _draw():
 		else:
 			draw_arc(lw, radius, 0.0, TAU, 48, Color(w_col.r, w_col.g, w_col.b, fade * 0.85), 2.0)
 
+	# Always-visible (dim) door / key icons; the echo makes them flash brighter.
+	if SHOW_STATIC_ICONS:
+		var main_node := get_parent()
+		if main_node != null and main_node.has_method("echo_features"):
+			for f in main_node.echo_features():
+				var f_type: String = String(f["type"])
+				if f_type != "door" and f_type != "switch":
+					continue
+				var f_pos := Vector2(f["pos"])
+				if has_cull and not cull_rect.has_point(f_pos):
+					continue
+				var base: Color = f.get("color", Color.WHITE)
+				var lp := to_local(f_pos)
+				if f_type == "door":
+					var is_open: bool = bool(f.get("open", false))
+					var tex: Texture2D = ICON_DOOR_OPEN if is_open else ICON_DOOR_CLOSED
+					draw_texture_rect(tex, Rect2(lp - Vector2(16, 16), Vector2(32, 32)), false,
+						Color(base.r, base.g, base.b, 0.35 if is_open else 0.6))
+				else:
+					var used: bool = bool(f.get("pressed", false))
+					draw_texture_rect(ICON_KEY, Rect2(lp - Vector2(15, 15), Vector2(30, 30)), false,
+						Color(base.r, base.g, base.b, 0.22 if used else 0.6))
+
 	for m in marks:
 		var m_pos := Vector2(m["pos"])
 		if has_cull and not cull_rect.has_point(m_pos):
@@ -455,17 +491,20 @@ func _draw_mark(m: Dictionary, a: float) -> void:
 			draw_line(p + Vector2(-2.0, 4.5), p + Vector2(5.0, 7.2), c, 1.5)
 			draw_line(p + Vector2(5.0, 7.2), p + Vector2(9.5, 5.5), c, 1.5)
 		"switch":
+			# Key icon, tinted with the link colour; dimmed once collected.
 			var is_pressed: bool = bool(m.get("pressed", false))
-			var c := Color(SWITCH_COLOR.r, SWITCH_COLOR.g, SWITCH_COLOR.b, a * (0.45 if is_pressed else 1.0))
-			draw_arc(p, 8.0, 0.0, TAU, 20, c, 2.0)
-			if not is_pressed:
-				draw_circle(p, 3.5, c)
+			var base: Color = m.get("color", SWITCH_COLOR)
+			var c := Color(base.r, base.g, base.b, a * (0.4 if is_pressed else 1.0))
+			draw_texture_rect(ICON_KEY, Rect2(p - Vector2(15, 15), Vector2(30, 30)), false, c)
 		"door":
-			var c := Color(DOOR_COLOR.r, DOOR_COLOR.g, DOOR_COLOR.b, a)
-			draw_rect(Rect2(p - Vector2(15, 15), Vector2(30, 30)), c, false, 2.0)
-			draw_line(p - Vector2(15, 15), p + Vector2(15, 15), c, 1.0)
-			draw_line(p + Vector2(-15, 15), p + Vector2(15, -15), c, 1.0)
+			# Closed-door icon, or the open-door icon once its key has been used.
+			var base: Color = m.get("color", DOOR_COLOR)
+			var is_open: bool = bool(m.get("open", false))
+			var c := Color(base.r, base.g, base.b, a * (0.7 if is_open else 1.0))
+			var tex: Texture2D = ICON_DOOR_OPEN if is_open else ICON_DOOR_CLOSED
+			draw_texture_rect(tex, Rect2(p - Vector2(16, 16), Vector2(32, 32)), false, c)
 		"exit":
-			var c := Color(0.55, 1.0, 0.92, a)
-			draw_rect(Rect2(p - Vector2(16, 16), Vector2(32, 32)), c, false, 3.0)
-			draw_rect(Rect2(p - Vector2(22, 22), Vector2(44, 44)), Color(0.55, 1.0, 0.92, a * 0.5), false, 1.5)
+			# Red while locked (no exit key yet), teal once unlocked.
+			var ec: Color = Color(1.0, 0.2, 0.2) if bool(m.get("locked", false)) else Color(0.55, 1.0, 0.92)
+			draw_rect(Rect2(p - Vector2(16, 16), Vector2(32, 32)), Color(ec.r, ec.g, ec.b, a), false, 3.0)
+			draw_rect(Rect2(p - Vector2(22, 22), Vector2(44, 44)), Color(ec.r, ec.g, ec.b, a * 0.5), false, 1.5)

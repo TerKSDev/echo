@@ -10,7 +10,7 @@ scenes/      main.tscn         Game container: loads the current level and wires
 characters/
   player/    Player, MicInput
   enemy/     Enemy (logic), EnemyPresets (stats), EnemyVisual (drawing),
-             enemy_<type>.tscn (ready-to-drop presets)
+			 enemy_<type>.tscn (ready-to-drop presets)
 systems/
   echo/      EchoLayer         Draws echo waves / wall dots
   sound/     SoundBus          Routes player sounds, Screamer shrieks, Listener alarms

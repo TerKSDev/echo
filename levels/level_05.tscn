@@ -4,7 +4,7 @@
 [ext_resource type="TileSet" uid="uid://0kitrq7qjdh5" path="res://tilesets/echo_tileset.tres" id="2_7d3dm"]
 [ext_resource type="Script" uid="uid://dlpb0h4lai6o0" path="res://systems/level/LevelMarker.gd" id="3_g3bu7"]
 [ext_resource type="PackedScene" path="res://characters/enemy/enemy_chaser.tscn" id="4_ecwps"]
-[ext_resource type="PackedScene" path="res://characters/enemy/enemy_patroller.tscn" id="5_7d3dm"]
+[ext_resource type="PackedScene" uid="uid://dikpqlh7ntbn2" path="res://characters/enemy/enemy_patroller.tscn" id="5_7d3dm"]
 [ext_resource type="PackedScene" path="res://characters/enemy/enemy_listener.tscn" id="6_g3bu7"]
 
 [node name="Level" type="Node2D" unique_id=1469938229]
@@ -27,27 +27,25 @@ position = Vector2(1155, 477)
 script = ExtResource("3_g3bu7")
 kind = 0
 
+[node name="Switch_exit_1" type="Marker2D" parent="Markers" unique_id=596920354]
+position = Vector2(560, 720)
+script = ExtResource("3_g3bu7")
+kind = 3
+link_id = "exit"
+
 [node name="EnemyChaser" parent="." unique_id=383283321 instance=ExtResource("4_ecwps")]
 position = Vector2(662, 334)
 
 [node name="EnemyChaser2" parent="." unique_id=370203619 instance=ExtResource("4_ecwps")]
 position = Vector2(711, 334)
 
-[node name="EnemyPatroller" parent="." unique_id=1819746434 instance=ExtResource("5_7d3dm")]
-position = Vector2(394, 331)
-patrol_points = Array[Vector2]([Vector2(196, 112), Vector2(196, 300), Vector2(60, 300), Vector2(60, 112)])
-
 [node name="EnemyPatroller2" parent="." unique_id=1348497673 instance=ExtResource("5_7d3dm")]
-position = Vector2(242, 451)
-patrol_points = Array[Vector2]([Vector2(196, 112), Vector2(196, 300), Vector2(60, 300), Vector2(60, 112)])
-
-[node name="EnemyPatroller3" parent="." unique_id=1251268175 instance=ExtResource("5_7d3dm")]
-position = Vector2(1150, 318)
-patrol_points = Array[Vector2]([Vector2(196, 112), Vector2(196, 300), Vector2(60, 300), Vector2(60, 112)])
-
-[node name="EnemyPatroller4" parent="." unique_id=1202052835 instance=ExtResource("5_7d3dm")]
-position = Vector2(599, 710)
-patrol_points = Array[Vector2]([Vector2(196, 112), Vector2(196, 300), Vector2(60, 300), Vector2(60, 112)])
+position = Vector2(225, 323)
+patrol_points = Array[Vector2]([Vector2(464, 336), Vector2(464, 464), Vector2(240, 464), Vector2(240, 336)])
 
 [node name="EnemyListener" parent="." unique_id=884702973 instance=ExtResource("6_g3bu7")]
 position = Vector2(665, 488)
+
+[node name="EnemyPatroller3" parent="." unique_id=1871760580 instance=ExtResource("5_7d3dm")]
+position = Vector2(1160, 321)
+patrol_points = Array[Vector2]([Vector2(944, 336), Vector2(1168, 336)])
