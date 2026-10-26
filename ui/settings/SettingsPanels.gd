@@ -1,3 +1,4 @@
+class_name SettingsPanels
 extends RefCounted
 ## Tab Panel Construction for ECHO Settings System.
 ## Modularly builds General, Controls, Display, and Advanced options.

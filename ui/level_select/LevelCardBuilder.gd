@@ -1,3 +1,4 @@
+class_name LevelCardBuilder
 extends RefCounted
 ## Modular Sector Button Card Builder for Level Select.
 ## Constructs high-contrast glassmorphic level cards, star indicators,
@@ -118,27 +119,43 @@ static func build_level_card(
 
 	var sector_name := "CAVERN SECTOR %02d" % level_number
 	var raw_depth := "-%d M" % (level_number * 160)
+	var is_king_sector := false
 
-	if level_path != "":
-		var filename := level_path.get_file().get_basename()
-		if filename == "level_0":
+	if GameState.current_mode == GameState.GameMode.CHALLENGE:
+		if level_path.ends_with("level_SP.tscn") or level_number == 21:
+			is_king_sector = true
+			sector_name = "THE FINAL ECHO"
+			raw_depth = "-9,999 M"
+		elif level_path != "":
+			var filename := level_path.get_file().get_basename()
+			var num := int(filename.replace("level_", ""))
+			var c_idx := num - 1
+			if c_idx >= 0 and c_idx < GameState.CHALLENGE_SECTORS.size():
+				sector_name = GameState.CHALLENGE_SECTORS[c_idx]["name"]
+				raw_depth = GameState.CHALLENGE_SECTORS[c_idx]["depth"]
+		else:
+			var c_idx := level_number - 1
+			if c_idx >= 0 and c_idx < GameState.CHALLENGE_SECTORS.size():
+				sector_name = GameState.CHALLENGE_SECTORS[c_idx]["name"]
+				raw_depth = GameState.CHALLENGE_SECTORS[c_idx]["depth"]
+	else:
+		# Story Mode
+		if level_path.ends_with("level_0.tscn") or (level_number == 1 and level_path == ""):
 			sector_name = "FIRST STEPS"
 			raw_depth = "TRAINING"
-		elif filename == "level_SP":
-			sector_name = "THE FINAL ECHO"
-			raw_depth = "SPECIAL"
-		elif filename.begins_with("level_"):
-			var num_str := filename.replace("level_", "")
-			var num := int(num_str)
-			var sec_idx := num - 1
-			if sec_idx >= 0 and sec_idx < GameState.SECTORS.size():
-				sector_name = GameState.SECTORS[sec_idx]["name"]
-				raw_depth = GameState.SECTORS[sec_idx]["depth"]
-			else:
-				sector_name = "SECTOR %02d" % num
-	elif (level_number - 1) >= 0 and (level_number - 1) < GameState.SECTORS.size():
-		sector_name = GameState.SECTORS[level_number - 1]["name"]
-		raw_depth = GameState.SECTORS[level_number - 1]["depth"]
+		elif level_path != "":
+			var filename := level_path.get_file().get_basename()
+			if filename.begins_with("level_"):
+				var num := int(filename.replace("level_", ""))
+				var sec_idx := num - 1
+				if sec_idx >= 0 and sec_idx < GameState.STORY_SECTORS.size():
+					sector_name = GameState.STORY_SECTORS[sec_idx]["name"]
+					raw_depth = GameState.STORY_SECTORS[sec_idx]["depth"]
+				else:
+					sector_name = "SECTOR %02d" % num
+		elif (level_number - 1) >= 0 and (level_number - 1) < GameState.STORY_SECTORS.size():
+			sector_name = GameState.STORY_SECTORS[level_number - 1]["name"]
+			raw_depth = GameState.STORY_SECTORS[level_number - 1]["depth"]
 
 	# Format depth string without extra clutter
 	var depth_str := raw_depth
@@ -149,11 +166,32 @@ static func build_level_card(
 	var display_subtitle: String = depth_str
 
 	if not is_unlocked:
-		# Conceal locked level names with ??? for mystery
-		display_title = "???"
+		# Conceal locked level names with ??? for mystery, but hint King Sector
+		if is_king_sector:
+			display_title = "👑 KING SECTOR"
+		else:
+			display_title = "???"
 
 	# Style the card frame
-	if is_active:
+	if is_king_sector:
+		# Regal crimson/gold boss styling for Level SP
+		var k_norm := make_button_style(
+			Color(0.14, 0.02, 0.05, 0.98),
+			Color(1.0, 0.80, 0.28, 0.98),
+			2, 14,
+			Color(0.9, 0.15, 0.20, 0.55), 10
+		)
+		var k_hov := make_button_style(
+			Color(0.20, 0.03, 0.07, 0.98),
+			Color(1.0, 0.92, 0.50, 1.0),
+			2, 14,
+			Color(1.0, 0.25, 0.30, 0.75), 14
+		)
+		button.add_theme_stylebox_override("normal", k_norm)
+		button.add_theme_stylebox_override("hover", k_hov)
+		button.add_theme_stylebox_override("pressed", k_norm)
+		button.add_theme_stylebox_override("focus", k_norm)
+	elif is_active:
 		var norm := make_button_style(
 			Color(0.035, 0.11, 0.20, 0.95),
 			Color(0.35, 0.88, 1.0, 0.95),
@@ -245,8 +283,13 @@ static func build_level_card(
 	title_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	title_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_lbl.clip_text = true
-	title_lbl.text = display_title
-	if is_active:
+	title_lbl.text = ("👑 " + display_title) if is_king_sector else display_title
+	if is_king_sector:
+		title_lbl.add_theme_font_size_override("font_size", 18)
+		title_lbl.add_theme_color_override("font_color", Color(1.0, 0.92, 0.45))
+		title_lbl.add_theme_color_override("font_shadow_color", Color(0.75, 0.12, 0.20, 0.95))
+		title_lbl.add_theme_constant_override("shadow_offset_y", 1)
+	elif is_active:
 		title_lbl.add_theme_font_size_override("font_size", 18)
 		title_lbl.add_theme_color_override("font_color", Color(0.96, 0.98, 1.0))
 		title_lbl.add_theme_color_override("font_shadow_color", Color(0.05, 0.48, 0.95, 0.9))
@@ -259,7 +302,7 @@ static func build_level_card(
 		title_lbl.add_theme_color_override("font_color", Color(0.65, 0.78, 0.90, 0.92))
 	row1.add_child(title_lbl)
 
-	# Status chip: READY for active sector, LOCKED for locked sectors
+	# Status chip: READY / BOSS for active sector, LOCKED for locked sectors
 	if is_active:
 		var status_box := HBoxContainer.new()
 		status_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -272,7 +315,10 @@ static func build_level_card(
 		icon_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		icon_canvas.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		icon_canvas.custom_minimum_size = Vector2(14, 14)
-		icon_canvas.draw.connect(func(): Icons.draw_beacon(icon_canvas))
+		if is_king_sector:
+			icon_canvas.draw.connect(func(): Icons.draw_trophy(icon_canvas))
+		else:
+			icon_canvas.draw.connect(func(): Icons.draw_beacon(icon_canvas))
 		status_box.add_child(icon_canvas)
 
 		var status_chip := Label.new()
@@ -280,8 +326,8 @@ static func build_level_card(
 		status_chip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		status_chip.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		status_chip.add_theme_font_size_override("font_size", 13)
-		status_chip.text = "READY"
-		status_chip.add_theme_color_override("font_color", Color(0.35, 0.95, 1.0))
+		status_chip.text = "BOSS" if is_king_sector else "READY"
+		status_chip.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3) if is_king_sector else Color(0.35, 0.95, 1.0))
 		status_box.add_child(status_chip)
 	elif not is_unlocked:
 		var status_box := HBoxContainer.new()
@@ -300,6 +346,12 @@ static func build_level_card(
 
 		var status_chip := Label.new()
 		status_chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		status_chip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		status_chip.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		status_chip.add_theme_font_size_override("font_size", 13)
+		status_chip.text = "KING" if is_king_sector else "LOCKED"
+		status_chip.add_theme_color_override("font_color", Color(0.95, 0.55, 0.65) if is_king_sector else Color(0.55, 0.68, 0.82, 0.90))
+		status_box.add_child(status_chip)
 		status_chip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		status_chip.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		status_chip.add_theme_font_size_override("font_size", 13)

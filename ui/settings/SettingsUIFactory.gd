@@ -1,3 +1,4 @@
+class_name SettingsUIFactory
 extends RefCounted
 ## UI Component Factory for ECHO Settings System.
 ## Procedurally constructs responsive sliders, toggle chips, section headers,

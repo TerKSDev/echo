@@ -138,8 +138,16 @@ horizontal_alignment = 1
 layout_mode = 2
 theme_override_colors/font_color = Color(0.45, 0.78, 0.95, 0.85)
 theme_override_font_sizes/font_size = 10
-text = "UNLOCKED: 01 / 13"
+text = "UNLOCKED: 01 / 21"
 horizontal_alignment = 1
+
+[node name="ModeToggle" type="Button" parent="TopBar" unique_id=778899112]
+custom_minimum_size = Vector2(148, 56)
+layout_mode = 2
+size_flags_horizontal = 4
+focus_mode = 0
+theme_override_font_sizes/font_size = 13
+text = "◈ STORY"
 
 [node name="Spacer" type="Control" parent="TopBar"]
 layout_mode = 2
@@ -178,11 +186,11 @@ offset_right = -58.0
 offset_bottom = -22.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/separation = 24
+theme_override_constants/separation = 34
 
 [node name="HeaderBox" type="VBoxContainer" parent="MainArea"]
 layout_mode = 2
-theme_override_constants/separation = 2
+theme_override_constants/separation = 6
 
 [node name="TrackerLabel" type="Label" parent="MainArea/HeaderBox"]
 layout_mode = 2
@@ -219,9 +227,9 @@ horizontal_scroll_mode = 0
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/margin_left = 12
-theme_override_constants/margin_top = 16
+theme_override_constants/margin_top = 28
 theme_override_constants/margin_right = 12
-theme_override_constants/margin_bottom = 24
+theme_override_constants/margin_bottom = 28
 
 [node name="LevelGrid" type="GridContainer" parent="MainArea/ScrollContainer/GridMargin" unique_id=560705883]
 layout_mode = 2

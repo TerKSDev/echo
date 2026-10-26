@@ -1,3 +1,4 @@
+class_name LevelPathRenderer
 extends RefCounted
 ## Procedural Bezier Conduit & Animated Sonar Pulse Renderer for Level Select.
 ## Connects cavern sectors with biome-specific conduit paths and energy surges.
@@ -88,45 +89,47 @@ static func draw_level_path(
 		var b_entry: String = spec["b_entry"]
 		var b_frac: float = spec["b_frac"]
 
+		var going_down := btn_b.position.y > btn_a.position.y
+		if going_down:
+			if a_exit == "top": a_exit = "bottom"
+			elif a_exit == "bottom": a_exit = "top"
+			if b_entry == "bottom": b_entry = "top"
+			elif b_entry == "top": b_entry = "bottom"
+
 		# Multi-edge docking points
 		var start_pt := get_dock_point(btn_a, a_exit, a_frac)
 		var end_pt := get_dock_point(btn_b, b_entry, b_frac)
 
 		var dx := end_pt.x - start_pt.x
 		var dy := absf(start_pt.y - end_pt.y)
+		var dir_y := 1.0 if end_pt.y >= start_pt.y else -1.0
 
 		# Perpendicular tangent control handles matching dock geometry
 		var cp1: Vector2
 		match a_exit:
-			"top":
-				cp1 = start_pt + Vector2(dx * 0.12, -dy * 0.50)
-			"bottom":
-				cp1 = start_pt + Vector2(dx * 0.12, dy * 0.50)
+			"top", "bottom":
+				cp1 = start_pt + Vector2(dx * 0.12, dir_y * dy * 0.50)
 			"right":
 				# Exits rightward horizontally into the chasm
-				cp1 = start_pt + Vector2(absf(dx) * 0.45, -dy * 0.08)
+				cp1 = start_pt + Vector2(absf(dx) * 0.45, dir_y * dy * 0.08)
 			"left":
 				# Exits leftward horizontally into the chasm
-				cp1 = start_pt + Vector2(-absf(dx) * 0.45, -dy * 0.08)
+				cp1 = start_pt + Vector2(-absf(dx) * 0.45, dir_y * dy * 0.08)
 			_:
-				cp1 = start_pt + Vector2(dx * 0.20, -dy * 0.50)
+				cp1 = start_pt + Vector2(dx * 0.20, dir_y * dy * 0.50)
 
 		var cp2: Vector2
 		match b_entry:
-			"bottom":
-				# Enters from below upward into the bottom
-				cp2 = end_pt + Vector2(-dx * 0.10, dy * 0.50)
-			"top":
-				# Enters from above downward into the top
-				cp2 = end_pt + Vector2(-dx * 0.10, -dy * 0.50)
+			"bottom", "top":
+				cp2 = end_pt + Vector2(-dx * 0.10, -dir_y * dy * 0.50)
 			"left":
 				# Enters from the left horizontally into the card
-				cp2 = end_pt + Vector2(-absf(dx) * 0.45, dy * 0.08)
+				cp2 = end_pt + Vector2(-absf(dx) * 0.45, -dir_y * dy * 0.08)
 			"right":
 				# Enters from the right horizontally into the card
-				cp2 = end_pt + Vector2(absf(dx) * 0.45, dy * 0.08)
+				cp2 = end_pt + Vector2(absf(dx) * 0.45, -dir_y * dy * 0.08)
 			_:
-				cp2 = end_pt + Vector2(-dx * 0.20, dy * 0.50)
+				cp2 = end_pt + Vector2(-dx * 0.20, -dir_y * dy * 0.50)
 
 		# Sample smooth Bezier points
 		var segments := 28
@@ -136,8 +139,9 @@ static func draw_level_path(
 			var t := float(s) / float(segments)
 			pts[s] = start_pt.bezier_interpolate(cp1, cp2, end_pt, t)
 
+		var is_challenge := GameState.current_mode == GameState.GameMode.CHALLENGE
 		# Connection terminal nodes on card edges
-		var node_col := Color(0.35, 0.88, 1.0, 0.95) if is_unlocked_path else Color(0.28, 0.55, 0.75, 0.55)
+		var node_col := (Color(1.0, 0.45, 0.85, 0.95) if is_challenge else Color(0.35, 0.88, 1.0, 0.95)) if is_unlocked_path else (Color(0.55, 0.25, 0.50, 0.55) if is_challenge else Color(0.28, 0.55, 0.75, 0.55))
 		canvas.draw_circle(start_pt, 3.2, node_col)
 		canvas.draw_circle(start_pt, 6.0, Color(node_col.r, node_col.g, node_col.b, 0.25))
 		canvas.draw_circle(end_pt, 3.2, node_col)
@@ -145,18 +149,20 @@ static func draw_level_path(
 
 		if is_unlocked_path:
 			# Solid Line with bioluminescent glow for cleared/unlocked sectors
-			canvas.draw_polyline(pts, Color(0.12, 0.45, 0.75, 0.30), 5.5)
-			canvas.draw_polyline(pts, Color(0.35, 0.90, 1.0, 0.95), 2.4)
+			var glow_col := Color(0.65, 0.12, 0.45, 0.35) if is_challenge else Color(0.12, 0.45, 0.75, 0.30)
+			var core_col := Color(1.0, 0.55, 0.88, 0.95) if is_challenge else Color(0.35, 0.90, 1.0, 0.95)
+			canvas.draw_polyline(pts, glow_col, 5.5)
+			canvas.draw_polyline(pts, core_col, 2.4)
 
 			# Traveling sonar acoustic pulse along the curve
 			var pulse_t := fmod(time * 0.55 + float(lvl) * 0.35, 1.0)
 			var pulse_pt := eval_curved_path_point(pts, pulse_t)
-			canvas.draw_circle(pulse_pt, 4.0, Color(0.90, 0.98, 1.0, 0.98))
-			canvas.draw_circle(pulse_pt, 8.5, Color(0.25, 0.75, 1.0, 0.35))
+			canvas.draw_circle(pulse_pt, 4.0, Color(1.0, 0.95, 0.98, 0.98) if is_challenge else Color(0.90, 0.98, 1.0, 0.98))
+			canvas.draw_circle(pulse_pt, 8.5, Color(0.85, 0.25, 0.65, 0.45) if is_challenge else Color(0.25, 0.75, 1.0, 0.35))
 		elif is_discovery_path:
 			# Subtle dashed discovery trail leading into the next locked sector
 			var pulse_a := 0.35 + 0.3 * sin(time * 3.0)
-			var col := Color(0.35, 0.75, 1.0, pulse_a)
+			var col := Color(0.95, 0.45, 0.85, pulse_a) if is_challenge else Color(0.35, 0.75, 1.0, pulse_a)
 			for p in range(pts.size() - 1):
 				if p % 2 == 0:
 					canvas.draw_line(pts[p], pts[p + 1], col, 1.8)

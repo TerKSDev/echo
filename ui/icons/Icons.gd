@@ -1,3 +1,4 @@
+class_name Icons
 extends RefCounted
 ## Centralized Procedural Vector Icons Renderer for ECHO.
 ## Draws high-DPI resolution-independent vector icons using Godot CanvasItem draw calls.

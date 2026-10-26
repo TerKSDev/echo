@@ -76,7 +76,11 @@ func _play_entry_sequence() -> void:
 
 	# Format level title & evocative philosophical subtitle banner
 	var cur_lvl := GameState.current_level
-	var title_text: String = GameState.get_level_name(cur_lvl)
+	var title_text: String = ""
+	if GameState.current_mode == GameState.GameMode.CHALLENGE:
+		title_text = GameState.get_level_name(cur_lvl + 1)
+	else:
+		title_text = GameState.get_level_name(cur_lvl)
 	var subtitle_text: String = GameState.get_sector_log(cur_lvl)
 
 	if _level_root != null:
@@ -234,8 +238,9 @@ func _physics_process(delta: float) -> void:
 		_press_switch(c)
 	if has_exit and c == exit_cell and not is_exit_locked():
 		_changing = true
+		var level_num: int = GameState.current_level + 1
 		var debrief_data := GameState.record_level_clear(
-			GameState.current_level,
+			level_num,
 			_level_time,
 			_sonar_pings,
 			_enemies_alerted

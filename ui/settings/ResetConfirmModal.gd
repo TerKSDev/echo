@@ -1,3 +1,4 @@
+class_name ResetConfirmModal
 extends RefCounted
 ## Irreversible Data Reset Confirmation Modal Dialog.
 ## Warns user before wiping cavern sector progress, records, and stars.

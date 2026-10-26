@@ -14,6 +14,11 @@ const LevelCardBuilder = preload("res://ui/level_select/LevelCardBuilder.gd")
 @onready var settings_button: Button = $TopBar/SettingsButton
 @onready var status_pill: PanelContainer = $TopBar/StatusPill
 @onready var progress_label: Label = $TopBar/StatusPill/StatusBox/ProgressLabel
+@onready var mode_toggle: Button = get_node_or_null("TopBar/ModeToggle")
+@onready var tracker_label: Label = get_node_or_null("MainArea/HeaderBox/TrackerLabel")
+@onready var title_label: Label = get_node_or_null("MainArea/HeaderBox/Title")
+@onready var subtitle_label: Label = get_node_or_null("MainArea/HeaderBox/Subtitle")
+@onready var sector_label: Label = get_node_or_null("TopBar/StatusPill/StatusBox/SectorLabel")
 @onready var sonar_backdrop: Control = $SonarBackdrop
 
 var _time := 0.0
@@ -27,6 +32,7 @@ var _level_buttons: Dictionary = {}
 var _depth_tag_alpha: float = 0.0
 var _depth_tag_timer: float = 0.0
 var _is_dragging_gauge: bool = false
+var _overscroll_dist: float = 0.0
 
 # Procedural UI Audio
 var _wav_click: AudioStreamWAV
@@ -76,22 +82,13 @@ func _ready() -> void:
 		pill_style.set_corner_radius_all(12)
 		status_pill.add_theme_stylebox_override("panel", pill_style)
 
+	_setup_mode_toggle()
 	_setup_intel_button()
 	_setup_settings_button()
 	_setup_leaderboard_button()
 
 	_create_level_buttons()
-
-	# Update Top Status Bar progress text with sectors and stars
-	var playable_levels := _get_playable_levels()
-	var total_levels: int = playable_levels.size()
-	var highest: int = GameState.highest_unlocked_level
-	var cur_unlocked := clampi(highest, 1, total_levels)
-	var total_stars := 0
-	for i in range(1, total_levels + 1):
-		total_stars += GameState.get_level_stars(i)
-	if progress_label != null:
-		progress_label.text = "SECTORS: %02d/%02d   ★ %d/%d" % [cur_unlocked, total_levels, total_stars, total_levels * 3]
+	_update_header_and_mode_ui()
 
 	# Auto-scroll directly to the highest active level on entry
 	call_deferred("_scroll_to_current_level")
@@ -124,29 +121,102 @@ func _apply_safe_area() -> void:
 # --------------------------------------------------
 
 func _get_playable_levels() -> Array[String]:
-	var playable_levels: Array[String] = []
-	for level_path in GameState.LEVELS:
-		var path := str(level_path)
-		if path == TEST_LEVEL_PATH:
-			continue
-		playable_levels.append(path)
-	return playable_levels
+	if GameState.current_mode == GameState.GameMode.CHALLENGE:
+		return GameState.CHALLENGE_LEVELS
+	return GameState.STORY_LEVELS
 
 
 func _on_scroll_container_gui_input(event: InputEvent) -> void:
 	if event is InputEventScreenDrag or (event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT)):
 		_depth_tag_timer = 1.0
+		var rel_y: float = event.relative.y
+
+		var vbar := scroll_container.get_v_scroll_bar()
+		var page := vbar.page if vbar.page > 0.0 else scroll_container.size.y
+		var max_scroll := maxf(0.0, vbar.max_value - page)
+
+		if GameState.current_mode == GameState.GameMode.STORY:
+			# At bottom of story mode: dragging upwards pulls downward past the abyss
+			if scroll_container.scroll_vertical >= max_scroll - 10.0 and rel_y < -3.0:
+				_overscroll_dist += absf(rel_y)
+				if _overscroll_dist >= 45.0:
+					_overscroll_dist = 0.0
+					_on_rift_descend_triggered()
+			elif scroll_container.scroll_vertical < max_scroll - 25.0:
+				_overscroll_dist = 0.0
+		else:
+			# At top of challenge mode: dragging downwards pulls upwards to ascend
+			if scroll_container.scroll_vertical <= 10.0 and rel_y > 3.0:
+				_overscroll_dist += rel_y
+				if _overscroll_dist >= 45.0:
+					_overscroll_dist = 0.0
+					_ascend_to_story_mode()
+			elif scroll_container.scroll_vertical > 25.0:
+				_overscroll_dist = 0.0
+
+	elif event is InputEventMouseButton and event.is_pressed():
+		var vbar := scroll_container.get_v_scroll_bar()
+		var page := vbar.page if vbar.page > 0.0 else scroll_container.size.y
+		var max_scroll := maxf(0.0, vbar.max_value - page)
+
+		if event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			if GameState.current_mode == GameState.GameMode.STORY and scroll_container.scroll_vertical >= max_scroll - 10.0:
+				_overscroll_dist += 25.0
+				if _overscroll_dist >= 45.0:
+					_overscroll_dist = 0.0
+					_on_rift_descend_triggered()
+		elif event.button_index == MOUSE_BUTTON_WHEEL_UP:
+			if GameState.current_mode == GameState.GameMode.CHALLENGE and scroll_container.scroll_vertical <= 10.0:
+				_overscroll_dist += 25.0
+				if _overscroll_dist >= 45.0:
+					_overscroll_dist = 0.0
+					_ascend_to_story_mode()
 
 
 # --------------------------------------------------
-# TOP BAR BUTTONS SETUP
+# TOP BAR BUTTONS & MODE SETUP
 # --------------------------------------------------
+
+func _setup_mode_toggle() -> void:
+	if mode_toggle == null:
+		return
+	mode_toggle.custom_minimum_size = Vector2(148, 56)
+	_style_mode_toggle(mode_toggle, GameState.current_mode == GameState.GameMode.CHALLENGE)
+	mode_toggle.pressed.connect(_on_mode_toggle_pressed)
+	_wire_button_Juice(mode_toggle)
+
+
+func _style_mode_toggle(btn: Button, is_challenge: bool) -> void:
+	if btn == null:
+		return
+	var n_bg := Color(0.20, 0.04, 0.12, 0.92) if is_challenge else Color(0.04, 0.12, 0.22, 0.85)
+	var n_border := Color(0.95, 0.45, 0.75, 0.95) if is_challenge else Color(0.28, 0.72, 0.95, 0.8)
+	var h_bg := Color(0.28, 0.06, 0.18, 0.98) if is_challenge else Color(0.08, 0.22, 0.38, 0.95)
+	var h_border := Color(1.0, 0.65, 0.9, 1.0) if is_challenge else Color(0.5, 0.92, 1.0, 1.0)
+	var n_sb: StyleBoxFlat = LevelCardBuilder.make_button_style(n_bg, n_border, 2, 12)
+	var h_sb: StyleBoxFlat = LevelCardBuilder.make_button_style(h_bg, h_border, 2, 12)
+	btn.add_theme_stylebox_override("normal", n_sb)
+	btn.add_theme_stylebox_override("hover", h_sb)
+	btn.add_theme_stylebox_override("pressed", h_sb)
+	btn.add_theme_stylebox_override("focus", n_sb)
+	btn.add_theme_color_override("font_color", Color(1.0, 0.85, 0.95) if is_challenge else Color(0.85, 0.95, 1.0))
+
+
+func _on_mode_toggle_pressed() -> void:
+	if GameState.current_mode == GameState.GameMode.STORY:
+		if GameState.is_story_completed():
+			_descend_to_challenge_mode()
+		else:
+			_show_challenge_locked_hint()
+	else:
+		_ascend_to_story_mode()
+
 
 func _setup_intel_button() -> void:
 	intel_button.custom_minimum_size = Vector2(56, 56)
-	var n_sb := LevelCardBuilder.make_button_style(Color(0.04, 0.12, 0.22, 0.85), Color(0.28, 0.72, 0.95, 0.8), 2, 12)
-	var h_sb := LevelCardBuilder.make_button_style(Color(0.08, 0.22, 0.38, 0.95), Color(0.5, 0.92, 1.0, 1.0), 2, 12)
-	var p_sb := LevelCardBuilder.make_button_style(Color(0.12, 0.30, 0.50, 1.0), Color(0.7, 1.0, 1.0, 1.0), 2, 12)
+	var n_sb: StyleBoxFlat = LevelCardBuilder.make_button_style(Color(0.04, 0.12, 0.22, 0.85), Color(0.28, 0.72, 0.95, 0.8), 2, 12)
+	var h_sb: StyleBoxFlat = LevelCardBuilder.make_button_style(Color(0.08, 0.22, 0.38, 0.95), Color(0.5, 0.92, 1.0, 1.0), 2, 12)
+	var p_sb: StyleBoxFlat = LevelCardBuilder.make_button_style(Color(0.12, 0.30, 0.50, 1.0), Color(0.7, 1.0, 1.0, 1.0), 2, 12)
 	intel_button.add_theme_stylebox_override("normal", n_sb)
 	intel_button.add_theme_stylebox_override("hover", h_sb)
 	intel_button.add_theme_stylebox_override("pressed", p_sb)
@@ -163,9 +233,9 @@ func _setup_intel_button() -> void:
 
 func _setup_settings_button() -> void:
 	settings_button.custom_minimum_size = Vector2(56, 56)
-	var n_sb := LevelCardBuilder.make_button_style(Color(0.04, 0.12, 0.22, 0.85), Color(0.28, 0.72, 0.95, 0.8), 2, 12)
-	var h_sb := LevelCardBuilder.make_button_style(Color(0.08, 0.22, 0.38, 0.95), Color(0.5, 0.92, 1.0, 1.0), 2, 12)
-	var p_sb := LevelCardBuilder.make_button_style(Color(0.12, 0.30, 0.50, 1.0), Color(0.7, 1.0, 1.0, 1.0), 2, 12)
+	var n_sb: StyleBoxFlat = LevelCardBuilder.make_button_style(Color(0.04, 0.12, 0.22, 0.85), Color(0.28, 0.72, 0.95, 0.8), 2, 12)
+	var h_sb: StyleBoxFlat = LevelCardBuilder.make_button_style(Color(0.08, 0.22, 0.38, 0.95), Color(0.5, 0.92, 1.0, 1.0), 2, 12)
+	var p_sb: StyleBoxFlat = LevelCardBuilder.make_button_style(Color(0.12, 0.30, 0.50, 1.0), Color(0.7, 1.0, 1.0, 1.0), 2, 12)
 	settings_button.add_theme_stylebox_override("normal", n_sb)
 	settings_button.add_theme_stylebox_override("hover", h_sb)
 	settings_button.add_theme_stylebox_override("pressed", p_sb)
@@ -182,9 +252,9 @@ func _setup_settings_button() -> void:
 
 func _setup_leaderboard_button() -> void:
 	leaderboard_button.custom_minimum_size = Vector2(56, 56)
-	var n_sb := LevelCardBuilder.make_button_style(Color(0.04, 0.12, 0.22, 0.85), Color(0.28, 0.72, 0.95, 0.8), 2, 12)
-	var h_sb := LevelCardBuilder.make_button_style(Color(0.08, 0.22, 0.38, 0.95), Color(0.5, 0.92, 1.0, 1.0), 2, 12)
-	var p_sb := LevelCardBuilder.make_button_style(Color(0.12, 0.30, 0.50, 1.0), Color(0.7, 1.0, 1.0, 1.0), 2, 12)
+	var n_sb: StyleBoxFlat = LevelCardBuilder.make_button_style(Color(0.04, 0.12, 0.22, 0.85), Color(0.28, 0.72, 0.95, 0.8), 2, 12)
+	var h_sb: StyleBoxFlat = LevelCardBuilder.make_button_style(Color(0.08, 0.22, 0.38, 0.95), Color(0.5, 0.92, 1.0, 1.0), 2, 12)
+	var p_sb: StyleBoxFlat = LevelCardBuilder.make_button_style(Color(0.12, 0.30, 0.50, 1.0), Color(0.7, 1.0, 1.0, 1.0), 2, 12)
 	leaderboard_button.add_theme_stylebox_override("normal", n_sb)
 	leaderboard_button.add_theme_stylebox_override("hover", h_sb)
 	leaderboard_button.add_theme_stylebox_override("pressed", p_sb)
@@ -232,60 +302,352 @@ func _create_level_buttons() -> void:
 		child.queue_free()
 	_level_buttons.clear()
 
+	var is_challenge := GameState.current_mode == GameState.GameMode.CHALLENGE
 	var playable_levels := _get_playable_levels()
 	var total_levels: int = playable_levels.size()
 
-	# Top padding in the grid (at top of cavern ascent, near surface)
-	var top_pad_a := Control.new()
-	top_pad_a.custom_minimum_size = Vector2(0, 28)
-	top_pad_a.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var top_pad_b := Control.new()
-	top_pad_b.custom_minimum_size = Vector2(0, 28)
-	top_pad_b.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	level_grid.add_child(top_pad_a)
-	level_grid.add_child(top_pad_b)
-
-	# Levels progress from bottom (Depth 01 - Abyss Origin) to top (Depth 13 - Surface Breach).
-	# Because GridContainer lays out items from top to bottom,
-	# we iterate downwards from total_levels down to 1 with alternating spacers for a zigzag trail.
-	for level_number in range(total_levels, 0, -1):
-		var p_idx := level_number - 1
-		var lvl_path: String = playable_levels[p_idx] if (p_idx >= 0 and p_idx < playable_levels.size()) else ""
-		var button := LevelCardBuilder.build_level_card(
-			level_number,
-			func() -> float: return _time,
-			_on_level_pressed,
-			_wire_button_Juice,
-			_play_ui_sound,
-			_wav_error,
-			lvl_path
+	if is_challenge:
+		# Top row in Challenge Mode: Ascend back to Story Mode + Status Badge
+		var ascend_btn := Button.new()
+		ascend_btn.custom_minimum_size = Vector2(290, 80)
+		ascend_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		ascend_btn.focus_mode = Control.FOCUS_NONE
+		var asc_sb: StyleBoxFlat = LevelCardBuilder.make_button_style(
+			Color(0.04, 0.14, 0.24, 0.92),
+			Color(0.35, 0.85, 1.0, 0.9),
+			2, 12,
+			Color(0.1, 0.5, 0.8, 0.35), 6
 		)
-		_level_buttons[level_number] = button
+		ascend_btn.add_theme_stylebox_override("normal", asc_sb)
+		ascend_btn.add_theme_stylebox_override("hover", asc_sb)
+		ascend_btn.add_theme_stylebox_override("pressed", asc_sb)
 
-		var spacer := Control.new()
-		spacer.custom_minimum_size = Vector2(0, 60)
-		spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var asc_margin := MarginContainer.new()
+		asc_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+		asc_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		asc_margin.add_theme_constant_override("margin_left", 14)
+		asc_margin.add_theme_constant_override("margin_right", 12)
+		ascend_btn.add_child(asc_margin)
 
-		# Alternating zigzag:
-		# If level_number is odd (1, 3, 5, ...): Card on Left (col 0), Spacer on Right (col 1)
-		# If level_number is even (2, 4, 6, ...): Spacer on Left (col 0), Card on Right (col 1)
-		if level_number % 2 == 1:
-			level_grid.add_child(button)
-			level_grid.add_child(spacer)
+		var asc_vbox := VBoxContainer.new()
+		asc_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		asc_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+		asc_margin.add_child(asc_vbox)
+
+		var asc_title := Label.new()
+		asc_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		asc_title.text = "▲ RETURN TO STORY MODE"
+		asc_title.add_theme_font_size_override("font_size", 15)
+		asc_title.add_theme_color_override("font_color", Color(0.85, 0.95, 1.0))
+		asc_vbox.add_child(asc_title)
+
+		var asc_sub := Label.new()
+		asc_sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		asc_sub.text = "ASCEND TO SURFACE CAVERNS"
+		asc_sub.add_theme_font_size_override("font_size", 11)
+		asc_sub.add_theme_color_override("font_color", Color(0.45, 0.75, 0.95, 0.85))
+		asc_vbox.add_child(asc_sub)
+
+		ascend_btn.pressed.connect(_ascend_to_story_mode)
+		_wire_button_Juice(ascend_btn)
+
+		var header_pad := Control.new()
+		header_pad.custom_minimum_size = Vector2(0, 80)
+		header_pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+		level_grid.add_child(ascend_btn)
+		level_grid.add_child(header_pad)
+
+		# Levels in Challenge Mode:
+		# Delving downwards from Level 1 (-4,500M) down to Level 21 (-9,999M King Sector SP)!
+		for level_number in range(1, total_levels + 1):
+			var p_idx := level_number - 1
+			var lvl_path: String = playable_levels[p_idx] if (p_idx >= 0 and p_idx < playable_levels.size()) else ""
+			var button: Button = LevelCardBuilder.build_level_card(
+				level_number,
+				func() -> float: return _time,
+				_on_level_pressed,
+				_wire_button_Juice,
+				_play_ui_sound,
+				_wav_error,
+				lvl_path
+			)
+			_level_buttons[level_number] = button
+
+			var spacer := Control.new()
+			spacer.custom_minimum_size = Vector2(0, 60)
+			spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+			if level_number % 2 == 1:
+				level_grid.add_child(button)
+				level_grid.add_child(spacer)
+			else:
+				level_grid.add_child(spacer)
+				level_grid.add_child(button)
+
+		# Bottom padding
+		var bot_pad_a := Control.new()
+		bot_pad_a.custom_minimum_size = Vector2(0, 32)
+		bot_pad_a.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var bot_pad_b := Control.new()
+		bot_pad_b.custom_minimum_size = Vector2(0, 32)
+		bot_pad_b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		level_grid.add_child(bot_pad_a)
+		level_grid.add_child(bot_pad_b)
+
+	else:
+		# Story Mode:
+		# Top padding in the grid (giving comfortable space under header)
+		var top_pad_a := Control.new()
+		top_pad_a.custom_minimum_size = Vector2(0, 32)
+		top_pad_a.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var top_pad_b := Control.new()
+		top_pad_b.custom_minimum_size = Vector2(0, 32)
+		top_pad_b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		level_grid.add_child(top_pad_a)
+		level_grid.add_child(top_pad_b)
+
+		# Iterate from total_levels (Level 21: Surface Breach) down to 1 (Level 1: First Steps / Training)
+		for level_number in range(total_levels, 0, -1):
+			var p_idx := level_number - 1
+			var lvl_path: String = playable_levels[p_idx] if (p_idx >= 0 and p_idx < playable_levels.size()) else ""
+			var button: Button = LevelCardBuilder.build_level_card(
+				level_number,
+				func() -> float: return _time,
+				_on_level_pressed,
+				_wire_button_Juice,
+				_play_ui_sound,
+				_wav_error,
+				lvl_path
+			)
+			_level_buttons[level_number] = button
+
+			var spacer := Control.new()
+			spacer.custom_minimum_size = Vector2(0, 60)
+			spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+			if level_number % 2 == 1:
+				level_grid.add_child(button)
+				level_grid.add_child(spacer)
+			else:
+				level_grid.add_child(spacer)
+				level_grid.add_child(button)
+
+		# At the deepest bottom of Story Mode:
+		# Col 0: Abyssal Rift (Challenge Mode portal)
+		# Col 1: Test Arena (Sandbox)
+		var is_unlocked := GameState.is_story_completed()
+		var rift_btn := Button.new()
+		rift_btn.custom_minimum_size = Vector2(290, 88)
+		rift_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		rift_btn.focus_mode = Control.FOCUS_NONE
+
+		var r_box: StyleBoxFlat
+		if is_unlocked:
+			r_box = LevelCardBuilder.make_button_style(
+				Color(0.18, 0.04, 0.12, 0.96),
+				Color(0.95, 0.45, 0.85, 0.95),
+				2, 12,
+				Color(0.8, 0.15, 0.5, 0.45), 8
+			)
 		else:
-			level_grid.add_child(spacer)
-			level_grid.add_child(button)
+			r_box = LevelCardBuilder.make_button_style(
+				Color(0.02, 0.04, 0.08, 0.95),
+				Color(0.25, 0.35, 0.50, 0.85),
+				1, 12
+			)
+		rift_btn.add_theme_stylebox_override("normal", r_box)
+		rift_btn.add_theme_stylebox_override("hover", r_box)
+		rift_btn.add_theme_stylebox_override("pressed", r_box)
 
-	# Bottom padding in the grid (so Depth 01 has comfortable margin at bottom)
-	var bot_pad_a := Control.new()
-	bot_pad_a.custom_minimum_size = Vector2(0, 16)
-	bot_pad_a.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var bot_pad_b := Control.new()
-	bot_pad_b.custom_minimum_size = Vector2(0, 16)
-	bot_pad_b.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	level_grid.add_child(bot_pad_a)
-	level_grid.add_child(bot_pad_b)
+		var rift_margin := MarginContainer.new()
+		rift_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+		rift_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		rift_margin.add_theme_constant_override("margin_left", 14)
+		rift_margin.add_theme_constant_override("margin_right", 12)
+		rift_margin.add_theme_constant_override("margin_top", 10)
+		rift_margin.add_theme_constant_override("margin_bottom", 10)
+		rift_btn.add_child(rift_margin)
+
+		var rift_vbox := VBoxContainer.new()
+		rift_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		rift_vbox.add_theme_constant_override("separation", 4)
+		rift_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+		rift_margin.add_child(rift_vbox)
+
+		var rift_title := Label.new()
+		rift_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		rift_title.text = "▼ ABYSSAL RIFT" if is_unlocked else "🔒 ABYSSAL RIFT"
+		rift_title.add_theme_font_size_override("font_size", 16)
+		rift_title.add_theme_color_override("font_color", Color(1.0, 0.85, 0.95) if is_unlocked else Color(0.65, 0.75, 0.88))
+		rift_vbox.add_child(rift_title)
+
+		var rift_sub := Label.new()
+		rift_sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var cleared_cnt := mini(GameState.story_highest_unlocked - 1, 21)
+		rift_sub.text = "DESCEND TO CHALLENGE MODE" if is_unlocked else "UNLOCK: CLEAR STORY (%d/21)" % cleared_cnt
+		rift_sub.add_theme_font_size_override("font_size", 12)
+		rift_sub.add_theme_color_override("font_color", Color(0.95, 0.65, 0.85, 0.9) if is_unlocked else Color(0.48, 0.58, 0.70))
+		rift_vbox.add_child(rift_sub)
+
+		rift_btn.pressed.connect(_on_rift_descend_triggered)
+		_wire_button_Juice(rift_btn)
+
+		# Test Arena Button
+		var test_btn := Button.new()
+		test_btn.custom_minimum_size = Vector2(290, 88)
+		test_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		test_btn.focus_mode = Control.FOCUS_NONE
+		var t_box: StyleBoxFlat = LevelCardBuilder.make_button_style(
+			Color(0.03, 0.08, 0.14, 0.92),
+			Color(0.24, 0.55, 0.75, 0.75),
+			1, 12
+		)
+		test_btn.add_theme_stylebox_override("normal", t_box)
+		test_btn.add_theme_stylebox_override("hover", t_box)
+		test_btn.add_theme_stylebox_override("pressed", t_box)
+
+		var test_margin := MarginContainer.new()
+		test_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+		test_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		test_margin.add_theme_constant_override("margin_left", 14)
+		test_margin.add_theme_constant_override("margin_right", 12)
+		test_margin.add_theme_constant_override("margin_top", 10)
+		test_margin.add_theme_constant_override("margin_bottom", 10)
+		test_btn.add_child(test_margin)
+
+		var test_vbox := VBoxContainer.new()
+		test_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		test_vbox.add_theme_constant_override("separation", 4)
+		test_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+		test_margin.add_child(test_vbox)
+
+		var test_title := Label.new()
+		test_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		test_title.text = "🛠 TEST ARENA"
+		test_title.add_theme_font_size_override("font_size", 16)
+		test_title.add_theme_color_override("font_color", Color(0.85, 0.95, 1.0))
+		test_vbox.add_child(test_title)
+
+		var test_sub := Label.new()
+		test_sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		test_sub.text = "SANDBOX PROVING GROUND"
+		test_sub.add_theme_font_size_override("font_size", 12)
+		test_sub.add_theme_color_override("font_color", Color(0.48, 0.75, 0.92, 0.85))
+		test_vbox.add_child(test_sub)
+
+		test_btn.pressed.connect(_on_test_arena_pressed)
+		_wire_button_Juice(test_btn)
+
+		level_grid.add_child(rift_btn)
+		level_grid.add_child(test_btn)
+
+		var bot_pad_a := Control.new()
+		bot_pad_a.custom_minimum_size = Vector2(0, 24)
+		bot_pad_a.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var bot_pad_b := Control.new()
+		bot_pad_b.custom_minimum_size = Vector2(0, 24)
+		bot_pad_b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		level_grid.add_child(bot_pad_a)
+		level_grid.add_child(bot_pad_b)
+
+
+func _update_header_and_mode_ui() -> void:
+	var is_challenge := GameState.current_mode == GameState.GameMode.CHALLENGE
+	if is_challenge:
+		if tracker_label != null:
+			tracker_label.text = "((   F O R B I D D E N   A B Y S S   ))"
+			tracker_label.add_theme_color_override("font_color", Color(0.9, 0.45, 0.75, 0.9))
+		if title_label != null:
+			title_label.text = "CHALLENGE SECTORS"
+			title_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.95))
+			title_label.add_theme_color_override("font_shadow_color", Color(0.48, 0.05, 0.22, 0.95))
+			title_label.add_theme_color_override("font_outline_color", Color(0.85, 0.25, 0.65, 0.7))
+		if subtitle_label != null:
+			subtitle_label.text = "Enter the deep void. Conquer the King Sector."
+			subtitle_label.add_theme_color_override("font_color", Color(0.95, 0.65, 0.85, 0.85))
+		if sector_label != null:
+			sector_label.text = "ABYSS VOID"
+		if mode_toggle != null:
+			mode_toggle.text = "⚡ CHALLENGE"
+			_style_mode_toggle(mode_toggle, true)
+	else:
+		if tracker_label != null:
+			tracker_label.text = "((   E S C A P E   T H E   A B Y S S   ))"
+			tracker_label.add_theme_color_override("font_color", Color(0.38, 0.75, 1, 0.85))
+		if title_label != null:
+			title_label.text = "ESCAPE THE ABYSS"
+			title_label.add_theme_color_override("font_color", Color(0.88, 0.96, 1, 1))
+			title_label.add_theme_color_override("font_shadow_color", Color(0.04, 0.22, 0.48, 0.85))
+			title_label.add_theme_color_override("font_outline_color", Color(0.25, 0.68, 0.95, 0.55))
+		if subtitle_label != null:
+			subtitle_label.text = "Stay calm. Stay silent. Find the way out."
+			subtitle_label.add_theme_color_override("font_color", Color(0.55, 0.76, 0.92, 0.8))
+		if sector_label != null:
+			sector_label.text = "ESCAPE DIRECTORY"
+		if mode_toggle != null:
+			mode_toggle.text = "◈ STORY"
+			_style_mode_toggle(mode_toggle, false)
+
+	# Update Top Status Bar progress text with sectors and stars
+	var playable_levels := _get_playable_levels()
+	var total_levels: int = playable_levels.size()
+	var highest: int = GameState.highest_unlocked_level
+	var cur_unlocked := clampi(highest, 1, total_levels)
+	var total_stars := 0
+	for i in range(1, total_levels + 1):
+		total_stars += GameState.get_level_stars(i)
+	if progress_label != null:
+		progress_label.text = "SECTORS: %02d/%02d   ★ %d/%d" % [cur_unlocked, total_levels, total_stars, total_levels * 3]
+
+	if depth_gauge != null and is_instance_valid(depth_gauge):
+		depth_gauge.queue_redraw()
+
+
+func _on_rift_descend_triggered() -> void:
+	if GameState.is_story_completed():
+		_descend_to_challenge_mode()
+	else:
+		_show_challenge_locked_hint()
+
+
+func _show_challenge_locked_hint() -> void:
+	_play_ui_sound(_wav_error, -3.0, 0.9)
+	if OS.has_feature("mobile") or OS.get_name() == "Android":
+		Input.vibrate_handheld(45)
+
+	if subtitle_label != null:
+		var orig_text := subtitle_label.text
+		var orig_col := subtitle_label.get_theme_color("font_color")
+		var cleared_cnt := mini(GameState.story_highest_unlocked - 1, 21)
+		subtitle_label.text = "🔒 CLEAR ALL 21 STORY SECTORS TO UNLOCK (%d/21)" % cleared_cnt
+		subtitle_label.add_theme_color_override("font_color", Color(1.0, 0.45, 0.45, 1.0))
+		var tw := create_tween()
+		tw.tween_interval(2.2)
+		tw.tween_callback(func():
+			if is_instance_valid(subtitle_label):
+				subtitle_label.text = orig_text
+				subtitle_label.add_theme_color_override("font_color", orig_col)
+		)
+
+
+func _descend_to_challenge_mode() -> void:
+	_play_ui_sound(_wav_click, -2.0, 0.7)
+	GameState.current_mode = GameState.GameMode.CHALLENGE
+	_create_level_buttons()
+	_update_header_and_mode_ui()
+	scroll_container.scroll_vertical = 0
+	call_deferred("_scroll_to_current_level")
+
+
+func _ascend_to_story_mode() -> void:
+	_play_ui_sound(_wav_click, -2.0, 1.25)
+	GameState.current_mode = GameState.GameMode.STORY
+	_create_level_buttons()
+	_update_header_and_mode_ui()
+	call_deferred("_scroll_to_current_level")
 
 
 func _scroll_to_current_level() -> void:
@@ -342,7 +704,7 @@ func _on_level_pressed(level_number: int) -> void:
 		return
 
 	var level_path := playable_levels[playable_index]
-	var actual_level_index: int = GameState.LEVELS.find(level_path)
+	var actual_level_index: int = GameState.get_current_levels().find(level_path)
 	_play_ui_sound(_wav_click, -4.0, 1.0)
 	if actual_level_index != -1:
 		GameState.start_game(actual_level_index)

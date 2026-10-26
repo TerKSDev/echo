@@ -9,6 +9,62 @@ const LEVEL_SELECT_SCENE := "res://ui/screens/level_select.tscn"
 const SETTINGS_PATH := "user://settings.cfg"
 const PROGRESS_PATH := "user://level_progress.cfg"
 
+enum GameMode { STORY, CHALLENGE }
+var current_mode: GameMode = GameMode.STORY
+
+const TEST_LEVEL_PATH := "res://levels/level_test.tscn"
+
+# Story Mode: 21 Levels (Level 0: Tutorial + Level 01 ~ Level 20)
+const STORY_LEVELS: Array[String] = [
+	"res://levels/level_0.tscn",
+	"res://levels/level_01.tscn",
+	"res://levels/level_02.tscn",
+	"res://levels/level_03.tscn",
+	"res://levels/level_04.tscn",
+	"res://levels/level_05.tscn",
+	"res://levels/level_06.tscn",
+	"res://levels/level_07.tscn",
+	"res://levels/level_08.tscn",
+	"res://levels/level_09.tscn",
+	"res://levels/level_10.tscn",
+	"res://levels/level_11.tscn",
+	"res://levels/level_12.tscn",
+	"res://levels/level_13.tscn",
+	"res://levels/level_14.tscn",
+	"res://levels/level_15.tscn",
+	"res://levels/level_16.tscn",
+	"res://levels/level_17.tscn",
+	"res://levels/level_18.tscn",
+	"res://levels/level_19.tscn",
+	"res://levels/level_20.tscn",
+]
+
+# Challenge Mode (Rogue-like Abyss): 21 Levels (Level 01 ~ Level 20 + Level SP as King/Boss Sector)
+const CHALLENGE_LEVELS: Array[String] = [
+	"res://levels/level_01.tscn",
+	"res://levels/level_02.tscn",
+	"res://levels/level_03.tscn",
+	"res://levels/level_04.tscn",
+	"res://levels/level_05.tscn",
+	"res://levels/level_06.tscn",
+	"res://levels/level_07.tscn",
+	"res://levels/level_08.tscn",
+	"res://levels/level_09.tscn",
+	"res://levels/level_10.tscn",
+	"res://levels/level_11.tscn",
+	"res://levels/level_12.tscn",
+	"res://levels/level_13.tscn",
+	"res://levels/level_14.tscn",
+	"res://levels/level_15.tscn",
+	"res://levels/level_16.tscn",
+	"res://levels/level_17.tscn",
+	"res://levels/level_18.tscn",
+	"res://levels/level_19.tscn",
+	"res://levels/level_20.tscn",
+	"res://levels/level_SP.tscn",
+]
+
+# Backwards compatibility list containing all registered game scenes
 const LEVELS: Array[String] = [
 	"res://levels/level_test.tscn",
 	"res://levels/level_0.tscn",
@@ -35,46 +91,111 @@ const LEVELS: Array[String] = [
 	"res://levels/level_SP.tscn",
 ]
 
-const SECTORS: Array[Dictionary] = [
-	{"name": "ABYSS ORIGIN", "depth": "-2,680 M"},
-	{"name": "VOID CAVITY", "depth": "-2,360 M"},
-	{"name": "SUB-CRUST TRENCH", "depth": "-2,060 M"},
-	{"name": "LURKING VAULT", "depth": "-1,780 M"},
-	{"name": "OBSIDIAN LABYRINTH", "depth": "-1,520 M"},
-	{"name": "ECHO CHAMBER", "depth": "-1,280 M"},
-	{"name": "BASALT TUNNELS", "depth": "-1,060 M"},
-	{"name": "SCREAMER NEST", "depth": "-850 M"},
-	{"name": "THE SILENT POOL", "depth": "-660 M"},
-	{"name": "CRYSTAL DRIFT", "depth": "-480 M"},
-	{"name": "BONE HOLLOW", "depth": "-320 M"},
-	{"name": "WHISPER CHASM", "depth": "-160 M"},
+# Story Mode: Even, satisfying ~220m depth steps ascending from -4,200M (Abyss Origin) to -40M (Surface Breach)
+const STORY_SECTORS: Array[Dictionary] = [
+	{"name": "ABYSS ORIGIN", "depth": "-4,200 M"},
+	{"name": "VOID CAVITY", "depth": "-3,980 M"},
+	{"name": "SUB-CRUST TRENCH", "depth": "-3,760 M"},
+	{"name": "LURKING VAULT", "depth": "-3,540 M"},
+	{"name": "OBSIDIAN LABYRINTH", "depth": "-3,320 M"},
+	{"name": "ECHO CHAMBER", "depth": "-3,100 M"},
+	{"name": "BASALT TUNNELS", "depth": "-2,880 M"},
+	{"name": "SCREAMER NEST", "depth": "-2,660 M"},
+	{"name": "THE SILENT POOL", "depth": "-2,440 M"},
+	{"name": "CRYSTAL DRIFT", "depth": "-2,220 M"},
+	{"name": "BONE HOLLOW", "depth": "-2,000 M"},
+	{"name": "WHISPER CHASM", "depth": "-1,780 M"},
+	{"name": "MUDDY DUNGEON", "depth": "-1,560 M"},
+	{"name": "BLIND SHAFTS", "depth": "-1,340 M"},
+	{"name": "THE LISTENING EYE", "depth": "-1,120 M"},
+	{"name": "DROWNED RETURN", "depth": "-900 M"},
+	{"name": "THREE CROSSINGS", "depth": "-680 M"},
+	{"name": "RIPPLES IN THE DARK", "depth": "-460 M"},
+	{"name": "ECHOING PASSAGE", "depth": "-240 M"},
 	{"name": "SURFACE BREACH", "depth": "-40 M"},
-	{"name": "MUDDY DUNGEON", "depth": "-30 M"},
-	{"name": "BLIND SHAFTS", "depth": "-20 M"},
-	{"name": "THE LISTENING EYE", "depth": "-15 M"},
-	{"name": "DROWNED RETURN", "depth": "-10 M"},
-	{"name": "THREE CROSSINGS", "depth": "-5 M"},
-	{"name": "RIPPLES IN THE DARK", "depth": "-2 M"},
-	{"name": "THE FINAL ECHO", "depth": "-0 M"},
 ]
 
+# Challenge Mode: Plunges from -4,500M down to -9,999M (King Sector: The Final Echo)
+const CHALLENGE_SECTORS: Array[Dictionary] = [
+	{"name": "ABYSS DESCENT I", "depth": "-4,500 M"},
+	{"name": "HOLLOW VOID", "depth": "-4,750 M"},
+	{"name": "DEEP RIFT", "depth": "-5,000 M"},
+	{"name": "OBSIDIAN CHASM", "depth": "-5,250 M"},
+	{"name": "SILENT LABYRINTH", "depth": "-5,500 M"},
+	{"name": "ECHO SANCTUARY", "depth": "-5,750 M"},
+	{"name": "SCREAMING VEIN", "depth": "-6,000 M"},
+	{"name": "SUB-OCEAN TRENCH", "depth": "-6,250 M"},
+	{"name": "STILLWATER ABYSS", "depth": "-6,500 M"},
+	{"name": "FORBIDDEN DRIFT", "depth": "-6,750 M"},
+	{"name": "ANCIENT HOLLOW", "depth": "-7,000 M"},
+	{"name": "VOID NEXUS", "depth": "-7,250 M"},
+	{"name": "SPECTRAL VAULT", "depth": "-7,500 M"},
+	{"name": "SHADOW WELL", "depth": "-7,750 M"},
+	{"name": "BLIND ABYSS", "depth": "-8,000 M"},
+	{"name": "CRIMSON STRATA", "depth": "-8,250 M"},
+	{"name": "FORGOTTEN CRYPT", "depth": "-8,500 M"},
+	{"name": "PRIMORDIAL TRENCH", "depth": "-8,750 M"},
+	{"name": "THE DARK SPINE", "depth": "-9,000 M"},
+	{"name": "VOID THRESHOLD", "depth": "-9,250 M"},
+	{"name": "KING SECTOR • THE FINAL ECHO", "depth": "-9,999 M"},
+]
+
+# Alias for backwards compatibility
+const SECTORS: Array[Dictionary] = STORY_SECTORS
+
 var current_level := 0
-var highest_unlocked_level := 1
+var story_highest_unlocked := 1
+var challenge_highest_unlocked := 1
+var story_completed := false
+
+var highest_unlocked_level: int:
+	get:
+		if current_mode == GameMode.CHALLENGE:
+			return challenge_highest_unlocked
+		return story_highest_unlocked
+	set(val):
+		if current_mode == GameMode.CHALLENGE:
+			challenge_highest_unlocked = val
+		else:
+			story_highest_unlocked = val
+
+func is_story_completed() -> bool:
+	return story_completed or story_highest_unlocked > STORY_LEVELS.size()
+
+func get_current_levels() -> Array[String]:
+	if current_mode == GameMode.CHALLENGE:
+		return CHALLENGE_LEVELS
+	return STORY_LEVELS
 
 func get_level_name(lvl: int) -> String:
+	if current_mode == GameMode.CHALLENGE:
+		var c_idx := lvl - 1 if lvl > 0 else 0
+		if c_idx >= 0 and c_idx < CHALLENGE_SECTORS.size():
+			return str(CHALLENGE_SECTORS[c_idx]["name"])
+		return "CHALLENGE SECTOR %02d" % lvl
+
+	# Story Mode
 	if lvl == 0:
 		return "TRAINING GROUNDS"
 	var idx := lvl - 1
-	if idx >= 0 and idx < SECTORS.size():
-		return str(SECTORS[idx]["name"])
+	if idx >= 0 and idx < STORY_SECTORS.size():
+		return str(STORY_SECTORS[idx]["name"])
 	return "CAVERN SECTOR %02d" % lvl
 
 func get_level_depth_str(lvl: int) -> String:
+	if current_mode == GameMode.CHALLENGE:
+		var c_idx := lvl - 1 if lvl > 0 else 0
+		if c_idx >= 0 and c_idx < CHALLENGE_SECTORS.size():
+			var raw: String = str(CHALLENGE_SECTORS[c_idx]["depth"])
+			return "~" + raw.replace("-", "").strip_edges()
+		return "~4,500 M"
+
+	# Story Mode
 	if lvl == 0:
-		return "TRAINING"
+		return "TRAINING BASE"
 	var idx := lvl - 1
-	if idx >= 0 and idx < SECTORS.size():
-		var raw: String = str(SECTORS[idx]["depth"])
+	if idx >= 0 and idx < STORY_SECTORS.size():
+		var raw: String = str(STORY_SECTORS[idx]["depth"])
 		return "~" + raw.replace("-", "").strip_edges()
 	return "~0 M"
 
@@ -354,11 +475,14 @@ func set_sfx_volume(val: float) -> void:
 
 
 func current_level_path() -> String:
-	return LEVELS[clampi(current_level, 0, LEVELS.size() - 1)]
+	var lvls := get_current_levels()
+	if current_level >= 0 and current_level < lvls.size():
+		return lvls[current_level]
+	return lvls[0]
 
 
 func has_next_level() -> bool:
-	return current_level + 1 < LEVELS.size()
+	return current_level + 1 < get_current_levels().size()
 
 
 var _is_transitioning := false
@@ -406,11 +530,21 @@ func change_level(target) -> void:
 	if target is int:
 		start_game(target)
 	elif target is String:
-		var actual_idx: int = LEVELS.find(target)
+		var lvls := get_current_levels()
+		var actual_idx: int = lvls.find(target)
 		if actual_idx != -1:
 			start_game(actual_idx)
 		else:
-			transition_to_scene(target)
+			if target == "res://levels/level_SP.tscn":
+				current_mode = GameMode.CHALLENGE
+				var sp_idx: int = CHALLENGE_LEVELS.find(target)
+				start_game(sp_idx if sp_idx != -1 else 0)
+			else:
+				var glob_idx: int = LEVELS.find(target)
+				if glob_idx != -1:
+					start_game(glob_idx)
+				else:
+					transition_to_scene(target)
 
 
 func start_game(level_index: int = 0) -> void:
@@ -512,11 +646,16 @@ func reset_to_defaults() -> void:
 
 
 func reset_progress() -> void:
-	highest_unlocked_level = 1
+	story_highest_unlocked = 1
+	challenge_highest_unlocked = 1
+	story_completed = false
 	current_level = 0
 	level_records.clear()
 	var cfg := ConfigFile.new()
 	cfg.set_value("progress", "highest_unlocked_level", 1)
+	cfg.set_value("progress", "story_highest_unlocked", 1)
+	cfg.set_value("progress", "challenge_highest_unlocked", 1)
+	cfg.set_value("progress", "story_completed", false)
 	cfg.save(PROGRESS_PATH)
 
 
@@ -524,16 +663,26 @@ func load_progress() -> void:
 	var cfg := ConfigFile.new()
 	level_records.clear()
 	if cfg.load(PROGRESS_PATH) != OK:
-		highest_unlocked_level = 1
+		story_highest_unlocked = 1
+		challenge_highest_unlocked = 1
+		story_completed = false
 		return
 
-	highest_unlocked_level = clampi(
-		int(cfg.get_value("progress", "highest_unlocked_level", 1)),
+	var legacy_highest: int = int(cfg.get_value("progress", "highest_unlocked_level", 1))
+	story_highest_unlocked = clampi(
+		int(cfg.get_value("progress", "story_highest_unlocked", legacy_highest)),
 		1,
-		LEVELS.size()
+		STORY_LEVELS.size() + 1
 	)
+	challenge_highest_unlocked = clampi(
+		int(cfg.get_value("progress", "challenge_highest_unlocked", 1)),
+		1,
+		CHALLENGE_LEVELS.size() + 1
+	)
+	story_completed = bool(cfg.get_value("progress", "story_completed", story_highest_unlocked > STORY_LEVELS.size()))
 
-	for i in range(1, LEVELS.size() + 1):
+	var max_entries := maxi(STORY_LEVELS.size(), CHALLENGE_LEVELS.size()) + 2
+	for i in range(1, max_entries + 1):
 		var sec := "level_%02d" % i
 		if cfg.has_section(sec):
 			level_records[i] = {
@@ -642,22 +791,28 @@ func record_level_clear(level_number: int, clear_time: float, pings: int, alerts
 
 
 func complete_level(level_number: int) -> void:
-	if level_number < 1 or level_number > LEVELS.size():
+	var active_levels := get_current_levels()
+	if level_number < 1 or level_number > active_levels.size():
 		return
 
-	# 完成当前关卡后开放下一关
-	var next_unlocked := mini(level_number + 1, LEVELS.size())
+	# Complete current level and unlock next level
+	var next_unlocked := mini(level_number + 1, active_levels.size() + 1)
 
-	if next_unlocked > highest_unlocked_level:
-		highest_unlocked_level = next_unlocked
+	if current_mode == GameMode.STORY:
+		if next_unlocked > story_highest_unlocked:
+			story_highest_unlocked = next_unlocked
+		if level_number >= active_levels.size() or story_highest_unlocked > active_levels.size():
+			story_completed = true
+	else:
+		if next_unlocked > challenge_highest_unlocked:
+			challenge_highest_unlocked = next_unlocked
 
 	var cfg := ConfigFile.new()
 	cfg.load(PROGRESS_PATH)
-	cfg.set_value(
-		"progress",
-		"highest_unlocked_level",
-		highest_unlocked_level
-	)
+	cfg.set_value("progress", "highest_unlocked_level", story_highest_unlocked)
+	cfg.set_value("progress", "story_highest_unlocked", story_highest_unlocked)
+	cfg.set_value("progress", "challenge_highest_unlocked", challenge_highest_unlocked)
+	cfg.set_value("progress", "story_completed", story_completed)
 	var error := cfg.save(PROGRESS_PATH)
 
 	if error != OK:
