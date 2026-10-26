@@ -1,7 +1,7 @@
 extends Control
 
 const MIX_RATE := 22050
-const TOTAL_LEVEL_COUNT := 13
+const TOTAL_LEVEL_COUNT := 20
 
 @onready var sonar_backdrop: Control = $SonarBackdrop
 @onready var title_label: Label = $Content/HeaderBox/Title
@@ -246,7 +246,7 @@ func _on_credits_pressed() -> void:
 	_add_divider()
 	_add_guide_row(Color(0.38, 0.88, 1.0), "GAME DESIGN", "Team ECHO")
 	_add_guide_row(Color(0.38, 0.88, 1.0), "SYSTEMS & AI", "Team ECHO")
-	_add_guide_row(Color(0.38, 0.88, 1.0), "LEVEL DESIGN", "13 Cavern Sectors by Team")
+	_add_guide_row(Color(0.38, 0.88, 1.0), "LEVEL DESIGN", "20 Cavern Sectors + SP by Team")
 	_add_guide_row(Color(0.38, 0.88, 1.0), "AUDIO ENGINE", "Procedural Acoustic Synthesizer")
 
 
