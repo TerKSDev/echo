@@ -82,6 +82,8 @@ func _play_entry_sequence() -> void:
 	if _level_root != null:
 		if _level_root.level_name != "" and _level_root.level_name != "UNTITLED" and _level_root.level_name != "未命名":
 			title_text = _level_root.level_name
+		if _level_root.hint != "":
+			subtitle_text = _level_root.hint
 
 	hud.play_level_intro(title_text, subtitle_text)
 
@@ -255,7 +257,7 @@ func _physics_process(delta: float) -> void:
 
 func is_exit_locked() -> bool:
 	for c in switch_cells:
-		if str(switch_cells[c]) == "exit" and not pressed.has(c):
+		if str(switch_cells[c]).strip_edges().to_lower() == "exit" and not pressed.has(c):
 			return true
 	return false
 

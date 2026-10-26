@@ -100,7 +100,8 @@ static func build_level_card(
 	on_select: Callable,
 	wire_juice: Callable,
 	play_sound: Callable,
-	wav_error: AudioStreamWAV
+	wav_error: AudioStreamWAV,
+	level_path: String = ""
 ) -> Button:
 	var button := Button.new()
 	var highest: int = GameState.highest_unlocked_level
@@ -115,15 +116,34 @@ static func build_level_card(
 	button.focus_mode = Control.FOCUS_NONE
 	button.clip_contents = false
 
-	var sec_idx := level_number - 1
 	var sector_name := "CAVERN SECTOR %02d" % level_number
 	var raw_depth := "-%d M" % (level_number * 160)
-	if sec_idx >= 0 and sec_idx < GameState.SECTORS.size():
-		sector_name = GameState.SECTORS[sec_idx]["name"]
-		raw_depth = GameState.SECTORS[sec_idx]["depth"]
 
-	# Format depth string to '~2,680 M' without extra clutter
-	var depth_str := "~" + raw_depth.replace("-", "").strip_edges()
+	if level_path != "":
+		var filename := level_path.get_file().get_basename()
+		if filename == "level_0":
+			sector_name = "FIRST STEPS"
+			raw_depth = "TRAINING"
+		elif filename == "level_SP":
+			sector_name = "THE FINAL ECHO"
+			raw_depth = "SPECIAL"
+		elif filename.begins_with("level_"):
+			var num_str := filename.replace("level_", "")
+			var num := int(num_str)
+			var sec_idx := num - 1
+			if sec_idx >= 0 and sec_idx < GameState.SECTORS.size():
+				sector_name = GameState.SECTORS[sec_idx]["name"]
+				raw_depth = GameState.SECTORS[sec_idx]["depth"]
+			else:
+				sector_name = "SECTOR %02d" % num
+	elif (level_number - 1) >= 0 and (level_number - 1) < GameState.SECTORS.size():
+		sector_name = GameState.SECTORS[level_number - 1]["name"]
+		raw_depth = GameState.SECTORS[level_number - 1]["depth"]
+
+	# Format depth string without extra clutter
+	var depth_str := raw_depth
+	if raw_depth.ends_with("M"):
+		depth_str = "~" + raw_depth.replace("-", "").strip_edges()
 
 	var display_title: String = sector_name
 	var display_subtitle: String = depth_str

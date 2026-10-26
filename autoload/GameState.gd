@@ -49,18 +49,29 @@ const SECTORS: Array[Dictionary] = [
 	{"name": "BONE HOLLOW", "depth": "-320 M"},
 	{"name": "WHISPER CHASM", "depth": "-160 M"},
 	{"name": "SURFACE BREACH", "depth": "-40 M"},
+	{"name": "MUDDY DUNGEON", "depth": "-30 M"},
+	{"name": "BLIND SHAFTS", "depth": "-20 M"},
+	{"name": "THE LISTENING EYE", "depth": "-15 M"},
+	{"name": "DROWNED RETURN", "depth": "-10 M"},
+	{"name": "THREE CROSSINGS", "depth": "-5 M"},
+	{"name": "RIPPLES IN THE DARK", "depth": "-2 M"},
+	{"name": "THE FINAL ECHO", "depth": "-0 M"},
 ]
 
 var current_level := 0
 var highest_unlocked_level := 1
 
 func get_level_name(lvl: int) -> String:
+	if lvl == 0:
+		return "TRAINING GROUNDS"
 	var idx := lvl - 1
 	if idx >= 0 and idx < SECTORS.size():
 		return str(SECTORS[idx]["name"])
-	return "TRAINING GROUNDS" if lvl == 0 else "CAVERN SECTOR %02d" % lvl
+	return "CAVERN SECTOR %02d" % lvl
 
 func get_level_depth_str(lvl: int) -> String:
+	if lvl == 0:
+		return "TRAINING"
 	var idx := lvl - 1
 	if idx >= 0 and idx < SECTORS.size():
 		var raw: String = str(SECTORS[idx]["depth"])

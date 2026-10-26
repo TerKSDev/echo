@@ -124,7 +124,13 @@ func _apply_safe_area() -> void:
 # --------------------------------------------------
 
 func _get_playable_levels() -> Array[String]:
-	return GameState.LEVELS
+	var playable_levels: Array[String] = []
+	for level_path in GameState.LEVELS:
+		var path := str(level_path)
+		if path == TEST_LEVEL_PATH:
+			continue
+		playable_levels.append(path)
+	return playable_levels
 
 
 func _on_scroll_container_gui_input(event: InputEvent) -> void:
@@ -243,13 +249,16 @@ func _create_level_buttons() -> void:
 	# Because GridContainer lays out items from top to bottom,
 	# we iterate downwards from total_levels down to 1 with alternating spacers for a zigzag trail.
 	for level_number in range(total_levels, 0, -1):
+		var p_idx := level_number - 1
+		var lvl_path: String = playable_levels[p_idx] if (p_idx >= 0 and p_idx < playable_levels.size()) else ""
 		var button := LevelCardBuilder.build_level_card(
 			level_number,
 			func() -> float: return _time,
 			_on_level_pressed,
 			_wire_button_Juice,
 			_play_ui_sound,
-			_wav_error
+			_wav_error,
+			lvl_path
 		)
 		_level_buttons[level_number] = button
 
