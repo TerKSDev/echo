@@ -117,9 +117,10 @@ offset_bottom = 105.0
 theme_override_constants/separation = 14
 
 [node name="StatusPill" type="PanelContainer" parent="TopBar" unique_id=1501365221]
-custom_minimum_size = Vector2(175, 56)
+custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
 size_flags_horizontal = 4
+size_flags_vertical = 4
 mouse_filter = 2
 
 [node name="StatusBox" type="VBoxContainer" parent="TopBar/StatusPill"]
@@ -128,6 +129,7 @@ theme_override_constants/separation = 2
 alignment = 1
 
 [node name="SectorLabel" type="Label" parent="TopBar/StatusPill/StatusBox"]
+visible = false
 layout_mode = 2
 theme_override_colors/font_color = Color(0.78, 0.92, 1, 1)
 theme_override_font_sizes/font_size = 12
@@ -136,15 +138,18 @@ horizontal_alignment = 1
 
 [node name="ProgressLabel" type="Label" parent="TopBar/StatusPill/StatusBox" unique_id=998877665]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.45, 0.78, 0.95, 0.85)
-theme_override_font_sizes/font_size = 10
-text = "UNLOCKED: 01 / 21"
-horizontal_alignment = 1
+theme_override_colors/font_color = Color(1, 0.84, 0.28, 0.98)
+theme_override_colors/font_shadow_color = Color(0.18, 0.12, 0.02, 0.8)
+theme_override_constants/shadow_offset_y = 1
+theme_override_font_sizes/font_size = 17
+text = "★ 0"
+vertical_alignment = 1
 
 [node name="ModeToggle" type="Button" parent="TopBar" unique_id=778899112]
-custom_minimum_size = Vector2(148, 56)
+custom_minimum_size = Vector2(148, 48)
 layout_mode = 2
 size_flags_horizontal = 4
+size_flags_vertical = 4
 focus_mode = 0
 theme_override_font_sizes/font_size = 13
 text = "◈ STORY"
@@ -158,6 +163,7 @@ mouse_filter = 2
 custom_minimum_size = Vector2(48, 48)
 layout_mode = 2
 size_flags_horizontal = 4
+size_flags_vertical = 4
 focus_mode = 0
 flat = true
 theme_override_font_sizes/font_size = 18
@@ -166,6 +172,7 @@ theme_override_font_sizes/font_size = 18
 custom_minimum_size = Vector2(48, 48)
 layout_mode = 2
 size_flags_horizontal = 4
+size_flags_vertical = 4
 focus_mode = 0
 flat = true
 theme_override_font_sizes/font_size = 15
@@ -174,6 +181,7 @@ theme_override_font_sizes/font_size = 15
 custom_minimum_size = Vector2(48, 48)
 layout_mode = 2
 size_flags_horizontal = 4
+size_flags_vertical = 4
 focus_mode = 0
 flat = true
 theme_override_font_sizes/font_size = 20
@@ -184,7 +192,7 @@ anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 26.0
-offset_top = 148.0
+offset_top = 128.0
 offset_right = -58.0
 offset_bottom = -22.0
 grow_horizontal = 2
@@ -230,7 +238,7 @@ horizontal_scroll_mode = 0
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/margin_left = 12
-theme_override_constants/margin_top = 10
+theme_override_constants/margin_top = 14
 theme_override_constants/margin_right = 12
 theme_override_constants/margin_bottom = 24
 
@@ -248,7 +256,7 @@ anchor_left = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = -72.0
-offset_top = 152.0
+offset_top = 132.0
 offset_right = -6.0
 offset_bottom = -25.0
 grow_horizontal = 0

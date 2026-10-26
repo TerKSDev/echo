@@ -72,14 +72,10 @@ func _ready() -> void:
 		depth_gauge.draw.connect(_draw_depth_gauge)
 		depth_gauge.gui_input.connect(_on_depth_gauge_gui_input)
 
-	# Status pill stylish dark panel styling
+	# Status star display: completely frameless & blends into the cavern atmosphere
 	if status_pill != null:
-		var pill_style := StyleBoxFlat.new()
-		pill_style.bg_color = Color(0.03, 0.09, 0.16, 0.9)
-		pill_style.border_color = Color(0.18, 0.45, 0.7, 0.8)
-		pill_style.set_border_width_all(1)
-		pill_style.set_corner_radius_all(12)
-		status_pill.add_theme_stylebox_override("panel", pill_style)
+		var empty_sb := StyleBoxEmpty.new()
+		status_pill.add_theme_stylebox_override("panel", empty_sb)
 
 	_setup_mode_toggle()
 	_setup_intel_button()
@@ -112,10 +108,10 @@ func _apply_safe_area() -> void:
 			$TopBar.position.y = target_top
 		if has_node("MainArea"):
 			var main := $MainArea as Control
-			main.offset_top = target_top + 103.0
+			main.offset_top = target_top + 83.0
 		if has_node("DepthGauge"):
 			var gauge := $DepthGauge as Control
-			gauge.offset_top = target_top + 107.0
+			gauge.offset_top = target_top + 87.0
 
 
 # --------------------------------------------------
@@ -216,6 +212,7 @@ func _on_mode_toggle_pressed() -> void:
 
 func _setup_intel_button() -> void:
 	intel_button.custom_minimum_size = Vector2(48, 48)
+	intel_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	intel_button.flat = true
 	intel_button.focus_mode = Control.FOCUS_NONE
 	var empty_sb := StyleBoxEmpty.new()
@@ -230,12 +227,15 @@ func _setup_intel_button() -> void:
 	icon_canvas.draw.connect(func(): Icons.draw_book(icon_canvas))
 	intel_button.add_child(icon_canvas)
 
+	intel_button.mouse_entered.connect(func(): icon_canvas.queue_redraw())
+	intel_button.mouse_exited.connect(func(): icon_canvas.queue_redraw())
 	intel_button.pressed.connect(_on_intel_pressed)
 	_wire_button_Juice(intel_button)
 
 
 func _setup_settings_button() -> void:
 	settings_button.custom_minimum_size = Vector2(48, 48)
+	settings_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	settings_button.flat = true
 	settings_button.focus_mode = Control.FOCUS_NONE
 	var empty_sb := StyleBoxEmpty.new()
@@ -250,12 +250,15 @@ func _setup_settings_button() -> void:
 	icon_canvas.draw.connect(func(): Icons.draw_gear(icon_canvas))
 	settings_button.add_child(icon_canvas)
 
+	settings_button.mouse_entered.connect(func(): icon_canvas.queue_redraw())
+	settings_button.mouse_exited.connect(func(): icon_canvas.queue_redraw())
 	settings_button.pressed.connect(_on_settings_pressed)
 	_wire_button_Juice(settings_button)
 
 
 func _setup_leaderboard_button() -> void:
 	leaderboard_button.custom_minimum_size = Vector2(48, 48)
+	leaderboard_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	leaderboard_button.flat = true
 	leaderboard_button.focus_mode = Control.FOCUS_NONE
 	var empty_sb := StyleBoxEmpty.new()
@@ -270,6 +273,8 @@ func _setup_leaderboard_button() -> void:
 	icon_canvas.draw.connect(func(): Icons.draw_trophy(icon_canvas))
 	leaderboard_button.add_child(icon_canvas)
 
+	leaderboard_button.mouse_entered.connect(func(): icon_canvas.queue_redraw())
+	leaderboard_button.mouse_exited.connect(func(): icon_canvas.queue_redraw())
 	leaderboard_button.pressed.connect(_on_leaderboard_pressed)
 	_wire_button_Juice(leaderboard_button)
 
@@ -513,7 +518,7 @@ func _update_header_and_mode_ui() -> void:
 			subtitle_label.text = "Enter the deep void. Conquer the King Sector."
 			subtitle_label.add_theme_color_override("font_color", Color(0.95, 0.65, 0.85, 0.85))
 		if sector_label != null:
-			sector_label.text = "ABYSS VOID"
+			sector_label.visible = false
 		if mode_toggle != null:
 			mode_toggle.visible = true
 			mode_toggle.text = "⚡ CHALLENGE"
@@ -531,22 +536,22 @@ func _update_header_and_mode_ui() -> void:
 			subtitle_label.text = "Stay calm. Stay silent. Find the way out."
 			subtitle_label.add_theme_color_override("font_color", Color(0.55, 0.76, 0.92, 0.8))
 		if sector_label != null:
-			sector_label.text = "ESCAPE DIRECTORY"
+			sector_label.visible = false
 		if mode_toggle != null:
 			mode_toggle.visible = GameState.is_story_completed()
 			mode_toggle.text = "◈ STORY"
 			_style_mode_toggle(mode_toggle, false)
 
-	# Update Top Status Bar progress text with sectors and stars
+	# Update Top Status Bar: cleanly display current total star count without clutter
 	var playable_levels := _get_playable_levels()
 	var total_levels: int = playable_levels.size()
-	var highest: int = GameState.highest_unlocked_level
-	var cur_unlocked := clampi(highest, 1, total_levels)
 	var total_stars := 0
 	for i in range(1, total_levels + 1):
 		total_stars += GameState.get_level_stars(i)
 	if progress_label != null:
-		progress_label.text = "SECTORS: %02d/%02d   ★ %d/%d" % [cur_unlocked, total_levels, total_stars, total_levels * 3]
+		progress_label.text = "★ %d" % total_stars
+		progress_label.add_theme_color_override("font_color", Color(1.0, 0.84, 0.28, 0.98))
+		progress_label.add_theme_font_size_override("font_size", 17)
 
 	if depth_gauge != null and is_instance_valid(depth_gauge):
 		depth_gauge.queue_redraw()

@@ -5,53 +5,65 @@ extends RefCounted
 
 static func draw_trophy(canvas: Control) -> void:
 	var c := canvas.size * 0.5
-	var gold := Color(1.0, 0.82, 0.28, 0.98)
-	var gold_shadow := Color(0.85, 0.62, 0.15, 0.95)
-	var cup_fill := Color(0.35, 0.22, 0.05, 0.95)
+	var is_hovered := false
+	var parent := canvas.get_parent()
+	if parent is BaseButton:
+		var btn := parent as BaseButton
+		is_hovered = btn.is_hovered() or btn.button_pressed
 
-	# Cup body (trapezoid cup)
+	var col: Color = Color(1.0, 1.0, 1.0, 1.0) if is_hovered else Color(0.82, 0.92, 1.0, 0.95)
+	var fill_col: Color = Color(0.20, 0.55, 0.85, 0.28) if is_hovered else Color(0.12, 0.35, 0.60, 0.20)
+	var star_col: Color = Color(1.0, 0.88, 0.35, 1.0) if is_hovered else Color(1.0, 0.82, 0.30, 0.92)
+
+	# 1. Cup rim / lip
+	canvas.draw_line(Vector2(c.x - 7.5, c.y - 9.0), Vector2(c.x + 7.5, c.y - 9.0), col, 1.8)
+
+	# 2. Cup body (tapered goblet)
 	var cup_pts := PackedVector2Array([
-		Vector2(c.x - 7.0, c.y - 7.5),
-		Vector2(c.x + 7.0, c.y - 7.5),
-		Vector2(c.x + 5.0, c.y + 0.5),
-		Vector2(c.x - 5.0, c.y + 0.5)
+		Vector2(c.x - 7.0, c.y - 9.0),
+		Vector2(c.x + 7.0, c.y - 9.0),
+		Vector2(c.x + 6.0, c.y - 2.0),
+		Vector2(c.x + 3.0, c.y + 2.5),
+		Vector2(c.x - 3.0, c.y + 2.5),
+		Vector2(c.x - 6.0, c.y - 2.0)
 	])
-	canvas.draw_colored_polygon(cup_pts, cup_fill)
+	canvas.draw_colored_polygon(cup_pts, fill_col)
 	var cup_closed := cup_pts.duplicate()
 	cup_closed.append(cup_pts[0])
-	canvas.draw_polyline(cup_closed, gold, 1.6)
+	canvas.draw_polyline(cup_closed, col, 1.8)
 
-	# Handles (Left and Right loops)
-	canvas.draw_arc(Vector2(c.x - 7.0, c.y - 3.5), 3.2, -PI * 0.5, PI * 0.5, 12, gold, 1.4)
-	canvas.draw_arc(Vector2(c.x + 7.0, c.y - 3.5), 3.2, PI * 0.5, PI * 1.5, 12, gold, 1.4)
+	# 3. Symmetrical ear handles
+	canvas.draw_arc(Vector2(c.x - 7.0, c.y - 4.0), 3.6, -PI * 0.5, PI * 0.5, 14, col, 1.8)
+	canvas.draw_arc(Vector2(c.x + 7.0, c.y - 4.0), 3.6, PI * 0.5, PI * 1.5, 14, col, 1.8)
 
-	# Stem
-	canvas.draw_line(Vector2(c.x, c.y + 0.5), Vector2(c.x, c.y + 5.0), gold, 2.0)
+	# 4. Stem
+	canvas.draw_line(Vector2(c.x, c.y + 2.5), Vector2(c.x, c.y + 6.5), col, 2.2)
 
-	# Base / Pedestal
-	var base_pts := PackedVector2Array([
-		Vector2(c.x - 5.5, c.y + 5.0),
-		Vector2(c.x + 5.5, c.y + 5.0),
-		Vector2(c.x + 7.0, c.y + 8.5),
-		Vector2(c.x - 7.0, c.y + 8.5)
-	])
-	canvas.draw_colored_polygon(base_pts, gold_shadow)
-	var base_closed := base_pts.duplicate()
-	base_closed.append(base_pts[0])
-	canvas.draw_polyline(base_closed, gold, 1.4)
+	# 5. Pedestal base
+	canvas.draw_line(Vector2(c.x - 4.0, c.y + 6.5), Vector2(c.x + 4.0, c.y + 6.5), col, 1.8)
+	canvas.draw_line(Vector2(c.x - 7.5, c.y + 9.5), Vector2(c.x + 7.5, c.y + 9.5), col, 2.2)
 
-	# Little star or badge in cup center
-	canvas.draw_circle(Vector2(c.x, c.y - 3.5), 1.8, Color(1.0, 0.95, 0.6, 1.0))
+	# 6. Center achievement star
+	canvas.draw_circle(Vector2(c.x, c.y - 3.5), 1.6, star_col)
 
 
 static func draw_gear(canvas: Control) -> void:
 	var c := canvas.size * 0.5
+	var is_hovered := false
+	var parent := canvas.get_parent()
+	if parent is BaseButton:
+		var btn := parent as BaseButton
+		is_hovered = btn.is_hovered() or btn.button_pressed
+
+	var col: Color = Color(1.0, 1.0, 1.0, 1.0) if is_hovered else Color(0.82, 0.92, 1.0, 0.95)
+	var fill_col: Color = Color(0.20, 0.55, 0.85, 0.28) if is_hovered else Color(0.12, 0.35, 0.60, 0.20)
+
 	var r0 := 7.0
-	var r1 := 11.0
+	var r1 := 10.5
 	var num_teeth := 8
 	var pitch := TAU / float(num_teeth)
-	var w_base := pitch * 0.26
-	var w_tip := pitch * 0.14
+	var w_base := pitch * 0.28
+	var w_tip := pitch * 0.16
 	var pts := PackedVector2Array()
 
 	for i in range(num_teeth):
@@ -65,80 +77,83 @@ static func draw_gear(canvas: Control) -> void:
 		var a4 := a + w_base
 		pts.append(Vector2(c.x + cos(a4) * r0, c.y + sin(a4) * r0))
 		var a5 := a + pitch * 0.5
-		pts.append(Vector2(c.x + cos(a5) * (r0 - 0.2), c.y + sin(a5) * (r0 - 0.2)))
+		pts.append(Vector2(c.x + cos(a5) * (r0 - 0.4), c.y + sin(a5) * (r0 - 0.4)))
 
-	var col_fill := Color(0.78, 0.92, 1.0, 0.95)
-	var col_hole := Color(0.035, 0.09, 0.16, 1.0)
-	var col_rim := Color(0.25, 0.55, 0.85, 0.8)
-
-	# Solid gear teeth and body
-	canvas.draw_colored_polygon(pts, col_fill)
-	# Closed outline for crisp definition
+	# Translucent gear body with crisp cybernetic outline
+	canvas.draw_colored_polygon(pts, fill_col)
 	var closed_pts := pts.duplicate()
 	closed_pts.append(pts[0])
-	canvas.draw_polyline(closed_pts, Color(col_fill.r, col_fill.g, col_fill.b, 0.9), 1.2)
+	canvas.draw_polyline(closed_pts, col, 1.8)
 
-	# Axle center hole (knockout)
-	canvas.draw_circle(c, 3.6, col_hole)
-	canvas.draw_arc(c, 3.6, 0.0, TAU, 16, col_rim, 1.2)
-	# Subtle recessed mechanical groove ring
-	canvas.draw_arc(c, 5.5, 0.0, TAU, 20, Color(0.15, 0.35, 0.55, 0.65), 1.0)
+	# Axle center knockout hole
+	canvas.draw_circle(c, 3.6, Color(0.04, 0.10, 0.18, 0.95))
+	canvas.draw_arc(c, 3.6, 0.0, TAU, 16, col, 1.8)
+
+	# 4 mechanical spokes connecting core to teeth
+	for ang in [0.0, PI * 0.5, PI, PI * 1.5]:
+		var p1 := c + Vector2.from_angle(ang) * 3.6
+		var p2 := c + Vector2.from_angle(ang) * (r0 - 0.4)
+		canvas.draw_line(p1, p2, Color(col.r, col.g, col.b, 0.65), 1.5)
 
 
 static func draw_book(canvas: Control) -> void:
 	var c := canvas.size * 0.5
-	var col := Color(0.78, 0.92, 1.0, 0.95)
-	var page_fill := Color(0.06, 0.16, 0.28, 0.95)
+	var is_hovered := false
+	var parent := canvas.get_parent()
+	if parent is BaseButton:
+		var btn := parent as BaseButton
+		is_hovered = btn.is_hovered() or btn.button_pressed
 
-	# Left page polygon: curved top, vertical outer edge, curved bottom, center spine
+	var col: Color = Color(1.0, 1.0, 1.0, 1.0) if is_hovered else Color(0.82, 0.92, 1.0, 0.95)
+	var fill_col: Color = Color(0.20, 0.55, 0.85, 0.28) if is_hovered else Color(0.12, 0.35, 0.60, 0.20)
+
+	# Left page polygon
 	var left_poly := PackedVector2Array([
-		Vector2(c.x - 0.5, c.y - 7.0),
-		Vector2(c.x - 5.5, c.y - 8.5),
-		Vector2(c.x - 10.5, c.y - 7.0),
-		Vector2(c.x - 10.5, c.y + 6.5),
-		Vector2(c.x - 5.5, c.y + 5.0),
-		Vector2(c.x - 0.5, c.y + 6.5)
+		Vector2(c.x - 1.0, c.y - 8.5),
+		Vector2(c.x - 6.0, c.y - 9.5),
+		Vector2(c.x - 10.5, c.y - 7.5),
+		Vector2(c.x - 10.5, c.y + 7.0),
+		Vector2(c.x - 6.0, c.y + 5.5),
+		Vector2(c.x - 1.0, c.y + 7.0)
 	])
-	canvas.draw_colored_polygon(left_poly, page_fill)
+	canvas.draw_colored_polygon(left_poly, fill_col)
 	var left_closed := left_poly.duplicate()
 	left_closed.append(left_poly[0])
-	canvas.draw_polyline(left_closed, col, 1.6)
+	canvas.draw_polyline(left_closed, col, 1.8)
 
 	# Right page polygon
 	var right_poly := PackedVector2Array([
-		Vector2(c.x + 0.5, c.y - 7.0),
-		Vector2(c.x + 5.5, c.y - 8.5),
-		Vector2(c.x + 10.5, c.y - 7.0),
-		Vector2(c.x + 10.5, c.y + 6.5),
-		Vector2(c.x + 5.5, c.y + 5.0),
-		Vector2(c.x + 0.5, c.y + 6.5)
+		Vector2(c.x + 1.0, c.y - 8.5),
+		Vector2(c.x + 6.0, c.y - 9.5),
+		Vector2(c.x + 10.5, c.y - 7.5),
+		Vector2(c.x + 10.5, c.y + 7.0),
+		Vector2(c.x + 6.0, c.y + 5.5),
+		Vector2(c.x + 1.0, c.y + 7.0)
 	])
-	canvas.draw_colored_polygon(right_poly, page_fill)
+	canvas.draw_colored_polygon(right_poly, fill_col)
 	var right_closed := right_poly.duplicate()
 	right_closed.append(right_poly[0])
-	canvas.draw_polyline(right_closed, col, 1.6)
+	canvas.draw_polyline(right_closed, col, 1.8)
 
-	# Center book spine
-	canvas.draw_line(Vector2(c.x, c.y - 7.0), Vector2(c.x, c.y + 7.5), Color(0.35, 0.85, 1.0, 0.95), 2.0)
+	# Center spine
+	canvas.draw_line(Vector2(c.x, c.y - 8.5), Vector2(c.x, c.y + 8.5), Color(0.40, 0.85, 1.0, 0.95), 2.0)
 
-	# Left page text lines
-	var line_col := Color(col.r, col.g, col.b, 0.75)
-	canvas.draw_line(Vector2(c.x - 8.5, c.y - 3.0), Vector2(c.x - 2.5, c.y - 3.8), line_col, 1.4)
-	canvas.draw_line(Vector2(c.x - 8.5, c.y + 0.5), Vector2(c.x - 2.5, c.y - 0.3), line_col, 1.4)
-	canvas.draw_line(Vector2(c.x - 8.5, c.y + 4.0), Vector2(c.x - 3.5, c.y + 3.2), line_col, 1.4)
+	# Left page data tracks
+	var line_col := Color(col.r, col.g, col.b, 0.65)
+	canvas.draw_line(Vector2(c.x - 8.5, c.y - 2.5), Vector2(c.x - 3.0, c.y - 3.2), line_col, 1.5)
+	canvas.draw_line(Vector2(c.x - 8.5, c.y + 1.8), Vector2(c.x - 3.0, c.y + 1.0), line_col, 1.5)
 
-	# Right page text lines
-	canvas.draw_line(Vector2(c.x + 2.5, c.y - 3.8), Vector2(c.x + 8.5, c.y - 3.0), line_col, 1.4)
-	canvas.draw_line(Vector2(c.x + 2.5, c.y - 0.3), Vector2(c.x + 8.5, c.y + 0.5), line_col, 1.4)
-	canvas.draw_line(Vector2(c.x + 3.5, c.y + 3.2), Vector2(c.x + 8.5, c.y + 4.0), line_col, 1.4)
+	# Right page data tracks
+	canvas.draw_line(Vector2(c.x + 3.0, c.y - 3.2), Vector2(c.x + 8.5, c.y - 2.5), line_col, 1.5)
+	canvas.draw_line(Vector2(c.x + 3.0, c.y + 1.0), Vector2(c.x + 8.5, c.y + 1.8), line_col, 1.5)
 
 	# Bottom cover spine base ridge
 	var ridge := PackedVector2Array([
-		Vector2(c.x - 10.5, c.y + 8.0),
+		Vector2(c.x - 10.5, c.y + 8.5),
 		Vector2(c.x, c.y + 9.5),
-		Vector2(c.x + 10.5, c.y + 8.0)
+		Vector2(c.x + 10.5, c.y + 8.5)
 	])
-	canvas.draw_polyline(ridge, Color(col.r, col.g, col.b, 0.5), 1.5)
+	canvas.draw_polyline(ridge, Color(col.r, col.g, col.b, 0.45), 1.5)
 
 
 static func draw_beacon(canvas: Control) -> void:
