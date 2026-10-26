@@ -182,7 +182,7 @@ func _physics_process(_delta: float) -> void:
 
 	if switch_cells.has(c) and not pressed.has(c):
 		_press_switch(c)
-	if has_exit and c == exit_cell:
+	if has_exit and c == exit_cell and not is_exit_locked():
 		_changing = true
 		if GameState.has_next_level():
 			hud.play_level_exit_transition(func():
@@ -190,6 +190,14 @@ func _physics_process(_delta: float) -> void:
 			)
 		else:
 			hud.show_victory_screen()
+
+
+## The exit is locked while a key with link id "exit" exists and has not been picked up.
+func is_exit_locked() -> bool:
+	for c in switch_cells:
+		if str(switch_cells[c]) == "exit" and not pressed.has(c):
+			return true
+	return false
 
 
 func _press_switch(cell: Vector2i) -> void:
@@ -226,7 +234,7 @@ func echo_features() -> Array:
 			else:
 				_echo_features_cache.append({"type": "door", "pos": body.global_position, "body": body, "open": false, "id": id, "color": link_color(id)})
 	if has_exit:
-		_echo_features_cache.append({"type": "exit", "pos": cell_to_world(exit_cell)})
+		_echo_features_cache.append({"type": "exit", "pos": cell_to_world(exit_cell), "locked": is_exit_locked()})
 	_echo_features_dirty = false
 	return _echo_features_cache
 
@@ -241,6 +249,7 @@ const LINK_COLORS := {
 	"F": Color(0.7, 0.5, 1.0),
 	"G": Color(1.0, 0.6, 0.2),
 	"H": Color(0.95, 0.95, 0.95),
+	"EXIT": Color(1.0, 1.0, 1.0),
 }
 
 

@@ -3,7 +3,7 @@
 [ext_resource type="Script" uid="uid://doi52335aclw8" path="res://systems/level/LevelRoot.gd" id="1_ypm7u"]
 [ext_resource type="TileSet" uid="uid://0kitrq7qjdh5" path="res://tilesets/echo_tileset.tres" id="2_c166x"]
 [ext_resource type="Script" uid="uid://dlpb0h4lai6o0" path="res://systems/level/LevelMarker.gd" id="3_kf6oi"]
-[ext_resource type="PackedScene" path="res://characters/enemy/enemy_patroller.tscn" id="5_f1oi2"]
+[ext_resource type="PackedScene" uid="uid://dikpqlh7ntbn2" path="res://characters/enemy/enemy_patroller.tscn" id="5_f1oi2"]
 [ext_resource type="PackedScene" path="res://characters/enemy/enemy_sleeper.tscn" id="6_3xcqw"]
 [ext_resource type="PackedScene" path="res://characters/enemy/enemy_listener.tscn" id="7_2iqan"]
 
@@ -213,17 +213,23 @@ link_id = "C"
 position = Vector2(2000, 1296)
 script = ExtResource("3_kf6oi")
 
+[node name="Switch_exit_1" type="Marker2D" parent="Markers" unique_id=91445389]
+position = Vector2(2032, 592)
+script = ExtResource("3_kf6oi")
+kind = 3
+link_id = "exit"
+
 [node name="EnemyPatroller" parent="." unique_id=1638190346 instance=ExtResource("5_f1oi2")]
 position = Vector2(240, 224)
-patrol_points = Array[Vector2]([Vector2(240, 224), Vector2(816, 224)])
+patrol_points = Array[Vector2]([Vector2(240, 176), Vector2(464, 176), Vector2(464, 272), Vector2(240, 272)])
 
 [node name="EnemyPatroller2" parent="." unique_id=1731453903 instance=ExtResource("5_f1oi2")]
 position = Vector2(1232, 224)
-patrol_points = Array[Vector2]([Vector2(1232, 224), Vector2(1840, 224)])
+patrol_points = Array[Vector2]([Vector2(1232, 176), Vector2(1456, 176), Vector2(1456, 272), Vector2(1232, 272)])
 
 [node name="EnemyPatroller3" parent="." unique_id=2117999527 instance=ExtResource("5_f1oi2")]
 position = Vector2(272, 560)
-patrol_points = Array[Vector2]([Vector2(272, 560), Vector2(944, 560)])
+patrol_points = Array[Vector2]([Vector2(272, 592), Vector2(48, 592), Vector2(48, 528), Vector2(272, 528)])
 
 [node name="EnemySleeper" parent="." unique_id=1821909755 instance=ExtResource("6_3xcqw")]
 position = Vector2(1072, 400)

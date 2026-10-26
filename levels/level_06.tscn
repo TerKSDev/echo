@@ -3,7 +3,7 @@
 [ext_resource type="Script" uid="uid://doi52335aclw8" path="res://systems/level/LevelRoot.gd" id="1_up3qn"]
 [ext_resource type="TileSet" uid="uid://0kitrq7qjdh5" path="res://tilesets/echo_tileset.tres" id="2_g8tau"]
 [ext_resource type="Script" uid="uid://dlpb0h4lai6o0" path="res://systems/level/LevelMarker.gd" id="3_j8rst"]
-[ext_resource type="PackedScene" path="res://characters/enemy/enemy_patroller.tscn" id="5_ifoay"]
+[ext_resource type="PackedScene" uid="uid://dikpqlh7ntbn2" path="res://characters/enemy/enemy_patroller.tscn" id="5_ifoay"]
 [ext_resource type="PackedScene" path="res://characters/enemy/enemy_listener.tscn" id="6_nox4o"]
 [ext_resource type="PackedScene" path="res://characters/enemy/enemy_sleeper.tscn" id="7_qadnc"]
 
@@ -39,9 +39,15 @@ script = ExtResource("3_j8rst")
 kind = 3
 link_id = "a"
 
+[node name="Switch_exit_1" type="Marker2D" parent="Markers" unique_id=312833543]
+position = Vector2(944, 656)
+script = ExtResource("3_j8rst")
+kind = 3
+link_id = "exit"
+
 [node name="EnemyPatroller" parent="." unique_id=1741222963 instance=ExtResource("5_ifoay")]
 position = Vector2(464, 176)
-patrol_points = Array[Vector2]([Vector2(464, 176), Vector2(464, 640)])
+patrol_points = Array[Vector2]([Vector2(528, 176), Vector2(528, 400), Vector2(432, 400), Vector2(432, 176)])
 
 [node name="EnemyListener" parent="." unique_id=326411710 instance=ExtResource("6_nox4o")]
 position = Vector2(656, 656)

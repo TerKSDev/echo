@@ -9,6 +9,7 @@ const SETTINGS_PATH := "user://settings.cfg"
 
 const LEVELS: Array[String] = [
 	"res://levels/level_test.tscn",
+	"res://levels/level_0.tscn",
 	"res://levels/level_01.tscn",
 	"res://levels/level_02.tscn",
 	"res://levels/level_03.tscn",
@@ -23,6 +24,13 @@ const LEVELS: Array[String] = [
 	"res://levels/level_12.tscn",
 	"res://levels/level_13.tscn",
 	"res://levels/level_14.tscn",
+	"res://levels/level_15.tscn",
+	"res://levels/level_16.tscn",
+	"res://levels/level_17.tscn",
+	"res://levels/level_18.tscn",
+	"res://levels/level_19.tscn",
+	"res://levels/level_20.tscn",
+	"res://levels/level_SP.tscn",
 ]
 
 var current_level := 0

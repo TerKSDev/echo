@@ -4,7 +4,7 @@
 [ext_resource type="TileSet" uid="uid://0kitrq7qjdh5" path="res://tilesets/echo_tileset.tres" id="2_d5aqb"]
 [ext_resource type="Script" uid="uid://dlpb0h4lai6o0" path="res://systems/level/LevelMarker.gd" id="4_8j7gf"]
 [ext_resource type="PackedScene" path="res://characters/enemy/enemy_chaser.tscn" id="5_8j7gf"]
-[ext_resource type="PackedScene" path="res://characters/enemy/enemy_patroller.tscn" id="7_ddcr5"]
+[ext_resource type="PackedScene" uid="uid://dikpqlh7ntbn2" path="res://characters/enemy/enemy_patroller.tscn" id="7_ddcr5"]
 
 [node name="Level" type="Node2D" unique_id=1177565450]
 script = ExtResource("1_svwta")
@@ -192,11 +192,11 @@ script = ExtResource("4_8j7gf")
 kind = 3
 link_id = "c"
 
-[node name="Switch_a_1" type="Marker2D" parent="." unique_id=572238467]
-position = Vector2(44, 112)
+[node name="Switch_exit_1" type="Marker2D" parent="Markers" unique_id=182243018]
+position = Vector2(592, 528)
 script = ExtResource("4_8j7gf")
 kind = 3
-link_id = "a"
+link_id = "exit"
 
 [node name="Enemies" type="Node2D" parent="." unique_id=2100034751]
 

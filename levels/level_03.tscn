@@ -27,3 +27,9 @@ kind = 0
 [node name="Exit" type="Marker2D" parent="Markers" unique_id=1510759159]
 position = Vector2(944, 624)
 script = ExtResource("3_wq170")
+
+[node name="Switch_exit_1" type="Marker2D" parent="Markers" unique_id=984264937]
+position = Vector2(784, 528)
+script = ExtResource("3_wq170")
+kind = 3
+link_id = "exit"

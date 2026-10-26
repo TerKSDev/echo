@@ -1,7 +1,9 @@
 extends Control
 
 const MIX_RATE := 22050
-const TOTAL_LEVEL_COUNT := 13
+const TOTAL_LEVEL_COUNT := 20
+const LEVEL_ZERO_PATH := "res://levels/level_0.tscn"
+const LEVEL_SP_PATH := "res://levels/level_SP.tscn"
 
 @onready var sonar_backdrop: Control = $SonarBackdrop
 @onready var title_label: Label = $Content/VBoxContainer/Title
@@ -188,12 +190,23 @@ func _on_start_pressed() -> void:
 	_wire_button_Juice(test_btn)
 	_modal_body.add_child(test_btn)
 
-	# 13-Level Grid
+	# Scrollable level list: DEPTH 00, 20-level grid, then the SP level
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(0, 520)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_modal_body.add_child(scroll)
+	var list := VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_theme_constant_override("separation", 10)
+	scroll.add_child(list)
+
+	list.add_child(_make_level_button("DEPTH 00", LEVEL_ZERO_PATH))
+
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 10)
 	grid.add_theme_constant_override("v_separation", 10)
-	_modal_body.add_child(grid)
+	list.add_child(grid)
 
 	for i in range(1, TOTAL_LEVEL_COUNT + 1):
 		var lvl_path: String = "res://levels/level_%02d.tscn" % i
@@ -211,6 +224,25 @@ func _on_start_pressed() -> void:
 		)
 		_wire_button_Juice(btn)
 		grid.add_child(btn)
+
+	list.add_child(_make_level_button("SPECIAL DEPTH (SP)", LEVEL_SP_PATH))
+
+
+func _make_level_button(label: String, lvl_path: String) -> Button:
+	var btn := Button.new()
+	btn.custom_minimum_size = Vector2(0, 42)
+	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.add_theme_font_size_override("font_size", 14)
+	btn.text = label
+	if not ResourceLoader.exists(lvl_path):
+		btn.modulate = Color(0.65, 0.75, 0.88, 0.7)
+	btn.pressed.connect(func():
+		var idx: int = GameState.LEVELS.find(lvl_path)
+		GameState.start_game(maxi(idx, 0))
+	)
+	_wire_button_Juice(btn)
+	return btn
 
 
 func _launch_level_by_number(level_num: int, lvl_path: String) -> void:
@@ -413,7 +445,7 @@ func _on_credits_pressed() -> void:
 	_add_divider()
 	_add_guide_row(Color(0.38, 0.88, 1.0), "GAME DESIGN", "Team ECHO")
 	_add_guide_row(Color(0.38, 0.88, 1.0), "SYSTEMS & AI", "Team ECHO")
-	_add_guide_row(Color(0.38, 0.88, 1.0), "LEVEL DESIGN", "13 Cavern Sectors by Team")
+	_add_guide_row(Color(0.38, 0.88, 1.0), "LEVEL DESIGN", "20 Cavern Sectors + SP by Team")
 	_add_guide_row(Color(0.38, 0.88, 1.0), "AUDIO ENGINE", "Procedural Acoustic Synthesizer")
 
 

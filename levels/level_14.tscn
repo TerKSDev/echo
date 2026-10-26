@@ -6,7 +6,7 @@
 [ext_resource type="PackedScene" path="res://characters/enemy/enemy_listener.tscn" id="5_0duc7"]
 [ext_resource type="PackedScene" path="res://characters/enemy/enemy_sleeper.tscn" id="7_6lgjq"]
 [ext_resource type="PackedScene" path="res://characters/enemy/enemy_screamer.tscn" id="8_kkvbt"]
-[ext_resource type="PackedScene" path="res://characters/enemy/enemy_patroller.tscn" id="9_ylini"]
+[ext_resource type="PackedScene" uid="uid://dikpqlh7ntbn2" path="res://characters/enemy/enemy_patroller.tscn" id="9_ylini"]
 [ext_resource type="PackedScene" path="res://characters/enemy/enemy_chaser.tscn" id="10_70qwv"]
 
 [node name="Level" type="Node2D" unique_id=1177565450]
@@ -1008,11 +1008,11 @@ position = Vector2(1168, 528)
 script = ExtResource("2_6qos1")
 kind = 2
 
-[node name="Switch_a_1" type="Marker2D" parent="." unique_id=572238467]
-position = Vector2(44, 175)
+[node name="Switch_exit_1" type="Marker2D" parent="Markers" unique_id=1793553489]
+position = Vector2(944, 144)
 script = ExtResource("2_6qos1")
 kind = 3
-link_id = "a"
+link_id = "exit"
 
 [node name="Enemies" type="Node2D" parent="." unique_id=1037017476]
 

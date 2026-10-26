@@ -241,6 +241,7 @@ func _reveal_features(space: PhysicsDirectSpaceState2D, origin: Vector2, max_dis
 					existing["strength"] = maxf(float(existing["strength"]), s)
 					existing["pressed"] = is_pressed
 					existing["open"] = bool(f.get("open", false))
+					existing["locked"] = bool(f.get("locked", false))
 					existing["color"] = f.get("color", Color.WHITE)
 					updated = true
 					break
@@ -252,6 +253,7 @@ func _reveal_features(space: PhysicsDirectSpaceState2D, origin: Vector2, max_dis
 					"strength": s,
 					"pressed": is_pressed,
 					"open": bool(f.get("open", false)),
+					"locked": bool(f.get("locked", false)),
 					"color": f.get("color", Color.WHITE)
 				})
 	if marks.size() > MAX_MARKS:
@@ -426,6 +428,7 @@ func _draw_mark(m: Dictionary, a: float) -> void:
 			var tex: Texture2D = ICON_DOOR_OPEN if is_open else ICON_DOOR_CLOSED
 			draw_texture_rect(tex, Rect2(p - Vector2(16, 16), Vector2(32, 32)), false, c)
 		"exit":
-			var c := Color(0.55, 1.0, 0.92, a)
-			draw_rect(Rect2(p - Vector2(16, 16), Vector2(32, 32)), c, false, 3.0)
-			draw_rect(Rect2(p - Vector2(22, 22), Vector2(44, 44)), Color(0.55, 1.0, 0.92, a * 0.5), false, 1.5)
+			# Red while locked (no exit key yet), teal once unlocked.
+			var ec: Color = Color(1.0, 0.2, 0.2) if bool(m.get("locked", false)) else Color(0.55, 1.0, 0.92)
+			draw_rect(Rect2(p - Vector2(16, 16), Vector2(32, 32)), Color(ec.r, ec.g, ec.b, a), false, 3.0)
+			draw_rect(Rect2(p - Vector2(22, 22), Vector2(44, 44)), Color(ec.r, ec.g, ec.b, a * 0.5), false, 1.5)
