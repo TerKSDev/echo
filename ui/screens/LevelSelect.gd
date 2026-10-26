@@ -136,12 +136,12 @@ func _on_scroll_container_gui_input(event: InputEvent) -> void:
 		var max_scroll := maxf(0.0, vbar.max_value - page)
 
 		if GameState.current_mode == GameState.GameMode.STORY:
-			# At bottom of story mode: dragging upwards pulls downward past the abyss
-			if scroll_container.scroll_vertical >= max_scroll - 10.0 and rel_y < -3.0:
+			# At bottom of story mode: dragging upwards pulls downward past the abyss (only active once story completed)
+			if GameState.is_story_completed() and scroll_container.scroll_vertical >= max_scroll - 10.0 and rel_y < -3.0:
 				_overscroll_dist += absf(rel_y)
 				if _overscroll_dist >= 45.0:
 					_overscroll_dist = 0.0
-					_on_rift_descend_triggered()
+					_descend_to_challenge_mode()
 			elif scroll_container.scroll_vertical < max_scroll - 25.0:
 				_overscroll_dist = 0.0
 		else:
@@ -160,11 +160,11 @@ func _on_scroll_container_gui_input(event: InputEvent) -> void:
 		var max_scroll := maxf(0.0, vbar.max_value - page)
 
 		if event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			if GameState.current_mode == GameState.GameMode.STORY and scroll_container.scroll_vertical >= max_scroll - 10.0:
+			if GameState.current_mode == GameState.GameMode.STORY and GameState.is_story_completed() and scroll_container.scroll_vertical >= max_scroll - 10.0:
 				_overscroll_dist += 25.0
 				if _overscroll_dist >= 45.0:
 					_overscroll_dist = 0.0
-					_on_rift_descend_triggered()
+					_descend_to_challenge_mode()
 		elif event.button_index == MOUSE_BUTTON_WHEEL_UP:
 			if GameState.current_mode == GameState.GameMode.CHALLENGE and scroll_container.scroll_vertical <= 10.0:
 				_overscroll_dist += 25.0
@@ -180,6 +180,8 @@ func _on_scroll_container_gui_input(event: InputEvent) -> void:
 func _setup_mode_toggle() -> void:
 	if mode_toggle == null:
 		return
+	# Challenge mode is completely hidden until all 21 story sectors are cleared!
+	mode_toggle.visible = GameState.is_story_completed()
 	mode_toggle.custom_minimum_size = Vector2(148, 56)
 	_style_mode_toggle(mode_toggle, GameState.current_mode == GameState.GameMode.CHALLENGE)
 	mode_toggle.pressed.connect(_on_mode_toggle_pressed)
@@ -206,8 +208,6 @@ func _on_mode_toggle_pressed() -> void:
 	if GameState.current_mode == GameState.GameMode.STORY:
 		if GameState.is_story_completed():
 			_descend_to_challenge_mode()
-		else:
-			_show_challenge_locked_hint()
 	else:
 		_ascend_to_story_mode()
 
@@ -398,16 +398,6 @@ func _create_level_buttons() -> void:
 
 	else:
 		# Story Mode:
-		# Top padding in the grid (giving comfortable space under header)
-		var top_pad_a := Control.new()
-		top_pad_a.custom_minimum_size = Vector2(0, 32)
-		top_pad_a.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var top_pad_b := Control.new()
-		top_pad_b.custom_minimum_size = Vector2(0, 32)
-		top_pad_b.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		level_grid.add_child(top_pad_a)
-		level_grid.add_child(top_pad_b)
-
 		# Iterate from total_levels (Level 21: Surface Breach) down to 1 (Level 1: First Steps / Training)
 		for level_number in range(total_levels, 0, -1):
 			var p_idx := level_number - 1
@@ -436,64 +426,7 @@ func _create_level_buttons() -> void:
 				level_grid.add_child(button)
 
 		# At the deepest bottom of Story Mode:
-		# Col 0: Abyssal Rift (Challenge Mode portal)
-		# Col 1: Test Arena (Sandbox)
 		var is_unlocked := GameState.is_story_completed()
-		var rift_btn := Button.new()
-		rift_btn.custom_minimum_size = Vector2(290, 88)
-		rift_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		rift_btn.focus_mode = Control.FOCUS_NONE
-
-		var r_box: StyleBoxFlat
-		if is_unlocked:
-			r_box = LevelCardBuilder.make_button_style(
-				Color(0.18, 0.04, 0.12, 0.96),
-				Color(0.95, 0.45, 0.85, 0.95),
-				2, 12,
-				Color(0.8, 0.15, 0.5, 0.45), 8
-			)
-		else:
-			r_box = LevelCardBuilder.make_button_style(
-				Color(0.02, 0.04, 0.08, 0.95),
-				Color(0.25, 0.35, 0.50, 0.85),
-				1, 12
-			)
-		rift_btn.add_theme_stylebox_override("normal", r_box)
-		rift_btn.add_theme_stylebox_override("hover", r_box)
-		rift_btn.add_theme_stylebox_override("pressed", r_box)
-
-		var rift_margin := MarginContainer.new()
-		rift_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-		rift_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		rift_margin.add_theme_constant_override("margin_left", 14)
-		rift_margin.add_theme_constant_override("margin_right", 12)
-		rift_margin.add_theme_constant_override("margin_top", 10)
-		rift_margin.add_theme_constant_override("margin_bottom", 10)
-		rift_btn.add_child(rift_margin)
-
-		var rift_vbox := VBoxContainer.new()
-		rift_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		rift_vbox.add_theme_constant_override("separation", 4)
-		rift_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-		rift_margin.add_child(rift_vbox)
-
-		var rift_title := Label.new()
-		rift_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		rift_title.text = "▼ ABYSSAL RIFT" if is_unlocked else "🔒 ABYSSAL RIFT"
-		rift_title.add_theme_font_size_override("font_size", 16)
-		rift_title.add_theme_color_override("font_color", Color(1.0, 0.85, 0.95) if is_unlocked else Color(0.65, 0.75, 0.88))
-		rift_vbox.add_child(rift_title)
-
-		var rift_sub := Label.new()
-		rift_sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var cleared_cnt := mini(GameState.story_highest_unlocked - 1, 21)
-		rift_sub.text = "DESCEND TO CHALLENGE MODE" if is_unlocked else "UNLOCK: CLEAR STORY (%d/21)" % cleared_cnt
-		rift_sub.add_theme_font_size_override("font_size", 12)
-		rift_sub.add_theme_color_override("font_color", Color(0.95, 0.65, 0.85, 0.9) if is_unlocked else Color(0.48, 0.58, 0.70))
-		rift_vbox.add_child(rift_sub)
-
-		rift_btn.pressed.connect(_on_rift_descend_triggered)
-		_wire_button_Juice(rift_btn)
 
 		# Test Arena Button
 		var test_btn := Button.new()
@@ -541,8 +474,64 @@ func _create_level_buttons() -> void:
 		test_btn.pressed.connect(_on_test_arena_pressed)
 		_wire_button_Juice(test_btn)
 
-		level_grid.add_child(rift_btn)
-		level_grid.add_child(test_btn)
+		if is_unlocked:
+			# Only reveal the Abyssal Rift once Story Mode has been cleared!
+			var rift_btn := Button.new()
+			rift_btn.custom_minimum_size = Vector2(290, 88)
+			rift_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			rift_btn.focus_mode = Control.FOCUS_NONE
+
+			var r_box: StyleBoxFlat = LevelCardBuilder.make_button_style(
+				Color(0.18, 0.04, 0.12, 0.96),
+				Color(0.95, 0.45, 0.85, 0.95),
+				2, 12,
+				Color(0.8, 0.15, 0.5, 0.45), 8
+			)
+			rift_btn.add_theme_stylebox_override("normal", r_box)
+			rift_btn.add_theme_stylebox_override("hover", r_box)
+			rift_btn.add_theme_stylebox_override("pressed", r_box)
+
+			var rift_margin := MarginContainer.new()
+			rift_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+			rift_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			rift_margin.add_theme_constant_override("margin_left", 14)
+			rift_margin.add_theme_constant_override("margin_right", 12)
+			rift_margin.add_theme_constant_override("margin_top", 10)
+			rift_margin.add_theme_constant_override("margin_bottom", 10)
+			rift_btn.add_child(rift_margin)
+
+			var rift_vbox := VBoxContainer.new()
+			rift_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			rift_vbox.add_theme_constant_override("separation", 4)
+			rift_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+			rift_margin.add_child(rift_vbox)
+
+			var rift_title := Label.new()
+			rift_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			rift_title.text = "▼ ABYSSAL RIFT"
+			rift_title.add_theme_font_size_override("font_size", 16)
+			rift_title.add_theme_color_override("font_color", Color(1.0, 0.85, 0.95))
+			rift_vbox.add_child(rift_title)
+
+			var rift_sub := Label.new()
+			rift_sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			rift_sub.text = "DESCEND TO CHALLENGE MODE"
+			rift_sub.add_theme_font_size_override("font_size", 12)
+			rift_sub.add_theme_color_override("font_color", Color(0.95, 0.65, 0.85, 0.9))
+			rift_vbox.add_child(rift_sub)
+
+			rift_btn.pressed.connect(_descend_to_challenge_mode)
+			_wire_button_Juice(rift_btn)
+
+			level_grid.add_child(rift_btn)
+			level_grid.add_child(test_btn)
+		else:
+			# Story not cleared yet: Challenge Mode remains completely hidden
+			var spacer_bot := Control.new()
+			spacer_bot.custom_minimum_size = Vector2(290, 88)
+			spacer_bot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			level_grid.add_child(spacer_bot)
+			level_grid.add_child(test_btn)
 
 		var bot_pad_a := Control.new()
 		bot_pad_a.custom_minimum_size = Vector2(0, 24)
@@ -571,6 +560,7 @@ func _update_header_and_mode_ui() -> void:
 		if sector_label != null:
 			sector_label.text = "ABYSS VOID"
 		if mode_toggle != null:
+			mode_toggle.visible = true
 			mode_toggle.text = "⚡ CHALLENGE"
 			_style_mode_toggle(mode_toggle, true)
 	else:
@@ -588,6 +578,7 @@ func _update_header_and_mode_ui() -> void:
 		if sector_label != null:
 			sector_label.text = "ESCAPE DIRECTORY"
 		if mode_toggle != null:
+			mode_toggle.visible = GameState.is_story_completed()
 			mode_toggle.text = "◈ STORY"
 			_style_mode_toggle(mode_toggle, false)
 
@@ -609,28 +600,6 @@ func _update_header_and_mode_ui() -> void:
 func _on_rift_descend_triggered() -> void:
 	if GameState.is_story_completed():
 		_descend_to_challenge_mode()
-	else:
-		_show_challenge_locked_hint()
-
-
-func _show_challenge_locked_hint() -> void:
-	_play_ui_sound(_wav_error, -3.0, 0.9)
-	if OS.has_feature("mobile") or OS.get_name() == "Android":
-		Input.vibrate_handheld(45)
-
-	if subtitle_label != null:
-		var orig_text := subtitle_label.text
-		var orig_col := subtitle_label.get_theme_color("font_color")
-		var cleared_cnt := mini(GameState.story_highest_unlocked - 1, 21)
-		subtitle_label.text = "🔒 CLEAR ALL 21 STORY SECTORS TO UNLOCK (%d/21)" % cleared_cnt
-		subtitle_label.add_theme_color_override("font_color", Color(1.0, 0.45, 0.45, 1.0))
-		var tw := create_tween()
-		tw.tween_interval(2.2)
-		tw.tween_callback(func():
-			if is_instance_valid(subtitle_label):
-				subtitle_label.text = orig_text
-				subtitle_label.add_theme_color_override("font_color", orig_col)
-		)
 
 
 func _descend_to_challenge_mode() -> void:

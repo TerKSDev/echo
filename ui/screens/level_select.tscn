@@ -186,11 +186,11 @@ offset_right = -58.0
 offset_bottom = -22.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/separation = 34
+theme_override_constants/separation = 16
 
 [node name="HeaderBox" type="VBoxContainer" parent="MainArea"]
 layout_mode = 2
-theme_override_constants/separation = 6
+theme_override_constants/separation = 3
 
 [node name="TrackerLabel" type="Label" parent="MainArea/HeaderBox"]
 layout_mode = 2
@@ -227,9 +227,9 @@ horizontal_scroll_mode = 0
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/margin_left = 12
-theme_override_constants/margin_top = 28
+theme_override_constants/margin_top = 10
 theme_override_constants/margin_right = 12
-theme_override_constants/margin_bottom = 28
+theme_override_constants/margin_bottom = 24
 
 [node name="LevelGrid" type="GridContainer" parent="MainArea/ScrollContainer/GridMargin" unique_id=560705883]
 layout_mode = 2
