@@ -25,8 +25,6 @@ audio/ assets/                 Sound files, images
 2. Optional: add a `Marker2D` named `PlayerStart` for the spawn point.
 3. Append the path to `LEVELS` in `autoload/GameState.gd`.
 
-`levels/level_test.tscn` is a sandbox with one of each enemy.
-
 ## Enemies (player: walk 190, sneak 100)
 
 | Type | Start | Walk heard at | Speed (patrol / chase) | Special |

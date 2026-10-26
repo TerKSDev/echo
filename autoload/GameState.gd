@@ -12,8 +12,6 @@ const PROGRESS_PATH := "user://level_progress.cfg"
 enum GameMode { STORY, CHALLENGE }
 var current_mode: GameMode = GameMode.STORY
 
-const TEST_LEVEL_PATH := "res://levels/level_test.tscn"
-
 # Story Mode: 21 Levels (Level 0: Tutorial + Level 01 ~ Level 20)
 const STORY_LEVELS: Array[String] = [
 	"res://levels/level_0.tscn",
@@ -66,7 +64,6 @@ const CHALLENGE_LEVELS: Array[String] = [
 
 # Backwards compatibility list containing all registered game scenes
 const LEVELS: Array[String] = [
-	"res://levels/level_test.tscn",
 	"res://levels/level_0.tscn",
 	"res://levels/level_01.tscn",
 	"res://levels/level_02.tscn",

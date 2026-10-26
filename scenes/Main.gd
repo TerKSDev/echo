@@ -1,7 +1,6 @@
 extends Node2D
 ## Game container: loads the current level, then wires the systems together.
-## Supports both LevelRoot tilemap levels (level_01..level_13 with Water/Switch/Door/Exit)
-## and freeform arena scenes (level_test.tscn).
+## Supports LevelRoot tilemap levels with Water, Switch, Door, and Exit mechanisms.
 
 const TILE := 32.0
 const DOOR_COLOR := Color(1.0, 0.85, 0.2)

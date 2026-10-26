@@ -1,6 +1,5 @@
 extends Control
 
-const TEST_LEVEL_PATH := "res://levels/level_test.tscn"
 const Icons = preload("res://ui/icons/Icons.gd")
 const LevelPathRenderer = preload("res://ui/level_select/LevelPathRenderer.gd")
 const DepthGaugeRenderer = preload("res://ui/level_select/DepthGaugeRenderer.gd")
@@ -427,53 +426,6 @@ func _create_level_buttons() -> void:
 
 		# At the deepest bottom of Story Mode:
 		var is_unlocked := GameState.is_story_completed()
-
-		# Test Arena Button
-		var test_btn := Button.new()
-		test_btn.custom_minimum_size = Vector2(290, 88)
-		test_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		test_btn.focus_mode = Control.FOCUS_NONE
-		var t_box: StyleBoxFlat = LevelCardBuilder.make_button_style(
-			Color(0.03, 0.08, 0.14, 0.92),
-			Color(0.24, 0.55, 0.75, 0.75),
-			1, 12
-		)
-		test_btn.add_theme_stylebox_override("normal", t_box)
-		test_btn.add_theme_stylebox_override("hover", t_box)
-		test_btn.add_theme_stylebox_override("pressed", t_box)
-
-		var test_margin := MarginContainer.new()
-		test_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-		test_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		test_margin.add_theme_constant_override("margin_left", 14)
-		test_margin.add_theme_constant_override("margin_right", 12)
-		test_margin.add_theme_constant_override("margin_top", 10)
-		test_margin.add_theme_constant_override("margin_bottom", 10)
-		test_btn.add_child(test_margin)
-
-		var test_vbox := VBoxContainer.new()
-		test_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		test_vbox.add_theme_constant_override("separation", 4)
-		test_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-		test_margin.add_child(test_vbox)
-
-		var test_title := Label.new()
-		test_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		test_title.text = "🛠 TEST ARENA"
-		test_title.add_theme_font_size_override("font_size", 16)
-		test_title.add_theme_color_override("font_color", Color(0.85, 0.95, 1.0))
-		test_vbox.add_child(test_title)
-
-		var test_sub := Label.new()
-		test_sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		test_sub.text = "SANDBOX PROVING GROUND"
-		test_sub.add_theme_font_size_override("font_size", 12)
-		test_sub.add_theme_color_override("font_color", Color(0.48, 0.75, 0.92, 0.85))
-		test_vbox.add_child(test_sub)
-
-		test_btn.pressed.connect(_on_test_arena_pressed)
-		_wire_button_Juice(test_btn)
-
 		if is_unlocked:
 			# Only reveal the Abyssal Rift once Story Mode has been cleared!
 			var rift_btn := Button.new()
@@ -523,15 +475,12 @@ func _create_level_buttons() -> void:
 			rift_btn.pressed.connect(_descend_to_challenge_mode)
 			_wire_button_Juice(rift_btn)
 
-			level_grid.add_child(rift_btn)
-			level_grid.add_child(test_btn)
-		else:
-			# Story not cleared yet: Challenge Mode remains completely hidden
 			var spacer_bot := Control.new()
 			spacer_bot.custom_minimum_size = Vector2(290, 88)
 			spacer_bot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+			level_grid.add_child(rift_btn)
 			level_grid.add_child(spacer_bot)
-			level_grid.add_child(test_btn)
 
 		var bot_pad_a := Control.new()
 		bot_pad_a.custom_minimum_size = Vector2(0, 24)
@@ -679,11 +628,6 @@ func _on_level_pressed(level_number: int) -> void:
 		GameState.start_game(actual_level_index)
 	else:
 		GameState.change_level(level_path)
-
-
-func _on_test_arena_pressed() -> void:
-	_play_ui_sound(_wav_click, -4.0, 1.0)
-	GameState.start_game(0)
 
 
 func _unhandled_input(event: InputEvent) -> void:
