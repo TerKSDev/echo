@@ -37,39 +37,11 @@ func _ready() -> void:
 
 	_wire_button_Juice(credits_button)
 	credits_button.pressed.connect(_on_credits_pressed)
-	_build_settings_corner_button()
 
 	if touch_area != null:
 		touch_area.pressed.connect(_on_touch_area_pressed)
 
 	_build_modal_shell()
-
-
-func _build_settings_corner_button() -> void:
-	var content_node := get_node_or_null("Content") as Control
-	if content_node == null:
-		return
-	var settings_btn := Button.new()
-	settings_btn.name = "SettingsButton"
-	settings_btn.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	settings_btn.offset_left = 25.0
-	settings_btn.offset_top = -65.0
-	settings_btn.offset_right = 135.0
-	settings_btn.offset_bottom = -25.0
-	settings_btn.focus_mode = Control.FOCUS_NONE
-	settings_btn.flat = true
-	settings_btn.text = "⚙ SETTINGS"
-	settings_btn.add_theme_font_size_override("font_size", 13)
-	settings_btn.add_theme_color_override("font_color", Color(0.48, 0.68, 0.85, 0.55))
-	settings_btn.add_theme_color_override("font_hover_color", Color(0.85, 0.96, 1.0, 1.0))
-	settings_btn.add_theme_color_override("font_pressed_color", Color(0.38, 0.85, 1.0, 1.0))
-	content_node.add_child(settings_btn)
-	_wire_button_Juice(settings_btn)
-	settings_btn.pressed.connect(func():
-		if _descending or _is_modal_open:
-			return
-		GameState.go_to_settings("res://ui/screens/menu.tscn")
-	)
 
 
 func _process(delta: float) -> void:

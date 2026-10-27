@@ -66,7 +66,6 @@ func _draw() -> void:
 		draw_arc(Vector2.ZERO, boost_pulse, 0.0, TAU, 24, Color(1.0, 0.45, 0.1, 0.65 * maxf(enemy.visible_alpha, 0.5)), 1.8)
 
 	# Body is hidden until revealed by an echo (or while alert/screaming/alarming)
-	var always_shown := state == Enemy.State.ALERT or state == Enemy.State.SCREAM or state == Enemy.State.ALARM
 	if enemy.visible_alpha < 0.02 and not always_shown:
 		return
 
