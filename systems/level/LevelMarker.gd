@@ -8,6 +8,7 @@ enum Kind {
 	WATER,
 	SWITCH,
 	DOOR,
+	NOTE,
 }
 
 @export var kind: Kind = Kind.EXIT

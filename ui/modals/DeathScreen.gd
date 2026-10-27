@@ -100,12 +100,18 @@ func open(killer_type: int = -1) -> void:
 		killer_dot.color = col
 		killer_label.text = String(info["name"])
 		killer_label.add_theme_color_override("font_color", col.lerp(Color.WHITE, 0.35))
-		tip_label.text = String(info["tip"])
+		var tip_text: String = String(info["tip"])
+		if GameState.is_touch_or_mobile():
+			tip_text = tip_text.replace(" ([SHIFT])", "")
+		tip_label.text = tip_text
 	else:
 		killer_dot.color = Color(1.0, 0.28, 0.32)
 		killer_label.text = "DEVOURED BY THE ABYSS"
 		killer_label.add_theme_color_override("font_color", Color(1.0, 0.55, 0.58))
 		tip_label.text = "Every sound illuminates the cave, yet draws the attention of what lurks in the dark."
+
+	if retry_btn != null:
+		retry_btn.text = "TRY AGAIN" if GameState.is_touch_or_mobile() else "TRY AGAIN   [SPACE / R]"
 
 	var tw := create_tween().set_parallel(true)
 	tw.tween_property(self, "modulate:a", 1.0, 0.32).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)

@@ -77,12 +77,15 @@ func _draw() -> void:
 	_draw_stealth_icon(center, icon_col)
 
 	# Label below
-	var lbl_text := "STUNNED" if is_stunned else ("SNEAKING" if is_sneaking else ("TAP TO SNEAK" if tutorial_pulse else "SNEAK"))
+	var tut_lbl := "HOLD TO SNEAK" if GameState.sneak_hold_mode else "TAP TO SNEAK"
+	var lbl_text := "STUNNED" if is_stunned else ("SNEAKING" if is_sneaking else (tut_lbl if tutorial_pulse else "SNEAK"))
 	var lbl_col: Color = Color(0.48, 0.72, 0.92, 0.7).lerp(Color(0.5, 0.95, 1.0, 0.95), b)
 	if is_stunned:
 		lbl_col = Color(1.0, 0.38, 0.55, 0.85)
 	draw_string(ThemeDB.fallback_font, Vector2(0.0, 114.0), lbl_text, HORIZONTAL_ALIGNMENT_CENTER, int(size.x), 11, lbl_col)
-	draw_string(ThemeDB.fallback_font, Vector2(0.0, 127.0), "[SHIFT]", HORIZONTAL_ALIGNMENT_CENTER, int(size.x), 9, Color(lbl_col, 0.45))
+	if not GameState.is_touch_or_mobile():
+		var key_hint := "[HOLD SHIFT]" if GameState.sneak_hold_mode else "[SHIFT]"
+		draw_string(ThemeDB.fallback_font, Vector2(0.0, 127.0), key_hint, HORIZONTAL_ALIGNMENT_CENTER, int(size.x), 9, Color(lbl_col, 0.45))
 
 func _draw_stealth_icon(center: Vector2, col: Color) -> void:
 	Icons.draw_stealth(self, center, col)

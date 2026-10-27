@@ -23,6 +23,9 @@ var _is_active := false
 var _is_typing := false
 var _is_advancing := false
 var _dark_backdrop := true
+var _theme_mode := ""
+var _header_label: Label = null
+var _total_lines := 1
 var _type_tween: Tween = null
 var _time := 0.0
 var _last_char_count := 0
@@ -35,7 +38,9 @@ var _wav_advance: AudioStreamWAV
 
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	_build_audio()
+	_setup_header_label()
 	ripple_layer.draw.connect(_draw_ripples)
 	diamond_prompt.draw.connect(_draw_diamond_prompt)
 	touch_area.pressed.connect(_on_touch_pressed)
@@ -48,6 +53,20 @@ func _ready() -> void:
 	if content_box != null:
 		content_box.modulate.a = 0.0
 	touch_area.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+
+func _setup_header_label() -> void:
+	if content_box == null:
+		return
+	_header_label = Label.new()
+	_header_label.name = "HeaderLabel"
+	_header_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_header_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_header_label.add_theme_font_size_override("font_size", 12)
+	_header_label.add_theme_color_override("font_color", Color(0.42, 0.88, 1.0, 0.88))
+	_header_label.visible = false
+	content_box.add_child(_header_label)
+	content_box.move_child(_header_label, 0)
 
 
 func _process(delta: float) -> void:
@@ -76,12 +95,33 @@ func _process(delta: float) -> void:
 
 
 func _draw_ripples() -> void:
+	var vp_center := size * 0.5
+	if _theme_mode == "daylight" and _total_lines > 0:
+		var prog_sun := clampf(float(_current_line_idx) / float(maxi(_total_lines - 1, 1)), 0.0, 1.0)
+		if prog_sun > 0.05:
+			var sun_pulse := 0.88 + 0.12 * sin(_time * 1.8)
+			var base_r := (120.0 + prog_sun * 220.0) * sun_pulse
+			ripple_layer.draw_circle(vp_center, base_r * 1.35, Color(1.0, 0.82, 0.35, prog_sun * 0.08))
+			ripple_layer.draw_circle(vp_center, base_r * 0.85, Color(1.0, 0.90, 0.55, prog_sun * 0.11))
+			ripple_layer.draw_arc(vp_center, base_r, 0.0, TAU, 64, Color(1.0, 0.88, 0.45, prog_sun * 0.28), 1.8)
+	elif _theme_mode == "singularity":
+		var core_pulse := 0.85 + 0.15 * sin(_time * 2.2)
+		ripple_layer.draw_circle(vp_center, 150.0 * core_pulse, Color(0.85, 0.20, 0.55, 0.07))
+		ripple_layer.draw_arc(vp_center, 165.0 * core_pulse, 0.0, TAU, 64, Color(1.0, 0.42, 0.78, 0.22), 1.5)
+
+	var base_col := Color(0.35, 0.88, 1.0)
+	if _theme_mode == "daylight":
+		base_col = Color(1.0, 0.86, 0.42)
+	elif _theme_mode == "singularity":
+		base_col = Color(1.0, 0.45, 0.78)
+
 	for r in _ripples:
 		var dur: float = float(r.get("dur", 1.0))
 		var prog: float = clampf(float(r["age"]) / dur, 0.0, 1.0)
 		var rad: float = prog * float(r["max_r"])
 		var a: float = (1.0 - prog) * 0.40
-		ripple_layer.draw_arc(r["pos"], rad, 0.0, TAU, 48, Color(0.35, 0.88, 1.0, a), 1.6)
+		var r_col: Color = r.get("col", base_col)
+		ripple_layer.draw_arc(r["pos"], rad, 0.0, TAU, 48, Color(r_col.r, r_col.g, r_col.b, a), 1.6)
 
 
 func _draw_diamond_prompt() -> void:
@@ -95,7 +135,7 @@ func _draw_diamond_prompt() -> void:
 
 
 ## Start a sequential narrative sequence of dialogue lines
-func play_sequence(lines: Array, on_finished: Callable = Callable(), dark_backdrop: bool = true) -> void:
+func play_sequence(lines: Array, on_finished: Callable = Callable(), dark_backdrop: bool = true, header_text: String = "", theme_mode: String = "") -> void:
 	if lines.is_empty():
 		if on_finished.is_valid():
 			on_finished.call()
@@ -104,16 +144,42 @@ func play_sequence(lines: Array, on_finished: Callable = Callable(), dark_backdr
 	_queue.clear()
 	for item in lines:
 		_queue.append(str(item))
+	_total_lines = _queue.size()
 	_on_complete = on_finished
 	_is_active = true
 	_dark_backdrop = dark_backdrop
+	_theme_mode = theme_mode
 	_current_line_idx = 0
 	visible = true
 	modulate.a = 1.0
 	touch_area.mouse_filter = Control.MOUSE_FILTER_STOP
 
+	if _header_label != null:
+		if header_text != "":
+			_header_label.text = header_text
+			_header_label.visible = true
+			if _theme_mode == "daylight":
+				_header_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.40, 0.92))
+			elif _theme_mode == "singularity":
+				_header_label.add_theme_color_override("font_color", Color(1.0, 0.48, 0.80, 0.92))
+			else:
+				_header_label.add_theme_color_override("font_color", Color(0.42, 0.88, 1.0, 0.88))
+		else:
+			_header_label.visible = false
+
+	var center_box := get_node_or_null("CenterBox") as Control
+	if center_box != null:
+		if _dark_backdrop:
+			center_box.offset_top = 0.0
+			center_box.offset_bottom = 0.0
+		else:
+			# Position narration cleanly in the upper-middle above the centered player core
+			center_box.offset_top = -220.0
+			center_box.offset_bottom = -60.0
+
 	if _dark_backdrop and backdrop != null:
 		backdrop.visible = true
+		backdrop.color = Color(0.03, 0.01, 0.04, 1.0) if _theme_mode == "singularity" else Color(0.0, 0.0, 0.0, 1.0)
 		backdrop.modulate.a = 0.0
 		var b_tw := create_tween()
 		b_tw.tween_property(backdrop, "modulate:a", 1.0, 0.28).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
@@ -138,6 +204,27 @@ func _show_next_in_queue() -> void:
 	_is_typing = true
 	_is_advancing = false
 	_last_char_count = 0
+
+	# Progressive atmospheric backdrop evolution during Campaign Endings & Act Milestones
+	if _dark_backdrop and backdrop != null:
+		if _theme_mode == "daylight" and _total_lines > 1:
+			var prog := clampf(float(_current_line_idx) / float(_total_lines - 1), 0.0, 1.0)
+			var target_bg := Color(0.0, 0.01, 0.02, 1.0).lerp(Color(0.20, 0.15, 0.06, 1.0), prog)
+			create_tween().tween_property(backdrop, "color", target_bg, 0.85).set_trans(Tween.TRANS_SINE)
+			if dialogue_label != null:
+				var target_font := Color(0.92, 0.96, 1.0, 1.0).lerp(Color(1.0, 0.96, 0.84, 1.0), prog)
+				dialogue_label.add_theme_color_override("font_color", target_font)
+		elif dialogue_label != null:
+			dialogue_label.add_theme_color_override("font_color", Color(0.92, 0.96, 1.0, 1.0))
+
+	if _theme_mode != "":
+		var vp_center := size * 0.5 if size.x > 50.0 else Vector2(360.0, 320.0)
+		_ripples.append({
+			"pos": vp_center,
+			"age": 0.0,
+			"dur": 1.6,
+			"max_r": 260.0
+		})
 
 	dialogue_label.text = text
 	dialogue_label.visible_ratio = 0.0
@@ -312,7 +399,7 @@ func _play_sound(wav: AudioStreamWAV, volume_db: float = -12.0, pitch: float = 1
 	asp.stream = wav
 	asp.volume_db = volume_db
 	asp.pitch_scale = pitch
-	asp.bus = "Master"
+	asp.bus = &"SFX"
 	add_child(asp)
 	asp.finished.connect(asp.queue_free)
 	asp.play()

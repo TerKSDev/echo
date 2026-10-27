@@ -77,6 +77,10 @@ func emit_echo(origin: Vector2, radius: float, exclude: Array = [], show_wave: b
 	wave_clip_dists.resize(ray_count)
 	var last_primary_hit := Vector2(-99999.0, -99999.0)
 	var last_bounce_hit := Vector2(-99999.0, -99999.0)
+	var ray_query := PhysicsRayQueryParameters2D.new()
+	ray_query.collision_mask = 1
+	ray_query.exclude = wall_exclude_rids
+
 	for i in ray_count:
 		var cur_origin: Vector2 = origin
 		var cur_dir: Vector2 = Vector2.RIGHT.rotated(TAU * i / ray_count)
@@ -89,11 +93,10 @@ func emit_echo(origin: Vector2, radius: float, exclude: Array = [], show_wave: b
 			if remaining_dist < MIN_BOUNCE_REMAINING or cur_energy < 0.12:
 				break
 
-			var query := PhysicsRayQueryParameters2D.create(cur_origin, cur_origin + cur_dir * remaining_dist)
-			query.collision_mask = 1
-			query.exclude = wall_exclude_rids
+			ray_query.from = cur_origin
+			ray_query.to = cur_origin + cur_dir * remaining_dist
 
-			var hit: Dictionary = space.intersect_ray(query)
+			var hit: Dictionary = space.intersect_ray(ray_query)
 			if hit.is_empty():
 				break
 
@@ -190,6 +193,10 @@ func emit_echo(origin: Vector2, radius: float, exclude: Array = [], show_wave: b
 
 	_reveal_features(space, origin, radius, wall_exclude_rids)
 
+	var occ_query := PhysicsRayQueryParameters2D.new()
+	occ_query.collision_mask = 1
+	occ_query.exclude = exclude_rids
+
 	for enemy in get_tree().get_nodes_in_group("enemy"):
 		var enemy_node := enemy as Node2D
 		if enemy_node == null:
@@ -197,9 +204,8 @@ func emit_echo(origin: Vector2, radius: float, exclude: Array = [], show_wave: b
 		var dist: float = origin.distance_to(enemy_node.global_position)
 		if dist <= radius:
 			# Direct line of sight check
-			var occ_query := PhysicsRayQueryParameters2D.create(origin, enemy_node.global_position)
-			occ_query.collision_mask = 1
-			occ_query.exclude = exclude_rids
+			occ_query.from = origin
+			occ_query.to = enemy_node.global_position
 			var hit: Dictionary = space.intersect_ray(occ_query)
 
 			var is_revealed := false
@@ -214,10 +220,9 @@ func emit_echo(origin: Vector2, radius: float, exclude: Array = [], show_wave: b
 				var wall_n: Vector2 = hit.get("normal", Vector2.ZERO)
 				if wall_n != Vector2.ZERO:
 					var bounce_start: Vector2 = wall_pt + wall_n * 1.5
-					var bounce_query := PhysicsRayQueryParameters2D.create(bounce_start, enemy_node.global_position)
-					bounce_query.collision_mask = 1
-					bounce_query.exclude = exclude_rids
-					var bounce_hit: Dictionary = space.intersect_ray(bounce_query)
+					occ_query.from = bounce_start
+					occ_query.to = enemy_node.global_position
+					var bounce_hit: Dictionary = space.intersect_ray(occ_query)
 					if bounce_hit.is_empty():
 						var total_path: float = origin.distance_to(wall_pt) + wall_pt.distance_to(enemy_node.global_position)
 						if total_path <= radius:
@@ -237,12 +242,19 @@ func _reveal_features(space: PhysicsDirectSpaceState2D, origin: Vector2, max_dis
 	var main_node := get_parent()
 	if main_node == null or not main_node.has_method("echo_features"):
 		return
+	var max_dist_sq: float = max_dist * max_dist
+	var q := PhysicsRayQueryParameters2D.new()
+	q.collision_mask = 1
+	q.exclude = exclude
+
 	for f in main_node.echo_features():
 		var f_pos: Vector2 = Vector2(f["pos"])
-		var d: float = origin.distance_to(f_pos)
-		if d > max_dist:
+		var d_sq: float = origin.distance_squared_to(f_pos)
+		if d_sq > max_dist_sq:
 			continue
-		var q := PhysicsRayQueryParameters2D.create(origin, f_pos, 1, exclude)
+		var d: float = sqrt(d_sq)
+		q.from = origin
+		q.to = f_pos
 		var hit: Dictionary = space.intersect_ray(q)
 		var ok: bool = hit.is_empty()
 		if not ok and f.has("body"):
@@ -257,8 +269,9 @@ func _reveal_features(space: PhysicsDirectSpaceState2D, origin: Vector2, max_dis
 			var wall_pt: Vector2 = hit["position"]
 			var wall_n: Vector2 = hit.get("normal", Vector2.ZERO)
 			if wall_n != Vector2.ZERO:
-				var b_query := PhysicsRayQueryParameters2D.create(wall_pt + wall_n * 1.5, f_pos, 1, exclude)
-				var b_hit: Dictionary = space.intersect_ray(b_query)
+				q.from = wall_pt + wall_n * 1.5
+				q.to = f_pos
+				var b_hit: Dictionary = space.intersect_ray(q)
 				if b_hit.is_empty() or (f.has("body") and b_hit.get("collider") == f["body"]):
 					var total_path: float = origin.distance_to(wall_pt) + wall_pt.distance_to(f_pos)
 					if total_path <= max_dist:
@@ -282,6 +295,7 @@ func _reveal_features(space: PhysicsDirectSpaceState2D, origin: Vector2, max_dis
 					existing["pressed"] = is_pressed
 					existing["open"] = bool(f.get("open", false))
 					existing["locked"] = bool(f.get("locked", false))
+					existing["collected"] = bool(f.get("collected", false))
 					existing["color"] = f.get("color", Color.WHITE)
 					updated = true
 					break
@@ -294,6 +308,7 @@ func _reveal_features(space: PhysicsDirectSpaceState2D, origin: Vector2, max_dis
 					"pressed": is_pressed,
 					"open": bool(f.get("open", false)),
 					"locked": bool(f.get("locked", false)),
+					"collected": bool(f.get("collected", false)),
 					"color": f.get("color", Color.WHITE)
 				})
 	if marks.size() > MAX_MARKS:
@@ -313,24 +328,57 @@ func _process(delta):
 		return
 	_was_active = true
 
-	for p in points:
-		p["age"] += delta
-	points = points.filter(func(p): return p["age"] < LIFETIME)
+	if not points.is_empty():
+		var wp := 0
+		for i in points.size():
+			var p: Dictionary = points[i]
+			var next_age: float = float(p["age"]) + delta
+			if next_age < LIFETIME:
+				p["age"] = next_age
+				points[wp] = p
+				wp += 1
+		if wp < points.size():
+			points.resize(wp)
 
-	for m in marks:
-		m["age"] += delta
-	marks = marks.filter(func(m): return m["age"] < LIFETIME * 1.35)
+	if not marks.is_empty():
+		var wm := 0
+		var max_mark_age: float = LIFETIME * 1.35
+		for i in marks.size():
+			var m: Dictionary = marks[i]
+			var next_age: float = float(m["age"]) + delta
+			if next_age < max_mark_age:
+				m["age"] = next_age
+				marks[wm] = m
+				wm += 1
+		if wm < marks.size():
+			marks.resize(wm)
 
-	for w in waves:
-		w["age"] += delta
-	waves = waves.filter(func(w): return w["age"] * WAVE_SPEED < w["max_radius"])
+	if not waves.is_empty():
+		var ww := 0
+		for i in waves.size():
+			var w: Dictionary = waves[i]
+			var next_age: float = float(w["age"]) + delta
+			if next_age * WAVE_SPEED < float(w["max_radius"]):
+				w["age"] = next_age
+				waves[ww] = w
+				ww += 1
+		if ww < waves.size():
+			waves.resize(ww)
 
-	for mt in motes:
-		mt["age"] += delta
-		if mt["age"] > 0.0:
-			mt["pos"] = Vector2(mt["pos"]) + Vector2(mt["vel"]) * delta
-			mt["vel"] = Vector2(mt["vel"]).move_toward(Vector2(0.0, -4.0), delta * 12.0)
-	motes = motes.filter(func(mt): return mt["age"] < float(mt["life"]))
+	if not motes.is_empty():
+		var wmt := 0
+		for i in motes.size():
+			var mt: Dictionary = motes[i]
+			var next_age: float = float(mt["age"]) + delta
+			if next_age < float(mt["life"]):
+				mt["age"] = next_age
+				if next_age > 0.0:
+					mt["pos"] = Vector2(mt["pos"]) + Vector2(mt["vel"]) * delta
+					mt["vel"] = Vector2(mt["vel"]).move_toward(Vector2(0.0, -4.0), delta * 12.0)
+				motes[wmt] = mt
+				wmt += 1
+		if wmt < motes.size():
+			motes.resize(wmt)
 
 	queue_redraw()
 
@@ -469,13 +517,17 @@ func _draw():
 				if f_type == "door":
 					var is_open: bool = bool(f.get("open", false))
 					var tex: Texture2D = icon_door_open if is_open else icon_door_closed
+					if not is_open:
+						draw_rect(Rect2(lp - Vector2(16, 16), Vector2(32, 32)), Color(base.r, base.g, base.b, 0.22), false, 1.5)
 					if tex != null:
-						draw_texture_rect(tex, Rect2(lp - Vector2(16, 16), Vector2(32, 32)), false,
+						draw_texture_rect(tex, Rect2(lp - Vector2(15, 15), Vector2(30, 30)), false,
 							Color(base.r, base.g, base.b, 0.35 if is_open else 0.6))
 					else:
 						draw_rect(Rect2(lp - Vector2(15, 15), Vector2(30, 30)), Color(base.r, base.g, base.b, 0.35 if is_open else 0.6), false, 2.0)
 				else:
 					var used: bool = bool(f.get("pressed", false))
+					if not used:
+						draw_arc(lp, 18.0, 0.0, TAU, 24, Color(base.r, base.g, base.b, 0.25), 1.0)
 					if icon_key != null:
 						draw_texture_rect(icon_key, Rect2(lp - Vector2(15, 15), Vector2(30, 30)), false,
 							Color(base.r, base.g, base.b, 0.22 if used else 0.6))
@@ -511,10 +563,20 @@ func _draw_mark(m: Dictionary, a: float) -> void:
 			draw_line(p + Vector2(-2.0, 4.5), p + Vector2(5.0, 7.2), c, 1.5)
 			draw_line(p + Vector2(5.0, 7.2), p + Vector2(9.5, 5.5), c, 1.5)
 		"switch":
-			# Key icon, tinted with the link colour; dimmed once collected.
+			# Resonator Key: Key icon with link color, plus acoustic harmonic resonance rings
 			var is_pressed: bool = bool(m.get("pressed", false))
 			var base: Color = m.get("color", SWITCH_COLOR)
-			var c := Color(base.r, base.g, base.b, a * (0.4 if is_pressed else 1.0))
+			var c := Color(base.r, base.g, base.b, a * (0.35 if is_pressed else 1.0))
+			if not is_pressed:
+				var t := Time.get_ticks_msec() / 1000.0
+				var pulse := 0.5 + 0.5 * sin(t * 3.6)
+				var r_out := 18.0 + pulse * 3.5
+				draw_arc(p, r_out, 0.0, TAU, 32, Color(base.r, base.g, base.b, a * (0.28 + 0.15 * pulse)), 1.2)
+				for i in 4:
+					var ang := i * PI * 0.5
+					var dir := Vector2(cos(ang), sin(ang))
+					draw_line(p + dir * (r_out - 2.5), p + dir * (r_out + 3.0), Color(base.r, base.g, base.b, a * 0.45), 1.2)
+				draw_circle(p, 10.0, Color(base.r, base.g, base.b, a * 0.12))
 			if icon_key != null:
 				draw_texture_rect(icon_key, Rect2(p - Vector2(15, 15), Vector2(30, 30)), false, c)
 			else:
@@ -522,13 +584,29 @@ func _draw_mark(m: Dictionary, a: float) -> void:
 				if not is_pressed:
 					draw_circle(p, 3.5, c)
 		"door":
-			# Closed-door icon, or the open-door icon once its key has been used.
+			# Ancient Airlock / Sealed Gate with acoustic energy barrier
 			var base: Color = m.get("color", DOOR_COLOR)
 			var is_open: bool = bool(m.get("open", false))
-			var c := Color(base.r, base.g, base.b, a * (0.7 if is_open else 1.0))
+			var c := Color(base.r, base.g, base.b, a * (0.55 if is_open else 1.0))
+			if not is_open:
+				var d_box := Rect2(p - Vector2(16, 16), Vector2(32, 32))
+				draw_rect(d_box, Color(base.r, base.g, base.b, a * 0.12), true)
+				draw_rect(d_box, Color(base.r, base.g, base.b, a * 0.65), false, 1.5)
+				var blen := 6.0
+				draw_line(p + Vector2(-16, -16), p + Vector2(-16 + blen, -16), c, 2.0)
+				draw_line(p + Vector2(-16, -16), p + Vector2(-16, -16 + blen), c, 2.0)
+				draw_line(p + Vector2(16, -16), p + Vector2(16 - blen, -16), c, 2.0)
+				draw_line(p + Vector2(16, -16), p + Vector2(16, -16 + blen), c, 2.0)
+				draw_line(p + Vector2(-16, 16), p + Vector2(-16 + blen, 16), c, 2.0)
+				draw_line(p + Vector2(-16, 16), p + Vector2(-16, 16 - blen), c, 2.0)
+				draw_line(p + Vector2(16, 16), p + Vector2(16 - blen, 16), c, 2.0)
+				draw_line(p + Vector2(16, 16), p + Vector2(16, 16 - blen), c, 2.0)
+			else:
+				draw_line(p + Vector2(-15, -16), p + Vector2(-15, 16), Color(base.r, base.g, base.b, a * 0.35), 1.5)
+				draw_line(p + Vector2(15, -16), p + Vector2(15, 16), Color(base.r, base.g, base.b, a * 0.35), 1.5)
 			var tex: Texture2D = icon_door_open if is_open else icon_door_closed
 			if tex != null:
-				draw_texture_rect(tex, Rect2(p - Vector2(16, 16), Vector2(32, 32)), false, c)
+				draw_texture_rect(tex, Rect2(p - Vector2(15, 15), Vector2(30, 30)), false, c)
 			else:
 				draw_rect(Rect2(p - Vector2(15, 15), Vector2(30, 30)), c, false, 2.0)
 				if not is_open:
@@ -539,3 +617,24 @@ func _draw_mark(m: Dictionary, a: float) -> void:
 			var ec: Color = Color(1.0, 0.2, 0.2) if bool(m.get("locked", false)) else Color(0.55, 1.0, 0.92)
 			draw_rect(Rect2(p - Vector2(16, 16), Vector2(32, 32)), Color(ec.r, ec.g, ec.b, a), false, 3.0)
 			draw_rect(Rect2(p - Vector2(22, 22), Vector2(44, 44)), Color(ec.r, ec.g, ec.b, a * 0.5), false, 1.5)
+		"note":
+			# Expedition archive / journal fragment: glowing golden parchment / diamond glyph
+			var is_collected: bool = bool(m.get("collected", false))
+			var nc := Color(1.0, 0.82, 0.35, a * (0.45 if is_collected else 1.0))
+			if not is_collected:
+				var t := Time.get_ticks_msec() / 1000.0
+				var pulse := 0.5 + 0.5 * sin(t * 4.2)
+				var r_out := 15.0 + pulse * 3.0
+				draw_circle(p, 9.5, Color(1.0, 0.85, 0.35, a * 0.14))
+				draw_arc(p, r_out, 0.0, TAU, 28, Color(1.0, 0.90, 0.48, a * (0.32 + 0.18 * pulse)), 1.2)
+			var pts := PackedVector2Array([
+				p + Vector2(0.0, -11.0),
+				p + Vector2(10.0, 0.0),
+				p + Vector2(0.0, 11.0),
+				p + Vector2(-10.0, 0.0),
+				p + Vector2(0.0, -11.0)
+			])
+			draw_polyline(pts, nc, 2.0)
+			draw_line(p + Vector2(-4.0, -3.0), p + Vector2(4.0, -3.0), nc, 1.5)
+			draw_line(p + Vector2(-4.0, 1.0), p + Vector2(4.0, 1.0), nc, 1.5)
+			draw_line(p + Vector2(-4.0, 5.0), p + Vector2(1.0, 5.0), nc, 1.5)

@@ -18,6 +18,8 @@ var _body: VBoxContainer
 var _is_open := false
 var _time := 0.0
 
+var _current_tab := 0
+var _tab_buttons: Array[Button] = []
 var _bestiary_entries: Array[Dictionary] = []
 var _sfx_mgr: SfxManager
 var _wav_click: AudioStreamWAV
@@ -93,8 +95,8 @@ func open() -> void:
 	_is_open = true
 	visible = true
 	_sync_viewport_size()
-	if _bestiary_entries.is_empty():
-		_populate_content()
+	_update_tab_button_styles()
+	_populate_content()
 
 	var tw := create_tween().set_parallel(true)
 	tw.tween_property(self, "modulate:a", 1.0, 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
@@ -197,9 +199,31 @@ func _build_modal_shell() -> void:
 	top_div.color = Color(0.2, 0.48, 0.74, 0.45)
 	outer_vbox.add_child(top_div)
 
+	var tab_bar := HBoxContainer.new()
+	tab_bar.custom_minimum_size = Vector2(0, 32)
+	tab_bar.add_theme_constant_override("separation", 8)
+	outer_vbox.add_child(tab_bar)
+
+	_tab_buttons.clear()
+	var tabs_info := [
+		{"id": 0, "label": "THREAT BESTIARY"},
+		{"id": 1, "label": "SURVIVOR ARCHIVES"},
+		{"id": 2, "label": "ACCESSIBILITY & ETHOS"}
+	]
+	for t in tabs_info:
+		var btn := Button.new()
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		btn.focus_mode = Control.FOCUS_NONE
+		btn.add_theme_font_size_override("font_size", 11)
+		btn.pressed.connect(_on_tab_pressed.bind(int(t["id"])))
+		tab_bar.add_child(btn)
+		_tab_buttons.append(btn)
+
+	_update_tab_button_styles()
+
 	_scroll = ScrollContainer.new()
 	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_scroll.custom_minimum_size = Vector2(530, 480)
+	_scroll.custom_minimum_size = Vector2(530, 440)
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	outer_vbox.add_child(_scroll)
@@ -218,11 +242,75 @@ func _build_modal_shell() -> void:
 	scroll_margin.add_child(_body)
 
 
+func _update_tab_button_styles() -> void:
+	var col_notes := GameState.get_collected_note_count()
+	var tot_notes := GameState.get_total_note_count()
+	var titles := [
+		"THREAT BESTIARY",
+		"SURVIVOR ARCHIVES (%d/%d)" % [col_notes, tot_notes],
+		"ACCESSIBILITY & ETHOS"
+	]
+	for i in range(_tab_buttons.size()):
+		var btn: Button = _tab_buttons[i]
+		btn.text = titles[i]
+		var is_active := (i == _current_tab)
+		var style := StyleBoxFlat.new()
+		style.set_corner_radius_all(6)
+		style.content_margin_left = 6.0
+		style.content_margin_right = 6.0
+		style.content_margin_top = 4.0
+		style.content_margin_bottom = 4.0
+		if is_active:
+			if i == 1:
+				style.bg_color = Color(0.24, 0.18, 0.06, 0.95)
+				style.border_color = Color(1.0, 0.82, 0.35, 0.9)
+			else:
+				style.bg_color = Color(0.12, 0.28, 0.48, 0.95)
+				style.border_color = Color(0.38, 0.75, 1.0, 0.9)
+			style.set_border_width_all(1)
+			btn.add_theme_color_override("font_color", Color.WHITE)
+		else:
+			style.bg_color = Color(0.04, 0.09, 0.16, 0.6)
+			style.border_color = Color(0.15, 0.25, 0.38, 0.4)
+			style.set_border_width_all(1)
+			btn.add_theme_color_override("font_color", Color(0.55, 0.70, 0.85, 0.7))
+		btn.add_theme_stylebox_override("normal", style)
+		btn.add_theme_stylebox_override("hover", style)
+		btn.add_theme_stylebox_override("pressed", style)
+		btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+
+
+func _on_tab_pressed(idx: int) -> void:
+	if _current_tab == idx:
+		return
+	_current_tab = idx
+	_play_ui_sound(_wav_click, -4.0, 1.1)
+	_update_tab_button_styles()
+	_populate_content()
+	if _scroll != null:
+		_scroll.scroll_vertical = 0
+
+
 func _populate_content() -> void:
 	for child in _body.get_children():
 		child.queue_free()
 	_bestiary_entries.clear()
 
+	match _current_tab:
+		0:
+			_subtitle_lbl.text = "ACOUSTIC BESTIARY • TAP ENTITY TO PROVOKE EFFECTS"
+			_populate_bestiary()
+		1:
+			var col := GameState.get_collected_note_count()
+			var tot := GameState.get_total_note_count()
+			_subtitle_lbl.text = "VANGUARD VII EXPEDITION LOGS • %d / %d ARCHIVES RECOVERED" % [col, tot]
+			_populate_lore_notes()
+		2:
+			_subtitle_lbl.text = "NON-VIOLENT ETHOS • UNIVERSAL ACCESSIBILITY GUIDELINES"
+			_populate_ethos()
+
+
+func _populate_bestiary() -> void:
 	_add_section_header("THREAT ARCHIVE & ACOUSTIC SPECIMENS")
 
 	_add_bestiary_card(
@@ -266,7 +354,184 @@ func _populate_content() -> void:
 		"Minimize voice and sonar usage; extract swiftly."
 	)
 
-	_add_divider()
+
+func _populate_lore_notes() -> void:
+	var col_count: int = GameState.get_collected_note_count()
+	var tot_count: int = GameState.get_total_note_count()
+	var pct: float = (float(col_count) / float(tot_count) * 100.0) if tot_count > 0 else 0.0
+
+	var banner := PanelContainer.new()
+	var b_style := StyleBoxFlat.new()
+	b_style.content_margin_left = 14.0
+	b_style.content_margin_top = 10.0
+	b_style.content_margin_right = 14.0
+	b_style.content_margin_bottom = 10.0
+	b_style.bg_color = Color(0.04, 0.06, 0.1, 0.95)
+	b_style.border_color = Color(0.9, 0.75, 0.35, 0.75)
+	b_style.set_border_width_all(1)
+	b_style.set_corner_radius_all(10)
+	banner.add_theme_stylebox_override("panel", b_style)
+	_body.add_child(banner)
+
+	var b_vbox := VBoxContainer.new()
+	b_vbox.add_theme_constant_override("separation", 3)
+	banner.add_child(b_vbox)
+
+	var b_top := HBoxContainer.new()
+	b_vbox.add_child(b_top)
+
+	var b_title := Label.new()
+	b_title.text = "FIELD LOGS OF VANGUARD VII EXPEDITION"
+	b_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	b_title.add_theme_font_size_override("font_size", 13)
+	b_title.add_theme_color_override("font_color", Color(1.0, 0.88, 0.55, 1.0))
+	b_top.add_child(b_title)
+
+	var b_badge := Label.new()
+	b_badge.text = "COLLECTED: %d / %d (%.0f%%)" % [col_count, tot_count, pct]
+	b_badge.add_theme_font_size_override("font_size", 11)
+	b_badge.add_theme_color_override("font_color", Color(0.4, 0.95, 0.75, 1.0) if col_count == tot_count else Color(1.0, 0.82, 0.35, 0.9))
+	b_top.add_child(b_badge)
+
+	var b_desc := Label.new()
+	b_desc.text = "Subterranean archives left by Dr. Thorne, Maya Lin, Scout Jarek, and Elena. Hidden across the 20 Story Mode Sectors. Touch them in the caverns to recover."
+	b_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	b_desc.add_theme_font_size_override("font_size", 10)
+	b_desc.add_theme_color_override("font_color", Color(0.72, 0.82, 0.92, 0.8))
+	b_vbox.add_child(b_desc)
+
+	var all_notes := GameState.get_all_notes()
+	for note_data in all_notes:
+		_add_lore_note_card(note_data)
+
+
+func _add_lore_note_card(note_data: Dictionary) -> void:
+	var nid: String = str(note_data.get("id", ""))
+	var is_collected: bool = bool(note_data.get("collected", false))
+	var lvl_num: int = int(note_data.get("level", 1))
+	var depth_str: String = str(note_data.get("depth", ""))
+	var author_str: String = str(note_data.get("author", "Unknown Survivor"))
+	var title_str: String = str(note_data.get("title", "LOST ARCHIVE"))
+	var text_str: String = str(note_data.get("text", ""))
+
+	var card := PanelContainer.new()
+	var card_style := StyleBoxFlat.new()
+	card_style.content_margin_left = 12.0
+	card_style.content_margin_top = 8.0
+	card_style.content_margin_right = 12.0
+	card_style.content_margin_bottom = 8.0
+	card_style.set_corner_radius_all(8)
+	card_style.set_border_width_all(1)
+
+	if is_collected:
+		card_style.bg_color = Color(0.02, 0.045, 0.08, 0.94)
+		card_style.border_color = Color(0.85, 0.68, 0.28, 0.6)
+	else:
+		card_style.bg_color = Color(0.012, 0.02, 0.035, 0.75)
+		card_style.border_color = Color(0.18, 0.28, 0.38, 0.35)
+	card.add_theme_stylebox_override("panel", card_style)
+
+	var hbox := HBoxContainer.new()
+	hbox.add_theme_constant_override("separation", 10)
+	card.add_child(hbox)
+
+	var icon_box := CenterContainer.new()
+	icon_box.custom_minimum_size = Vector2(28, 28)
+	hbox.add_child(icon_box)
+
+	var icon_lbl := Label.new()
+	icon_lbl.text = "◈" if is_collected else "◇"
+	icon_lbl.add_theme_font_size_override("font_size", 16)
+	icon_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.4) if is_collected else Color(0.4, 0.5, 0.6, 0.5))
+	icon_box.add_child(icon_lbl)
+
+	var vbox := VBoxContainer.new()
+	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.add_theme_constant_override("separation", 2)
+	hbox.add_child(vbox)
+
+	var meta_row := HBoxContainer.new()
+	meta_row.add_theme_constant_override("separation", 6)
+	vbox.add_child(meta_row)
+
+	var sec_lbl := Label.new()
+	sec_lbl.text = "SECTOR %02d  •  %s" % [lvl_num, depth_str]
+	sec_lbl.add_theme_font_size_override("font_size", 10)
+	sec_lbl.add_theme_color_override("font_color", Color(0.85, 0.70, 0.35, 0.9) if is_collected else Color(0.45, 0.55, 0.65, 0.6))
+	meta_row.add_child(sec_lbl)
+
+	if is_collected and author_str != "":
+		var sep := Label.new()
+		sep.text = "•"
+		sep.add_theme_font_size_override("font_size", 10)
+		sep.add_theme_color_override("font_color", Color(0.4, 0.55, 0.7, 0.6))
+		meta_row.add_child(sep)
+
+		var auth_lbl := Label.new()
+		auth_lbl.text = author_str
+		auth_lbl.add_theme_font_size_override("font_size", 10)
+		auth_lbl.add_theme_color_override("font_color", Color(0.65, 0.82, 0.95, 0.8))
+		meta_row.add_child(auth_lbl)
+
+	var title_lbl := Label.new()
+	if is_collected:
+		title_lbl.text = title_str
+		title_lbl.add_theme_color_override("font_color", Color(0.96, 0.94, 0.90, 1.0))
+	else:
+		title_lbl.text = "??? [UNDISCOVERED LOG]"
+		title_lbl.add_theme_color_override("font_color", Color(0.45, 0.55, 0.65, 0.65))
+	title_lbl.add_theme_font_size_override("font_size", 13)
+	vbox.add_child(title_lbl)
+
+	var excerpt_lbl := Label.new()
+	excerpt_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	excerpt_lbl.add_theme_font_size_override("font_size", 11)
+	if is_collected:
+		var snippet := text_str.substr(0, 95)
+		if text_str.length() > 95:
+			snippet += "..."
+		excerpt_lbl.text = snippet
+		excerpt_lbl.add_theme_color_override("font_color", Color(0.72, 0.80, 0.88, 0.85))
+	else:
+		excerpt_lbl.text = "Locate and touch this expedition log in Story Mode Sector %02d to decrypt." % lvl_num
+		excerpt_lbl.add_theme_color_override("font_color", Color(0.38, 0.46, 0.55, 0.6))
+	vbox.add_child(excerpt_lbl)
+
+	var right_box := CenterContainer.new()
+	right_box.custom_minimum_size = Vector2(80, 0)
+	hbox.add_child(right_box)
+
+	if is_collected:
+		var read_btn := Button.new()
+		read_btn.text = "READ"
+		read_btn.custom_minimum_size = Vector2(70, 26)
+		read_btn.focus_mode = Control.FOCUS_NONE
+		read_btn.add_theme_font_size_override("font_size", 11)
+		var btn_style := StyleBoxFlat.new()
+		btn_style.bg_color = Color(0.20, 0.16, 0.05, 0.85)
+		btn_style.border_color = Color(0.95, 0.80, 0.35, 0.85)
+		btn_style.set_border_width_all(1)
+		btn_style.set_corner_radius_all(6)
+		read_btn.add_theme_stylebox_override("normal", btn_style)
+		read_btn.add_theme_color_override("font_color", Color(1.0, 0.90, 0.65))
+		read_btn.pressed.connect(func():
+			_play_ui_sound(_wav_click, -4.0, 1.2)
+			var script: GDScript = load("res://ui/modals/NoteReadModal.gd") as GDScript
+			if script != null:
+				script.open_note(self, note_data)
+		)
+		right_box.add_child(read_btn)
+	else:
+		var lock_lbl := Label.new()
+		lock_lbl.text = "LOCKED"
+		lock_lbl.add_theme_font_size_override("font_size", 10)
+		lock_lbl.add_theme_color_override("font_color", Color(0.35, 0.45, 0.55, 0.5))
+		right_box.add_child(lock_lbl)
+
+	_body.add_child(card)
+
+
+func _populate_ethos() -> void:
 	_add_section_header("CORE ETHOS • 核心正向价值与非暴力生存")
 	_add_guide_row(Color(0.35, 0.95, 0.75), "NON-VIOLENCE", "ECHO contains zero weapons and zero violence. Survival is achieved through mindfulness, calmness, and acoustic deflection rather than destruction.")
 	_add_guide_row(Color(0.45, 0.82, 1.0), "INNER RESILIENCE", "The subterranean ascent represents overcoming mental darkness, anxiety, and panic. Silence is your shield; resonance is your compass.")

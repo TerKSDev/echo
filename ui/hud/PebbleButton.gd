@@ -178,7 +178,8 @@ func _draw() -> void:
 		label_col = Color(0.55, 0.62, 0.7, 0.35)
 
 	draw_string(ThemeDB.fallback_font, Vector2(0.0, 84.0), label_text, HORIZONTAL_ALIGNMENT_CENTER, int(size.x), 10, label_col)
-	draw_string(ThemeDB.fallback_font, Vector2(0.0, 96.0), "[E / AIM]", HORIZONTAL_ALIGNMENT_CENTER, int(size.x), 8, Color(label_col, 0.45 * empty_alpha_mult))
+	if not GameState.is_touch_or_mobile():
+		draw_string(ThemeDB.fallback_font, Vector2(0.0, 96.0), "[E / AIM]", HORIZONTAL_ALIGNMENT_CENTER, int(size.x), 8, Color(label_col, 0.45 * empty_alpha_mult))
 
 
 func _draw_pebble_icon(center: Vector2, col: Color, is_empty: bool) -> void:

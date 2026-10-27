@@ -7,21 +7,27 @@ var enemy: Enemy
 
 
 func _draw() -> void:
-	if enemy == null or enemy.is_wall_occluded:
+	if enemy == null:
 		return
+	var state := enemy.state
+	var always_shown := state == Enemy.State.ALERT or state == Enemy.State.SCREAM or state == Enemy.State.ALARM
+	if enemy.is_wall_occluded and enemy.visible_alpha < 0.02 and not always_shown:
+		return
+
 	var base := EnemyPresets.color_of(enemy.enemy_type)
 	var t := Time.get_ticks_msec() / 1000.0
-	var state := enemy.state
 
 	# 1. Footstep ripples (mobile enemies)
-	for r in enemy.step_ripples:
-		var prog: float = float(r["age"])
-		var rad: float = prog * float(r["max_r"])
-		var is_water: bool = bool(r.get("is_water", false))
-		var col_r := Color(0.28, 0.75, 1.0, (1.0 - prog) * 0.55) if is_water else Color(base, (1.0 - prog) * 0.4)
-		draw_arc(to_local(Vector2(r["pos"])), rad, 0.0, TAU, 20, col_r, 1.6 if is_water else 1.2)
-		if is_water and prog < 0.55:
-			draw_arc(to_local(Vector2(r["pos"])), rad * 0.55, 0.0, TAU, 16, Color(0.5, 0.9, 1.0, (1.0 - prog) * 0.35), 1.0)
+	if not enemy.is_wall_occluded or enemy.visible_alpha >= 0.02 or state == Enemy.State.INVESTIGATE:
+		var occ_mult: float = 0.55 if enemy.is_wall_occluded else 1.0
+		for r in enemy.step_ripples:
+			var prog: float = float(r["age"])
+			var rad: float = prog * float(r["max_r"])
+			var is_water: bool = bool(r.get("is_water", false))
+			var col_r := Color(0.28, 0.75, 1.0, (1.0 - prog) * 0.55 * occ_mult) if is_water else Color(base, (1.0 - prog) * 0.4 * occ_mult)
+			draw_arc(to_local(Vector2(r["pos"])), rad, 0.0, TAU, 20, col_r, 1.6 if is_water else 1.2)
+			if is_water and prog < 0.55:
+				draw_arc(to_local(Vector2(r["pos"])), rad * 0.55, 0.0, TAU, 16, Color(0.5, 0.9, 1.0, (1.0 - prog) * 0.35 * occ_mult), 1.0)
 
 	# 2. Proximity aura and pulse
 	var proximity := enemy.proximity

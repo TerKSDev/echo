@@ -364,6 +364,16 @@ func _process_heartbeat(delta: float) -> void:
 		beat.emit(_threat)
 
 
+func play_single_heartbeat(vol_db: float = -6.0, pitch: float = 0.9) -> void:
+	if not _hb_players.is_empty():
+		var p := _hb_players[_hb_idx]
+		_hb_idx = (_hb_idx + 1) % _hb_players.size()
+		p.volume_db = vol_db
+		p.pitch_scale = pitch
+		p.play()
+		beat.emit(0.25)
+
+
 func _setup_ambient_drone() -> void:
 	if _ambient_drone_player != null:
 		return
@@ -607,64 +617,155 @@ static func _make_wav(samples: PackedFloat32Array, loop: bool = false) -> AudioS
 	return wav
 
 
-# Stone cavern footstep: 4 distinct natural variations (heel strike, sole impact, toe scuff, hollow rock)
+# Stone cavern footstep: 4 distinct natural variations with biphasic heel-to-toe roll & filtered mineral grit
 func _synth_step_walk(variant: int = 0) -> AudioStreamWAV:
-	var dur := 0.16
+	var dur := 0.17
 	var count := int(dur * MIX_RATE)
 	var out := PackedFloat32Array()
 	out.resize(count)
-	var phase := 0.0
-	var f_start: float = [148.0, 162.0, 136.0, 175.0][clampi(variant, 0, 3)]
-	var f_end: float = [44.0, 52.0, 40.0, 56.0][clampi(variant, 0, 3)]
-	var decay: float = [26.0, 31.0, 24.0, 33.0][clampi(variant, 0, 3)]
-	var grit_freq: float = [880.0, 1150.0, 720.0, 1340.0][clampi(variant, 0, 3)]
+	var v_idx := clampi(variant, 0, 3)
+	var f_heel_start: float = [142.0, 156.0, 132.0, 168.0][v_idx]
+	var f_heel_end: float = [46.0, 52.0, 42.0, 55.0][v_idx]
+	var f_toe_start: float = [96.0, 108.0, 88.0, 114.0][v_idx]
+	var toe_delay: float = [0.044, 0.048, 0.041, 0.046][v_idx]
+	var bp_freq: float = [760.0, 920.0, 680.0, 1040.0][v_idx]
+	var grain_t1: float = [0.009, 0.012, 0.007, 0.014][v_idx]
+	var grain_t2: float = [0.052, 0.058, 0.049, 0.055][v_idx]
+
+	var phase_heel := 0.0
+	var phase_toe := 0.0
+	var lp1 := 0.0
+	var lp2 := 0.0
+	var alpha_hp: float = clampf(TAU * bp_freq / MIX_RATE, 0.05, 0.45)
+	var alpha_lp: float = clampf(TAU * (bp_freq * 1.8) / MIX_RATE, 0.10, 0.65)
+
 	for i in count:
 		var t: float = float(i) / MIX_RATE
-		var freq: float = lerpf(f_start, f_end, clampf(t / 0.08, 0.0, 1.0))
-		phase += TAU * freq / MIX_RATE
-		var thump: float = sin(phase) * exp(-t * decay)
-		var grit: float = randf_range(-1.0, 1.0) * exp(-t * 48.0) * sin(t * grit_freq)
-		out[i] = (thump * 0.74 + grit * 0.36) * 0.85
+		# 1. Heel strike (t = 0.000s): firm limestone boot heel thud
+		var h_att: float = minf(t / 0.0018, 1.0)
+		var f_h: float = lerpf(f_heel_start, f_heel_end, clampf(t / 0.055, 0.0, 1.0))
+		phase_heel += TAU * f_h / MIX_RATE
+		var heel_thud: float = (sin(phase_heel) + 0.28 * sin(phase_heel * 2.1)) * h_att * exp(-t * 34.0)
+
+		# 2. Forefoot / sole roll (t = toe_delay): natural weight transfer
+		var toe_thud := 0.0
+		var toe_grit_env := 0.0
+		if t >= toe_delay:
+			var tt: float = t - toe_delay
+			var t_att: float = minf(tt / 0.003, 1.0)
+			var f_t: float = lerpf(f_toe_start, 38.0, clampf(tt / 0.048, 0.0, 1.0))
+			phase_toe += TAU * f_t / MIX_RATE
+			toe_thud = sin(phase_toe) * t_att * exp(-tt * 38.0) * 0.42
+			toe_grit_env = t_att * exp(-tt * 52.0) * 0.45
+
+		# 3. Band-passed mineral sole friction + discrete limestone micro-grit snaps
+		var raw_n: float = randf_range(-1.0, 1.0)
+		lp1 = lerpf(lp1, raw_n, alpha_lp)
+		lp2 = lerpf(lp2, lp1, alpha_hp)
+		var bp_noise: float = (lp1 - lp2) * 2.4
+		var heel_grit_env: float = h_att * exp(-t * 58.0)
+		var grit: float = bp_noise * (heel_grit_env + toe_grit_env)
+
+		# Discrete crushed sand/gravel micro-impulses under boot tread
+		var g1: float = sin(TAU * 1650.0 * (t - grain_t1)) * exp(-maxf(t - grain_t1, 0.0) * 180.0) * 0.26 if t >= grain_t1 else 0.0
+		var g2: float = sin(TAU * 1380.0 * (t - grain_t2)) * exp(-maxf(t - grain_t2, 0.0) * 190.0) * 0.18 if t >= grain_t2 else 0.0
+
+		out[i] = tanh((heel_thud * 0.68 + toe_thud + grit * 0.52 + g1 + g2) * 1.25) * 0.86
 	return _make_wav(out)
 
 
-# Soft muffled sneak steps (3 subtle toe/sole variations)
+# Soft muffled sneak steps: cushioned sole weight shift + low-passed silt glide (no harsh static)
 func _synth_step_sneak(variant: int = 0) -> AudioStreamWAV:
-	var dur := 0.11
+	var dur := 0.125
 	var count := int(dur * MIX_RATE)
 	var out := PackedFloat32Array()
 	out.resize(count)
+	var v_idx := clampi(variant, 0, 2)
+	var f_start: float = [82.0, 90.0, 76.0][v_idx]
+	var silt_cutoff: float = [540.0, 620.0, 480.0][v_idx]
 	var phase := 0.0
-	var f_start: float = [94.0, 102.0, 86.0][clampi(variant, 0, 2)]
+	var lp_silt := 0.0
+	var hp_silt := 0.0
+	var a_lp: float = clampf(TAU * silt_cutoff / MIX_RATE, 0.04, 0.35)
+	var a_hp: float = clampf(TAU * 180.0 / MIX_RATE, 0.01, 0.15)
+
 	for i in count:
 		var t: float = float(i) / MIX_RATE
-		var freq: float = lerpf(f_start, 38.0, clampf(t / 0.065, 0.0, 1.0))
+		var norm_t: float = t / dur
+		var soft_att: float = minf(t / 0.008, 1.0)
+		var freq: float = lerpf(f_start, 34.0, clampf(t / 0.075, 0.0, 1.0))
 		phase += TAU * freq / MIX_RATE
-		var soft: float = sin(phase) * exp(-t * 38.0)
-		var brush: float = randf_range(-1.0, 1.0) * exp(-t * 65.0) * 0.14
-		out[i] = (soft * 0.62 + brush) * 0.65
+		var cushion: float = sin(phase) * soft_att * exp(-t * 34.0)
+
+		# Smooth boot-on-silt brushing envelope (matches Maya Lin's "gliding our boots along the ground")
+		var raw_n: float = randf_range(-1.0, 1.0)
+		lp_silt = lerpf(lp_silt, raw_n, a_lp)
+		hp_silt = lerpf(hp_silt, lp_silt, a_hp)
+		var silt_glide: float = (lp_silt - hp_silt) * sin(norm_t * PI) * exp(-t * 22.0) * 0.42
+
+		out[i] = (cushion * 0.58 + silt_glide) * 0.68
 	return _make_wav(out)
 
 
-# Hydrodynamic water wading footsteps (viscous water displacement surge + surface fluid slosh)
+# Hydrodynamic water wading footsteps: deep displacement surge + filtered fluid slosh + Minnaert bubble pops
 func _synth_step_water(variant: int = 0) -> AudioStreamWAV:
-	var dur := 0.22
+	var dur := 0.24
 	var count := int(dur * MIX_RATE)
 	var out := PackedFloat32Array()
 	out.resize(count)
+	var v_idx := clampi(variant, 0, 2)
+	var f_base: float = [108.0, 96.0, 118.0][v_idx]
+	var b1_t: float = [0.026, 0.032, 0.022][v_idx]
+	var b2_t: float = [0.068, 0.076, 0.061][v_idx]
+	var b3_t: float = [0.118, 0.128, 0.108][v_idx]
+	var b1_f: float = [520.0, 480.0, 580.0][v_idx]
+	var b2_f: float = [740.0, 680.0, 810.0][v_idx]
+	var b3_f: float = [980.0, 890.0, 1060.0][v_idx]
+
 	var p_low := 0.0
-	var f_base: float = [115.0, 100.0, 128.0][clampi(variant, 0, 2)]
+	var p_b1 := 0.0
+	var p_b2 := 0.0
+	var p_b3 := 0.0
+	var lp_water := 0.0
+	var hp_water := 0.0
+
 	for i in count:
 		var t: float = float(i) / MIX_RATE
-		var f_low: float = f_base - 58.0 * clampf(t / 0.12, 0.0, 1.0)
+		# 1. Deep hydrodynamic foot plunge
+		var att: float = minf(t / 0.004, 1.0)
+		var f_low: float = f_base - 54.0 * clampf(t / 0.13, 0.0, 1.0)
 		p_low += TAU * f_low / MIX_RATE
-		var sub: float = sin(p_low) * exp(-t * 19.0) * 0.75
-		var splash: float = randf_range(-1.0, 1.0) * exp(-t * 42.0) * sin(t * 1950.0) * 0.45
-		var pop := 0.0
-		if t >= 0.045:
-			var tp: float = t - 0.045
-			pop = sin(TAU * (560.0 + 780.0 * (tp / 0.04)) * tp) * exp(-tp * 54.0) * 0.35
-		out[i] = tanh((sub + splash + pop) * 1.3) * 0.82
+		var sub: float = sin(p_low) * att * exp(-t * 18.0) * 0.68
+
+		# 2. Sweeping band-passed water surface slosh (450Hz -> 1350Hz -> 620Hz)
+		var slosh_fc: float = 520.0 + 780.0 * sin(clampf(t / 0.16, 0.0, 1.0) * PI)
+		var a_lp: float = clampf(TAU * slosh_fc / MIX_RATE, 0.05, 0.48)
+		var a_hp: float = clampf(TAU * (slosh_fc * 0.42) / MIX_RATE, 0.02, 0.25)
+		var raw_n: float = randf_range(-1.0, 1.0)
+		lp_water = lerpf(lp_water, raw_n, a_lp)
+		hp_water = lerpf(hp_water, lp_water, a_hp)
+		var slosh_env: float = minf(t / 0.012, 1.0) * exp(-t * 16.5)
+		var slosh: float = (lp_water - hp_water) * slosh_env * 0.72
+
+		# 3. Three realistic upward-pitching Minnaert air-cavity bubble pops
+		var bubbles := 0.0
+		if t >= b1_t:
+			var dt1: float = t - b1_t
+			var f1: float = b1_f * (1.0 + 0.85 * clampf(dt1 / 0.032, 0.0, 1.0))
+			p_b1 += TAU * f1 / MIX_RATE
+			bubbles += sin(p_b1) * minf(dt1 / 0.0015, 1.0) * exp(-dt1 * 56.0) * 0.34
+		if t >= b2_t:
+			var dt2: float = t - b2_t
+			var f2: float = b2_f * (1.0 + 0.92 * clampf(dt2 / 0.028, 0.0, 1.0))
+			p_b2 += TAU * f2 / MIX_RATE
+			bubbles += sin(p_b2) * minf(dt2 / 0.0015, 1.0) * exp(-dt2 * 64.0) * 0.28
+		if t >= b3_t:
+			var dt3: float = t - b3_t
+			var f3: float = b3_f * (1.0 + 0.75 * clampf(dt3 / 0.024, 0.0, 1.0))
+			p_b3 += TAU * f3 / MIX_RATE
+			bubbles += sin(p_b3) * minf(dt3 / 0.0012, 1.0) * exp(-dt3 * 72.0) * 0.20
+
+		out[i] = tanh((sub + slosh + bubbles) * 1.28) * 0.82
 	return _make_wav(out)
 
 
@@ -716,6 +817,7 @@ func _synth_sleeper_snore() -> AudioStreamWAV:
 	var out := PackedFloat32Array()
 	out.resize(count)
 	var p1 := 0.0
+	var lp_breath := 0.0
 	for i in count:
 		var t: float = float(i) / MIX_RATE
 		var norm_t: float = t / dur
@@ -723,25 +825,36 @@ func _synth_sleeper_snore() -> AudioStreamWAV:
 		var f: float = 52.0 + 8.0 * sin(TAU * 1.2 * t)
 		p1 += TAU * f / MIX_RATE
 		var cords: float = sin(p1) + 0.42 * sin(p1 * 2.0) + 0.22 * sin(p1 * 3.0)
-		var breath: float = randf_range(-1.0, 1.0) * exp(-absf(norm_t - 0.5) * 4.0) * 0.16
+		lp_breath = lerpf(lp_breath, randf_range(-1.0, 1.0), 0.08)
+		var breath: float = lp_breath * exp(-absf(norm_t - 0.5) * 4.0) * 0.28
 		out[i] = (cords * 0.72 + breath) * env * 0.75
 	return _make_wav(out)
 
 
-# Heavy monster footstep thud
+# Heavy monster footstep: chitinous claw click followed by floor-shaking stone stomp
 func _synth_enemy_step() -> AudioStreamWAV:
-	var dur := 0.18
+	var dur := 0.19
 	var count := int(dur * MIX_RATE)
 	var out := PackedFloat32Array()
 	out.resize(count)
 	var phase := 0.0
+	var lp_rock := 0.0
 	for i in count:
 		var t: float = float(i) / MIX_RATE
-		var freq: float = lerpf(110.0, 34.0, clampf(t / 0.12, 0.0, 1.0))
-		phase += TAU * freq / MIX_RATE
-		var sub: float = sin(phase) * exp(-t * 22.0)
-		var claw: float = randf_range(-1.0, 1.0) * exp(-t * 50.0) * 0.25
-		out[i] = tanh((sub + claw) * 1.4) * 0.8
+		# 1. Sharp chitinous talon/claw tap on stone (t = 0.000s)
+		var claw_tap: float = (sin(TAU * 1480.0 * t) * 0.65 + sin(TAU * 2340.0 * t) * 0.35) * exp(-t * 115.0) * 0.38
+		# 2. Heavy monster weight impact (t = 0.012s)
+		var stomp := 0.0
+		if t >= 0.012:
+			var ts: float = t - 0.012
+			var att: float = minf(ts / 0.0025, 1.0)
+			var freq: float = lerpf(108.0, 30.0, clampf(ts / 0.11, 0.0, 1.0))
+			phase += TAU * freq / MIX_RATE
+			var sub: float = (sin(phase) + 0.32 * sin(phase * 1.9)) * att * exp(-ts * 21.0)
+			lp_rock = lerpf(lp_rock, randf_range(-1.0, 1.0), 0.11)
+			var grit: float = lp_rock * att * exp(-ts * 46.0) * 0.36
+			stomp = sub * 0.88 + grit
+		out[i] = tanh((claw_tap + stomp) * 1.45) * 0.84
 	return _make_wav(out)
 
 
@@ -1027,7 +1140,7 @@ func _synth_star_chime(freq: float) -> AudioStreamWAV:
 	return _make_wav(out)
 
 
-# Organic stone skipping/clattering on cavern rock: sharp primary impact, high clack, secondary bounces and small roll
+# Organic stone skipping/clattering on cavern rock: multi-mode river pebble resonances + filtered mineral clack
 func _synth_pebble_clatter() -> AudioStreamWAV:
 	var dur := 0.42
 	var count := int(dur * MIX_RATE)
@@ -1035,19 +1148,27 @@ func _synth_pebble_clatter() -> AudioStreamWAV:
 	out.resize(count)
 	var hits: Array[float] = [0.0, 0.11, 0.20, 0.27, 0.33]
 	var amps: Array[float] = [1.0, 0.52, 0.26, 0.14, 0.08]
-	var freqs: Array[float] = [620.0, 780.0, 890.0, 1020.0, 1150.0]
+	var freqs: Array[float] = [680.0, 820.0, 940.0, 1080.0, 1220.0]
+	var lp_clack := 0.0
+	var hp_clack := 0.0
 	for i in count:
 		var t: float = float(i) / MIX_RATE
+		var raw_n: float = randf_range(-1.0, 1.0)
+		lp_clack = lerpf(lp_clack, raw_n, 0.38)
+		hp_clack = lerpf(hp_clack, lp_clack, 0.14)
+		var bp_clack: float = (lp_clack - hp_clack) * 2.2
 		var sample := 0.0
 		for k in hits.size():
 			var dt: float = t - hits[k]
-			if dt >= 0.0 and dt < 0.12:
-				var att: float = minf(dt / 0.0018, 1.0)
-				var env: float = att * exp(-dt * 48.0)
-				var ping: float = sin(TAU * freqs[k] * dt) * exp(-dt * 32.0)
-				var clack: float = randf_range(-1.0, 1.0) * exp(-dt * 85.0)
-				sample += (ping * 0.72 + clack * 0.48) * env * amps[k]
-		out[i] = clampf(tanh(sample * 1.35) * 0.88, -1.0, 1.0)
+			if dt >= 0.0 and dt < 0.11:
+				var att: float = minf(dt / 0.0012, 1.0)
+				var env: float = att * exp(-dt * 52.0)
+				var f0: float = freqs[k]
+				# Inharmonic natural stone modes (1.0 : 1.62 : 2.38)
+				var ping: float = (sin(TAU * f0 * dt) * 0.62 + sin(TAU * (f0 * 1.62) * dt) * 0.34 * exp(-dt * 28.0) + sin(TAU * (f0 * 2.38) * dt) * 0.18 * exp(-dt * 55.0)) * exp(-dt * 34.0)
+				var clack: float = bp_clack * exp(-dt * 110.0)
+				sample += (ping * 0.78 + clack * 0.42) * env * amps[k]
+		out[i] = clampf(tanh(sample * 1.38) * 0.88, -1.0, 1.0)
 	return _make_wav(out)
 
 
@@ -1057,14 +1178,20 @@ func _synth_pebble_clink() -> AudioStreamWAV:
 	var count := int(dur * MIX_RATE)
 	var out := PackedFloat32Array()
 	out.resize(count)
+	var lp_c := 0.0
+	var hp_c := 0.0
 	for i in count:
 		var t: float = float(i) / MIX_RATE
-		var att: float = minf(t / 0.0012, 1.0)
+		var att: float = minf(t / 0.0010, 1.0)
 		var env: float = att * exp(-t * 68.0)
-		var ping: float = sin(TAU * 1420.0 * t) * exp(-t * 42.0)
-		var ping2: float = sin(TAU * 2360.0 * t) * exp(-t * 85.0) * 0.45
-		var crack: float = randf_range(-1.0, 1.0) * exp(-t * 115.0)
-		var sample: float = (ping * 0.85 + ping2 + crack * 0.55) * env
+		var raw_n: float = randf_range(-1.0, 1.0)
+		lp_c = lerpf(lp_c, raw_n, 0.45)
+		hp_c = lerpf(hp_c, lp_c, 0.18)
+		var ping: float = sin(TAU * 1380.0 * t) * exp(-t * 42.0)
+		var ping2: float = sin(TAU * 2240.0 * t) * exp(-t * 80.0) * 0.46
+		var ping3: float = sin(TAU * 3280.0 * t) * exp(-t * 120.0) * 0.22
+		var crack: float = (lp_c - hp_c) * 2.2 * exp(-t * 135.0)
+		var sample: float = (ping * 0.82 + ping2 + ping3 + crack * 0.48) * env
 		out[i] = clampf(tanh(sample * 1.45) * 0.88, -1.0, 1.0)
 	return _make_wav(out)
 
@@ -1174,23 +1301,32 @@ func _synth_assist_toggle(enabled: bool) -> AudioStreamWAV:
 	return _make_wav(out)
 
 
-# Subterranean stone door sliding open: low cavern grinding rumble followed by latch release
+# Subterranean stone door sliding open: heavy slab grinding rumble followed by ancient seal release
 func _synth_door_open() -> AudioStreamWAV:
-	var dur := 0.65
+	var dur := 0.68
 	var count := int(dur * MIX_RATE)
 	var out := PackedFloat32Array()
 	out.resize(count)
+	var lp_grind := 0.0
+	var hp_grind := 0.0
 	for i in count:
 		var t: float = float(i) / MIX_RATE
-		var env: float = minf(t / 0.03, 1.0) * exp(-t * 3.8)
-		var rumble: float = sin(TAU * 75.0 * t) * exp(-t * 2.5) * 0.55
-		var grind: float = randf_range(-1.0, 1.0) * exp(-t * 4.5) * 0.35
+		var env: float = minf(t / 0.035, 1.0) * exp(-t * 3.4)
+		# Deep megalithic stone slab resonance (64Hz + 96Hz + 142Hz)
+		var grain_mod: float = 0.75 + 0.25 * sin(TAU * 29.0 * t) * cos(TAU * 17.0 * t)
+		var rumble: float = (sin(TAU * 64.0 * t) * 0.52 + sin(TAU * 96.0 * t) * 0.30 + sin(TAU * 142.0 * t) * 0.18) * grain_mod * exp(-t * 2.2)
+		# Low-passed stone-on-stone friction (eliminates harsh white-noise static)
+		var raw_n: float = randf_range(-1.0, 1.0)
+		lp_grind = lerpf(lp_grind, raw_n, 0.045)
+		hp_grind = lerpf(hp_grind, lp_grind, 0.012)
+		var grind: float = (lp_grind - hp_grind) * 2.0 * grain_mod * exp(-t * 3.8) * 0.45
+		# Ancient acoustic seal / latch release chime at t = 0.24s
 		var latch: float = 0.0
-		if t >= 0.25:
-			var tl: float = t - 0.25
-			var latch_env: float = minf(tl / 0.005, 1.0) * exp(-tl * 25.0)
-			latch = sin(TAU * 880.0 * tl) * latch_env * 0.4
-		out[i] = clampf((rumble + grind + latch) * env * 0.85, -1.0, 1.0)
+		if t >= 0.24:
+			var tl: float = t - 0.24
+			var latch_env: float = minf(tl / 0.005, 1.0) * exp(-tl * 18.0)
+			latch = (sin(TAU * 528.0 * tl) * 0.55 + sin(TAU * 792.0 * tl) * 0.35) * latch_env * 0.42
+		out[i] = clampf(tanh((rumble + grind + latch) * env * 1.25) * 0.86, -1.0, 1.0)
 	return _make_wav(out)
 
 

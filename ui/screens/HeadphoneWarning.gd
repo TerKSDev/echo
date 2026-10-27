@@ -4,6 +4,7 @@ extends Control
 @onready var headphone_icon: Control = $Content/IconCenter/HeadphoneIcon
 
 var _transitioning := false
+var _time := 0.0
 
 func _ready() -> void:
 	content.modulate.a = 0.0
@@ -18,6 +19,11 @@ func _ready() -> void:
 	tw.tween_property(content, "modulate:a", 0.0, 0.6).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	# 4. Smooth transition to Main Menu
 	tw.tween_callback(_go_to_menu)
+
+func _process(delta: float) -> void:
+	_time += delta
+	if headphone_icon != null:
+		headphone_icon.queue_redraw()
 
 func _draw_headphone_icon() -> void:
 	var center := Vector2(48.0, 48.0)
@@ -55,14 +61,22 @@ func _draw_headphone_icon() -> void:
 	headphone_icon.draw_rect(Rect2(center + Vector2(-34.0, 4.0), Vector2(6.0, 20.0)), Color(0.05, 0.18, 0.32, 0.9), true)
 	headphone_icon.draw_rect(Rect2(center + Vector2(28.0, 4.0), Vector2(6.0, 20.0)), Color(0.05, 0.18, 0.32, 0.9), true)
 
-	# 6. Sleek acoustic ripples beaming from both sides
-	headphone_icon.draw_arc(center + Vector2(-42.0, 14.0), 9.0, PI * 0.72, PI * 1.28, 16, Color(0.4, 0.88, 1.0, 0.75), 1.8)
-	headphone_icon.draw_arc(center + Vector2(-42.0, 14.0), 16.0, PI * 0.78, PI * 1.22, 16, Color(0.4, 0.88, 1.0, 0.35), 1.4)
-	headphone_icon.draw_arc(center + Vector2(42.0, 14.0), 9.0, -PI * 0.28, PI * 0.28, 16, Color(0.4, 0.88, 1.0, 0.75), 1.8)
-	headphone_icon.draw_arc(center + Vector2(42.0, 14.0), 16.0, -PI * 0.22, PI * 0.22, 16, Color(0.4, 0.88, 1.0, 0.35), 1.4)
+	# 6. Sleek animated acoustic ripples beaming from both sides
+	for i in 2:
+		var phase := fposmod(_time * 0.9 + float(i) * 0.5, 1.0)
+		var r := lerpf(7.0, 21.0, phase)
+		var a := sin(phase * PI) * 0.78
+		var w := lerpf(2.0, 1.2, phase)
+		headphone_icon.draw_arc(center + Vector2(-42.0, 14.0), r, PI * 0.74, PI * 1.26, 16, Color(0.4, 0.88, 1.0, a), w)
+		headphone_icon.draw_arc(center + Vector2(42.0, 14.0), r, -PI * 0.26, PI * 0.26, 16, Color(0.4, 0.88, 1.0, a), w)
 
 func _gui_input(event: InputEvent) -> void:
 	if (event is InputEventMouseButton and event.pressed) or (event is InputEventScreenTouch and event.pressed):
+		_go_to_menu()
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_accept") or event.is_action_pressed("ui_cancel") or (event is InputEventKey and event.pressed and not event.echo and (event.keycode == KEY_SPACE or event.keycode == KEY_ENTER or event.keycode == KEY_ESCAPE)):
+		get_viewport().set_input_as_handled()
 		_go_to_menu()
 
 func _go_to_menu() -> void:

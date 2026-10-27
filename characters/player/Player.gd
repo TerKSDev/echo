@@ -18,7 +18,7 @@ var pebble_aim_raw_pos := Vector2.ZERO
 var pebble_aim_target := Vector2.ZERO
 
 # Movement
-const WALK_SPEED := 190.0
+const WALK_SPEED := 185.0
 const SNEAK_SPEED := 100.0
 const ARRIVE_DIST := 8.0
 const ACCEL := 900.0
@@ -77,6 +77,7 @@ var _stun_timer := 0.0
 var _idle_timer := 0.0
 var _entry_timer := 1.2 # Prevents idle zoom during the initial level entry pull-back
 var _sneak_blend := 0.0 # Smooth 0..1 transition between normal and sneak visual state
+var wake_up_anim := false # Cinematic waking-up camera/scale sequence
 var _step_ripples: Array[Dictionary] = [] # World-space micro-ripples under footsteps
 var _tap_flash := 0.0 # Crisp ripple animation at destination marker when tapped
 var _wall_bump_pos := Vector2.ZERO
@@ -88,6 +89,21 @@ var _facing_dir := Vector2.DOWN
 var _cane_timer := 0.0
 var _wall_bump_sound_cooldown := 0.0
 var _last_touch_time := 0
+var _cached_pebble_trajectory: Array[Vector2] = []
+var _sfx_cached: SfxManager = null
+var _self_exclude: Array[RID] = []
+
+
+func _get_sfx() -> SfxManager:
+	if _sfx_cached == null or not is_instance_valid(_sfx_cached):
+		_sfx_cached = get_node_or_null("../SfxManager") as SfxManager
+	return _sfx_cached
+
+
+func _get_self_exclude() -> Array[RID]:
+	if _self_exclude.is_empty():
+		_self_exclude.append(get_rid())
+	return _self_exclude
 
 # Shake Camera
 func camera_shake(duration: float = 0.4, intensity: float = 8.0) -> void:
@@ -256,7 +272,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if GameState.fast_pulse_mode and event.index == 0:
 			var now_ms: int = Time.get_ticks_msec()
 			if now_ms - _last_touch_time < 320:
-				make_sound(160.0, true)
+				make_sound(MIN_LOUDNESS, true)
 				_last_touch_time = 0
 			else:
 				_last_touch_time = now_ms
@@ -274,8 +290,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		moving = true
 		if is_new_tap:
 			_tap_flash = 1.0
-		if event is InputEventScreenTouch and OS.get_name() == "Android" and mic != null:
-			mic.suppress_timer = 0.08
+			if mic != null:
+				mic.suppress_timer = 0.08
 	
 	# Handle keyboard input (on desktop)
 	if can_sound:
@@ -286,7 +302,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	
 		# Fast Pulse: double tap / double click triggers an instant burst of sonar sound
 		if GameState.fast_pulse_mode and is_new_tap and event is InputEventMouseButton and event.double_click:
-			make_sound(160.0, true)
+			make_sound(MIN_LOUDNESS, true)
 
 	# Handle sneaking with Shift key (supports Toggle or Hold mode)
 	if can_sneak and event is InputEventKey and event.keycode == KEY_SHIFT:
@@ -352,8 +368,7 @@ func _physics_process(delta: float) -> void:
 		desired = Vector2.ZERO
 		velocity = Vector2.ZERO
 		move_and_slide()
-		_update_trail()
-		queue_redraw()
+		_update_charging_and_visuals(delta)
 		return
 
 	# Handle immobilization / stun
@@ -413,17 +428,16 @@ func _physics_process(delta: float) -> void:
 			if dist > 12.0:
 				var perp := move_dir.orthogonal()
 				var space := get_world_2d().direct_space_state
-				var p_rid := get_rid()
+				var excl := _get_self_exclude()
 
 				var f_left := PhysicsRayQueryParameters2D.create(global_position + perp * 8.0, global_position + perp * 8.0 + move_dir * 16.0)
 				f_left.collision_mask = 1
-				f_left.exclude = [p_rid]
+				f_left.exclude = excl
 				var hit_l := space.intersect_ray(f_left)
 
-				var f_right := PhysicsRayQueryParameters2D.create(global_position - perp * 8.0, global_position - perp * 8.0 + move_dir * 16.0)
-				f_right.collision_mask = 1
-				f_right.exclude = [p_rid]
-				var hit_r := space.intersect_ray(f_right)
+				f_left.from = global_position - perp * 8.0
+				f_left.to = global_position - perp * 8.0 + move_dir * 16.0
+				var hit_r := space.intersect_ray(f_left)
 
 				if not hit_l.is_empty() and hit_r.is_empty():
 					move_dir = (move_dir - perp * 0.65).normalized()
@@ -444,21 +458,20 @@ func _physics_process(delta: float) -> void:
 	# Virtual Cane Proximity Radar for Blind / Visually Impaired navigation
 	_cane_timer -= delta
 	_wall_bump_sound_cooldown -= delta
-	if GameState.blind_assist_mode and (velocity.length() > 5.0 or desired != Vector2.ZERO):
+	if GameState.blind_assist_mode and _cane_timer <= 0.0 and (velocity.length() > 5.0 or desired != Vector2.ZERO):
 		var feel_dir: Vector2 = desired.normalized() if desired != Vector2.ZERO else _facing_dir
 		var space_state := get_world_2d().direct_space_state
 		var cane_query := PhysicsRayQueryParameters2D.create(global_position, global_position + feel_dir * 46.0)
 		cane_query.collision_mask = 1
-		cane_query.exclude = [get_rid()]
+		cane_query.exclude = _get_self_exclude()
 		var cane_hit := space_state.intersect_ray(cane_query)
 		if not cane_hit.is_empty():
 			var hit_dist: float = global_position.distance_to(cane_hit.position)
-			if _cane_timer <= 0.0:
-				_cane_timer = lerpf(0.18, 0.44, hit_dist / 46.0)
-				Input.vibrate_handheld(25)
-				var sfx_node := get_node_or_null("../SfxManager") as SfxManager
-				if sfx_node != null:
-					sfx_node.play_cane_tap(hit_dist)
+			_cane_timer = lerpf(0.18, 0.44, hit_dist / 46.0)
+			Input.vibrate_handheld(25)
+			var sfx_node := _get_sfx()
+			if sfx_node != null:
+				sfx_node.play_cane_tap(hit_dist)
 
 	# Handle wall collision: allow sliding along walls, stop only on head-on obstacle or zero progress
 	if get_slide_collision_count() > 0:
@@ -520,17 +533,20 @@ func _physics_process(delta: float) -> void:
 		# Gradually relax residual stride accumulation when standing still (prevents premature step on next micro-tap)
 		_step_dist_accum = move_toward(_step_dist_accum, 0.0, delta * 35.0)
 	
+	_update_charging_and_visuals(delta)
+
+
+func _update_charging_and_visuals(delta: float) -> void:
 	# Voice charging
+	var sfx_mgr := _get_sfx()
 	if charging:
 		charge = min(charge + delta / CHARGE_TIME, 1.0)
 		if charge >= 1.0 and not was_full:
 			was_full = true
 			full_charge = 1.0
 			Input.vibrate_handheld(40)
-			var sfx_node := get_node_or_null("../SfxManager") as SfxManager
-			if sfx_node != null:
-				sfx_node.play_charge_full()
-	var sfx_mgr := get_node_or_null("../SfxManager") as SfxManager
+			if sfx_mgr != null:
+				sfx_mgr.play_charge_full()
 	if sfx_mgr != null:
 		sfx_mgr.update_charge_hum(charging, charge)
 	full_charge = move_toward(full_charge, 0.0, delta * 4.0)
@@ -542,13 +558,20 @@ func _physics_process(delta: float) -> void:
 	_sneak_blend = move_toward(_sneak_blend, 1.0 if sneaking else 0.0, delta * 8.0)
 	_tap_flash = move_toward(_tap_flash, 0.0, delta * 3.2)
 	_wall_bump_alpha = move_toward(_wall_bump_alpha, 0.0, delta * 2.8)
-	var alive_ripples: Array[Dictionary] = []
-	for r: Dictionary in _step_ripples:
-		var next_age: float = float(r["age"]) + delta
-		if next_age < 0.65:
-			r["age"] = next_age
-			alive_ripples.append(r)
-	_step_ripples = alive_ripples
+	if not _step_ripples.is_empty():
+		var wr := 0
+		for i in _step_ripples.size():
+			var r: Dictionary = _step_ripples[i]
+			var next_age: float = float(r["age"]) + delta
+			if next_age < 0.65:
+				r["age"] = next_age
+				_step_ripples[wr] = r
+				wr += 1
+		if wr < _step_ripples.size():
+			_step_ripples.resize(wr)
+
+	if is_aiming_pebble:
+		_cached_pebble_trajectory = get_pebble_trajectory(pebble_aim_raw_pos)
 
 	# Dynamic camera zoom: initial pull-back on entry, gentle zoom-in when idle, wide view when active
 	if _entry_timer > 0.0:
@@ -559,7 +582,7 @@ func _physics_process(delta: float) -> void:
 	else:
 		_idle_timer += delta
 
-	if camera != null:
+	if camera != null and not wake_up_anim:
 		var target_z: float = IDLE_ZOOM_LEVEL if (_idle_timer >= IDLE_ZOOM_DELAY) else 1.0
 		if charging:
 			target_z -= 0.06 * charge # Subtle camera pull-back tension while charging
@@ -570,9 +593,10 @@ func _physics_process(delta: float) -> void:
 	_update_trail()
 	queue_redraw()
 
+
 func make_voice_sound(k: float):
-	# Ignore mic while dead, stunned, or movement/input is locked
-	if not alive or _stun_timer > 0.0 or not can_move:
+	# Ignore mic while dead, stunned, or sound input is locked
+	if not alive or _stun_timer > 0.0 or not can_sound:
 		return
 	make_sound(lerpf(MIN_LOUDNESS, MAX_LOUDNESS, k), true)
 
@@ -892,12 +916,13 @@ func get_pebble_trajectory(target_world_pos: Vector2) -> Array[Vector2]:
 	var hit1_pos: Vector2 = hit1.position
 	var n1: Vector2 = hit1.get("normal", -dir)
 	var d1: float = global_position.distance_to(hit1_pos)
-	result.append(hit1_pos)
 
 	var remaining := (total_len - d1) * 0.72 # Friction/energy loss on impact
 	if remaining < 18.0 or n1 == Vector2.ZERO:
-		result.append(hit1_pos + n1 * 10.0)
+		result.append(hit1_pos + n1 * 8.0)
 		return result
+
+	result.append(hit1_pos)
 
 	# Specular reflection: d_bounce = d - 2(d . n)n
 	var bounce_dir: Vector2 = dir.bounce(n1).normalized()
@@ -939,7 +964,8 @@ func start_aim_pebble() -> void:
 	is_aiming_pebble = true
 	var dir: Vector2 = velocity.normalized() if velocity.length() > 10.0 else _facing_dir
 	pebble_aim_raw_pos = global_position + dir * 180.0
-	pebble_aim_target = get_clamped_pebble_target(pebble_aim_raw_pos)
+	_cached_pebble_trajectory = get_pebble_trajectory(pebble_aim_raw_pos)
+	pebble_aim_target = _cached_pebble_trajectory.back()
 	queue_redraw()
 
 
@@ -947,7 +973,8 @@ func update_aim_pebble(target_world_pos: Vector2) -> void:
 	if not is_aiming_pebble:
 		return
 	pebble_aim_raw_pos = target_world_pos
-	pebble_aim_target = get_clamped_pebble_target(pebble_aim_raw_pos)
+	_cached_pebble_trajectory = get_pebble_trajectory(pebble_aim_raw_pos)
+	pebble_aim_target = _cached_pebble_trajectory.back()
 	queue_redraw()
 
 
@@ -986,7 +1013,7 @@ func throw_pebble(target_world_pos: Vector2) -> bool:
 
 
 func _draw_pebble_aim_trajectory(t: float) -> void:
-	var trajectory := get_pebble_trajectory(pebble_aim_raw_pos)
+	var trajectory: Array[Vector2] = _cached_pebble_trajectory if _cached_pebble_trajectory.size() >= 2 else get_pebble_trajectory(pebble_aim_raw_pos)
 	if trajectory.size() < 2:
 		return
 
@@ -994,14 +1021,20 @@ func _draw_pebble_aim_trajectory(t: float) -> void:
 	var final_local := to_local(final_world)
 	var amber := Color(1.0, 0.78, 0.28)
 
-	# 1. Acoustic distraction estimation ring at final target landing spot (~240px radius)
-	var noise_rad := 240.0
+	# 1. Acoustic distraction estimation ring at final target landing spot (280px dry / 360px in water)
+	var is_water_target := false
+	var main_node := get_parent()
+	if main_node != null and "water_cells" in main_node and "_level_root" in main_node and main_node._level_root != null and main_node._level_root.walls != null:
+		var wc: Vector2i = main_node._level_root.walls.local_to_map(main_node._level_root.walls.to_local(final_world))
+		is_water_target = main_node.water_cells.has(wc)
+	var noise_rad := 360.0 if is_water_target else 280.0
+	var ring_col := Color(0.35, 0.88, 1.0) if is_water_target else amber
 	var pulse := 0.5 + 0.5 * sin(t * 5.0)
-	draw_arc(final_local, noise_rad, 0.0, TAU, 48, Color(1.0, 0.78, 0.28, 0.12 + 0.06 * pulse), 1.2)
+	draw_arc(final_local, noise_rad, 0.0, TAU, 48, Color(ring_col, 0.14 + 0.06 * pulse), 1.2)
 	for k in 12:
 		var ang := k * TAU / 12.0 + t * 0.5
 		var tick_p := final_local + Vector2.from_angle(ang) * noise_rad
-		draw_circle(tick_p, 1.8, Color(1.0, 0.85, 0.4, 0.35))
+		draw_circle(tick_p, 1.8, Color(ring_col, 0.38))
 
 	# 2. Draw each flight segment (parabolic arc)
 	for s_idx in range(trajectory.size() - 1):

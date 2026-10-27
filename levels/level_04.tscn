@@ -6,11 +6,11 @@
 [node name="Level" type="Node2D"]
 script = ExtResource("1_root")
 level_name = "DEAD QUIET"
-hint = "The crimson ones hear every footstep, but never a whisper. Zigzag between them. Sneak."
+hint = "The crimson hunters hear every running step and every call—only a creeping step escapes their ears. Zigzag between them and sneak."
 ascii_map = "################################################
 ################################################
 ################################################
-#............######################............#
+#...N........######################........N...#
 #............######################............#
 #............######################............#
 #............######################............#

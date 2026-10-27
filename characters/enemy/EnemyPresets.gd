@@ -1,5 +1,5 @@
 class_name EnemyPresets
-## Stats for the 5 enemy types. Tuned against the player: walk 190, sneak 100.
+## Stats for the 5 enemy types. Tuned against the player: walk 185, sneak 100.
 ## Index order matches Enemy.EnemyType (SLEEPER, PATROLLER, CHASER, SCREAMER, LISTENER).
 ## init_state: 0 = SLEEP, 1 = PATROL (see Enemy.State).
 ##
@@ -28,7 +28,7 @@ const PRESETS: Array[Dictionary] = [
 	{ # CHASER - most sensitive (walk ~160px), very fast, longer chase, deaf to sneaking
 		"hearing_range": 300.0, "hearing_threshold": 0.03,
 		"can_hear_sneak": false, "can_hear_walk": true, "can_hear_voice": true,
-		"patrol_speed": 90.0, "chase_speed": 185.0,
+		"patrol_speed": 90.0, "chase_speed": 202.0,
 		"alert_time": 0.65, "investigate_timeout": 5.0,
 		"init_state": 1, "sleep_wake_radius": 75.0, "sneak_wake_radius": 30.0, "sneak_sense_radius": 24.0,
 		"color": Color(1.0, 0.18, 0.18), # Crimson

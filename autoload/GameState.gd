@@ -147,6 +147,8 @@ var story_completed := false
 var has_seen_intro := false
 var story_tutorial_completed := false
 var force_level_0_story := false
+var seen_act_milestones: Dictionary = {}
+var seen_campaign_endings: Dictionary = {}
 
 var highest_unlocked_level: int:
 	get:
@@ -158,6 +160,10 @@ var highest_unlocked_level: int:
 			challenge_highest_unlocked = val
 		else:
 			story_highest_unlocked = val
+
+func is_touch_or_mobile() -> bool:
+	return OS.has_feature("mobile") or OS.has_feature("android") or OS.has_feature("ios") or DisplayServer.is_touchscreen_available()
+
 
 func is_story_completed() -> bool:
 	return story_completed or story_highest_unlocked > STORY_LEVELS.size()
@@ -190,10 +196,10 @@ func get_current_levels() -> Array[String]:
 
 func get_level_name(lvl: int) -> String:
 	if current_mode == GameMode.CHALLENGE:
-		var c_idx := lvl - 1 if lvl > 0 else 0
+		var c_idx := clampi(lvl, 0, CHALLENGE_SECTORS.size() - 1)
 		if c_idx >= 0 and c_idx < CHALLENGE_SECTORS.size():
 			return str(CHALLENGE_SECTORS[c_idx]["name"])
-		return "CHALLENGE SECTOR %02d" % lvl
+		return "CHALLENGE SECTOR %02d" % (lvl + 1)
 
 	# Story Mode
 	if lvl == 0:
@@ -205,7 +211,7 @@ func get_level_name(lvl: int) -> String:
 
 func get_level_depth_str(lvl: int) -> String:
 	if current_mode == GameMode.CHALLENGE:
-		var c_idx := lvl - 1 if lvl > 0 else 0
+		var c_idx := clampi(lvl, 0, CHALLENGE_SECTORS.size() - 1)
 		if c_idx >= 0 and c_idx < CHALLENGE_SECTORS.size():
 			var raw: String = str(CHALLENGE_SECTORS[c_idx]["depth"])
 			return "~" + raw.replace("-", "").strip_edges()
@@ -222,20 +228,117 @@ func get_level_depth_str(lvl: int) -> String:
 
 # Evocative philosophical explorer recovery logs (convey positive psychological resilience & mindfulness)
 const SECTOR_LOGS: Dictionary = {
-	1: "In deepest dark, silence is not emptiness—it is your canvas.",
+	1: "In the deepest dark, silence is not emptiness—it is your canvas.",
 	2: "Sound travels far down straight halls, but calmness travels further.",
 	3: "Move gently. The abyss reflects only what you project.",
 	4: "A quiet diversion overcomes sheer brute force.",
 	5: "Patience unmasks every wall; panic only builds more.",
 	6: "Listen closely: every obstacle has an echo that reveals the path forward.",
 	7: "Walk with care. Subterranean pressure turns rough stone into steadfast resolve.",
-	8: "Seek shelter before the scream hits. Protection is never weakness.",
-	9: "Still your waters. Inner peace disarms the raging tempest.",
-	10: "In the crystalline cold, clarity shines through the dark.",
-	11: "Step past dormant fears; they only awaken if you tread in haste.",
-	12: "The hardest chasm is crossed not by speed, but by unwavering focus.",
-	13: "Listen closely: the sound of wind returning. The light awaits.",
+	8: "Still your waters. When current drags your feet, freeze and let the terror pass.",
+	9: "The loudest alarm can clear the quietest path. Wisdom turns danger into an ally.",
+	10: "In the crystalline cold, clarity shines through the dark. Unlock both sides of fear.",
+	11: "Step past dormant shadows. When the time comes, let courage outrun terror.",
+	12: "The grandest cathedral is crossed not by haste, but by unwavering focus between pillars.",
+	13: "Four paths in the gloom. Do not shout blindly; patience illuminates the true branch.",
+	14: "A scattered pebble buys precious heartbeats. In ancient tombs, ingenuity outpaces the beast.",
+	15: "Balance upon the dry beam above, wade through the deep below. Adaptability is survival.",
+	16: "Three ancient gates fall one by one. Every seal broken brings you closer to the sky.",
+	17: "The eye of the cavern listens to your every breath. Subdue your panic into absolute silence.",
+	18: "Every winding ring tests your spirit. Trust the inward curve; it leads upward.",
+	19: "Dark waters stretch under ancient domes. Cross the cold lake; the shore of daylight is near.",
+	20: "Forty meters from the sun. The abyss awakens in fury—shatter the ceiling and step into the light.",
 }
+
+# Narrative Act Interlude beats between major subterranean strata
+const ACT_MILESTONES: Dictionary = {
+	6: [
+		"You have climbed past the lowest stratum of silence: -3,100 Meters.",
+		"The subterranean chill sharpens. Distant shrieks vibrate through the stone.",
+		"The abyss is awake now. Steel your resolve as you ascend."
+	],
+	12: [
+		"Two thousand meters beneath the surface, ancient pillars rise into the dark.",
+		"These ruins were built by those who once sought to seal the shadows.",
+		"Trust not what you fear. Trust only the stillness within your heart."
+	],
+	18: [
+		"The winding spiral unravels beneath your feet: -460 Meters.",
+		"The stagnant air of the deep gives way to faint underground currents.",
+		"You can feel the heartbeat of the surface above. The ascent nears its end."
+	]
+}
+
+func has_seen_act_milestone(lvl: int) -> bool:
+	return seen_act_milestones.has(lvl)
+
+
+func mark_act_milestone_seen(lvl: int) -> void:
+	if seen_act_milestones.has(lvl):
+		return
+	seen_act_milestones[lvl] = true
+	var cfg := ConfigFile.new()
+	cfg.load(PROGRESS_PATH)
+	cfg.set_value("narrative", "seen_act_milestones", seen_act_milestones.keys())
+	cfg.save(PROGRESS_PATH)
+
+
+func has_seen_campaign_ending(mode_key: String = "") -> bool:
+	if mode_key.is_empty():
+		mode_key = "challenge" if current_mode == GameMode.CHALLENGE else "story"
+	return seen_campaign_endings.has(mode_key)
+
+
+func mark_campaign_ending_seen(mode_key: String = "") -> void:
+	if mode_key.is_empty():
+		mode_key = "challenge" if current_mode == GameMode.CHALLENGE else "story"
+	if seen_campaign_endings.has(mode_key):
+		return
+	seen_campaign_endings[mode_key] = true
+	var cfg := ConfigFile.new()
+	cfg.load(PROGRESS_PATH)
+	cfg.set_value("narrative", "seen_campaign_endings", seen_campaign_endings.keys())
+	cfg.save(PROGRESS_PATH)
+
+
+func get_act_milestone_lines(lvl: int) -> Array:
+	if current_mode == GameMode.STORY and ACT_MILESTONES.has(lvl):
+		if has_seen_act_milestone(lvl):
+			return []
+		return ACT_MILESTONES[lvl]
+	return []
+
+
+func get_act_milestone_header(lvl: int) -> String:
+	match lvl:
+		6:
+			return "◈   A C T   I   C L E A R E D   •   D E P T H   - 3 , 1 0 0   M   ◈"
+		12:
+			return "◈   A C T   I I   C L E A R E D   •   D E P T H   - 1 , 7 8 0   M   ◈"
+		18:
+			return "◈   A C T   I I I   C L E A R E D   •   D E P T H   - 4 6 0   M   ◈"
+		_:
+			return "◈   A B Y S S   S T R A T U M   A S C E N D E D   ◈"
+
+
+func get_campaign_ending_lines() -> Array:
+	if has_seen_campaign_ending():
+		return []
+	if current_mode == GameMode.CHALLENGE:
+		return [
+			"You stand at -9,999 Meters: the absolute core of the abyss.",
+			"Here, where light has never reached, your voice was the only genesis.",
+			"Every terror in the dark was an echo awaiting its answer.",
+			"You did not escape the dark. You brought understanding to it.",
+			"The Final Echo is complete."
+		]
+	return [
+		"The stone crust shatters upward.",
+		"A warmth you had long forgotten floods across your face.",
+		"Not the cold, damp breath of the cavern, but the living wind of the sky.",
+		"The pitch-black abyss dissolves into boundless daylight.",
+		"You are silent no longer. The light has returned."
+	]
 
 func get_sector_log(lvl: int) -> String:
 	if SECTOR_LOGS.has(lvl):
@@ -245,22 +348,313 @@ func get_sector_log(lvl: int) -> String:
 # Level Par Benchmarks: { level_number: { "par_time": float, "par_pings": int } }
 const LEVEL_PARS: Dictionary = {
 	0: { "par_time": 20.0, "par_pings": 6 },    # Tutorial
-	1: { "par_time": 22.0, "par_pings": 6 },    # Sector 01: Abyss Origin
-	2: { "par_time": 35.0, "par_pings": 10 },   # Sector 02: Void Cavity
-	3: { "par_time": 32.0, "par_pings": 8 },    # Sector 03: Sub-Crust Trench
-	4: { "par_time": 40.0, "par_pings": 10 },   # Sector 04: Lurking Vault
-	5: { "par_time": 45.0, "par_pings": 12 },   # Sector 05: Obsidian Labyrinth
-	6: { "par_time": 48.0, "par_pings": 14 },   # Sector 06: Echo Chamber
-	7: { "par_time": 52.0, "par_pings": 14 },   # Sector 07: Basalt Tunnels
-	8: { "par_time": 62.0, "par_pings": 16 },   # Sector 08: Screamer Nest
-	9: { "par_time": 58.0, "par_pings": 15 },   # Sector 09: The Silent Pool
-	10: { "par_time": 72.0, "par_pings": 18 },  # Sector 10: Crystal Drift
-	11: { "par_time": 85.0, "par_pings": 20 },  # Sector 11: Bone Hollow
-	12: { "par_time": 98.0, "par_pings": 24 },  # Sector 12: Whisper Chasm
-	13: { "par_time": 90.0, "par_pings": 22 },  # Sector 13: Surface Breach
+	1: { "par_time": 22.0, "par_pings": 6 },    # Shallow Ring
+	2: { "par_time": 30.0, "par_pings": 8 },    # Sleeping Giant
+	3: { "par_time": 32.0, "par_pings": 8 },    # The Living Door
+	4: { "par_time": 36.0, "par_pings": 8 },    # Dead Quiet
+	5: { "par_time": 42.0, "par_pings": 10 },   # The Tollkeeper
+	6: { "par_time": 45.0, "par_pings": 12 },   # Hush Hall
+	7: { "par_time": 48.0, "par_pings": 10 },   # Shriek Gallery
+	8: { "par_time": 56.0, "par_pings": 12 },   # The Flooded Stairs
+	9: { "par_time": 52.0, "par_pings": 14 },   # The Wrong Alarm
+	10: { "par_time": 62.0, "par_pings": 14 },  # Twin Vaults
+	11: { "par_time": 42.0, "par_pings": 8 },   # What Sleeps Above
+	12: { "par_time": 65.0, "par_pings": 16 },  # Cathedral of Pillars
+	13: { "par_time": 55.0, "par_pings": 12 },  # The Blind Forks
+	14: { "par_time": 48.0, "par_pings": 10 },  # Tomb Run
+	15: { "par_time": 68.0, "par_pings": 16 },  # The Drowned Gallery
+	16: { "par_time": 75.0, "par_pings": 18 },  # Three Locks
+	17: { "par_time": 82.0, "par_pings": 20 },  # The Listening Eye
+	18: { "par_time": 72.0, "par_pings": 16 },  # The Spiral
+	19: { "par_time": 78.0, "par_pings": 18 },  # The Black Lake
+	20: { "par_time": 65.0, "par_pings": 14 },  # Surface Breach
+	21: { "par_time": 105.0, "par_pings": 24 }, # King Sector: The Final Echo
 }
 
 var level_records: Dictionary = {}
+var collected_notes: Dictionary = {}
+
+# Collectible Expedition Archives & Subterranean Lore Notes
+const LORE_NOTES: Dictionary = {
+	"L01_1": {
+		"level": 1,
+		"title": "Field Log: The Deep Plunge",
+		"author": "Dr. Aris Thorne • Vanguard VII",
+		"depth": "-4,200 M",
+		"text": "The elevator cables snapped at 0400 hours. We plunged through four kilometers of basalt before the emergency brakes melted into the shaft. We survived, but our lanterns were smashed. Here at -4,200 meters, darkness has weight. Yet in this suffocating void, if you hold your breath, the stone hums. Sound is our only sight now."
+	},
+	"L02_1": {
+		"level": 2,
+		"title": "Biologist Note: Slumber in Silt",
+		"author": "Biologist Maya Lin",
+		"depth": "-3,980 M",
+		"text": "We found the first specimen curled in the sediment. It has no eyes—not even vestigial sockets—only oversized tympanic membranes along its flanks. As long as we sneak, gliding our boots along the ground without lifting our heels, it remains in catatonic dormancy. Run, however, and it awakens with terrifying speed."
+	},
+	"L03_1": {
+		"level": 3,
+		"title": "Tactical Log: The Thrown Stone",
+		"author": "Scout Jarek",
+		"depth": "-3,760 M",
+		"text": "A beast was blocking the only corridor out of the flooded chamber. Thorne took a handful of dry gravel from his pocket and threw it against the far stalactite. The clatter drew the creature away like a moth to a flame. The blind predators here don't chase you; they chase sound. Mislead their ears, and they are powerless."
+	},
+	"L04_1": {
+		"level": 4,
+		"title": "Field Log: The Crimson Hunter",
+		"author": "Dr. Aris Thorne",
+		"depth": "-3,540 M",
+		"text": "Three apex predators block the eastern halls: Chasers. Unlike the pacing sentries, their auditory nerves are tuned exclusively to sharp acoustic spikes—they are completely deaf to creeping footsteps. Yet the moment a voice echo or normal bootstep touches them, they charge the sound origin at blinding velocity. Toss a pebble into a far alcove, then slip past in dead silence."
+	},
+	"L04_2": {
+		"level": 4,
+		"title": "Acoustic Physics: Porous Shielding",
+		"author": "Engineer Kaelen",
+		"depth": "-3,540 M",
+		"text": "The cavern partitions here are composed of volcanic pumice. Sound waves attempting to penetrate a solid stone corner lose up to seventy percent of their kinetic amplitude. When a threat roars in the dark, do not run down an open hallway—duck behind a thick wall. Stone absorbs panic."
+	},
+	"L05_1": {
+		"level": 5,
+		"title": "Survey Note: The Pacing Sentinel",
+		"author": "Dr. Aris Thorne",
+		"depth": "-3,320 M",
+		"text": "There are creatures that never sleep. They pace perpetual geometric loops around the megalithic pillars, tracing the same route with mechanical precision. Their gait is measured, rhythmically tapping the floor. It is almost as if they are blind sentinels stationed here eons ago to enforce an ancient quarantine."
+	},
+	"L06_1": {
+		"level": 6,
+		"title": "Monolith Log: The Hive Ear",
+		"author": "Biologist Maya Lin",
+		"depth": "-3,100 M",
+		"text": "At the center of Hush Hall sits an emerald monolith that breathes: The Listener. It possesses no limbs, and it ignores footsteps completely, yet its tympanic core spans the entire chamber. It accumulates vocal echoes and thrown stones like sand in an hourglass. On the fifth disturbance, it broadcasts a sector-wide alarm that drives every beast toward you."
+	},
+	"L06_2": {
+		"level": 6,
+		"title": "Scout's Scrawl: The Broken Compass",
+		"author": "Scout Jarek",
+		"depth": "-3,100 M",
+		"text": "Magnetic north is dead down here. But when you strike the stone with a boot, the echo returns faster from the near wall and slower from the distant corridor. My ears are becoming eyes. If we ever make it back to the sun, I wonder if daylight will hurt to look at."
+	},
+	"L07_1": {
+		"level": 7,
+		"title": "Autopsy Fragment: Vocal Cocoon",
+		"author": "Biologist Maya Lin",
+		"depth": "-2,880 M",
+		"text": "In this gallery we encountered stationary organisms suspended in the dark like pulsating fuchsia cocoons: Screamers. They cannot walk, but when disturbed by two consecutive sound waves, the cocoon unleashes a deafening shriek that reverberates across the entire cavern—summoning every mobile predator in range."
+	},
+	"L08_1": {
+		"level": 8,
+		"title": "Fluid Dynamics: Viscous Drag",
+		"author": "Engineer Kaelen",
+		"depth": "-2,660 M",
+		"text": "Subterranean aquifers have flooded these stairs. Wading through knee-deep water cuts movement speed in half, and every splash amplifies footsteps threefold. But water also reveals: when a beast wades fifty paces away, pressure ripples reach your boots long before its breathing touches your ears."
+	},
+	"L08_2": {
+		"level": 8,
+		"title": "Stillness: The Riverbed Secret",
+		"author": "Maya Lin",
+		"depth": "-2,660 M",
+		"text": "The secret to surviving the flooded stairs is stillness. When the sentinel patrols the landing right above you, do not attempt to scramble away in the mud. Freeze. The moment your legs cease moving, the ripples dissipate into the black water, and you become just another submerged stone."
+	},
+	"L09_1": {
+		"level": 9,
+		"title": "Warning: The Resonance Chain",
+		"author": "Biologist Maya Lin",
+		"depth": "-2,440 M",
+		"text": "Our worst fears were realized in Sector 09. When a Screamer unleashes its shriek, that shockwave pierces straight through stone walls—not only luring nearby hunters, but also feeding the Listener's resonance counter from afar. Keep the Screamers quiet, or their chain reaction will awaken the entire sector."
+	},
+	"L09_2": {
+		"level": 9,
+		"title": "Tactical Log: The Deliberate Decoy",
+		"author": "Dr. Aris Thorne",
+		"depth": "-2,440 M",
+		"text": "We turned the Listener against its own guardians. The eastern exit was impassable, swarming with prowlers. I stood at the threshold of the north passage and deliberately shouted five times, then bolted into the upper conduit. The alarm drew every beast straight to the monolith. Chaos can be carved into an open door."
+	},
+	"L10_1": {
+		"level": 10,
+		"title": "Archaeology: The Twin Architects",
+		"author": "Elena • Antiquities Scholar",
+		"depth": "-2,220 M",
+		"text": "These vaults were not carved by erosion. The ashlar masonry fits together without mortar, sealed by dual pressure plates. The left vault bears glyphs of slumber; the right bears glyphs of shrieking resonance. The ancient architects knew that escape requires conquering both sides of fear."
+	},
+	"L10_2": {
+		"level": 10,
+		"title": "Discarded Gear: Lightening the Load",
+		"author": "Scout Jarek",
+		"depth": "-2,220 M",
+		"text": "Vance dropped his field kit near the right vault switch. I forbade him from retrieving it—the sentry was already turning the corner. We leave our heavy rations and metal canisters behind. Only what keeps us quiet and agile moves forward."
+	},
+	"L11_1": {
+		"level": 11,
+		"title": "Observation: Shadows on the Rafters",
+		"author": "Maya Lin",
+		"depth": "-2,000 M",
+		"text": "Two thousand meters depth. We looked up into the darkness and saw them perched along the high vault: Crimson Chasers. They do not patrol the silt; they nest directly above the key mechanism. The instant the lock turns, their claws release. Run without hesitation when the light appears."
+	},
+	"L12_1": {
+		"level": 12,
+		"title": "Sacred Space: The Silent Nave",
+		"author": "Elena • Antiquities Scholar",
+		"depth": "-1,780 M",
+		"text": "A subterranean cathedral spanning thousands of square meters. Twelve colossal pillars support the crushing weight of the strata above. This was once a sanctuary of an ancient acoustic civilization who worshipped silence as sacred. To them, unnecessary sound was profanity."
+	},
+	"L12_2": {
+		"level": 12,
+		"title": "Prowler Tracking: The Clockwork Loop",
+		"author": "Engineer Kaelen",
+		"depth": "-1,780 M",
+		"text": "The three sentinels pace this cathedral like interlocking clockwork gears. One shuttles the central aisle; two orbit the pillar clusters in strict clockwise rings. When obstacles are massive and predictable, terror diminishes. Study their cadence, and the cathedral becomes an open highway."
+	},
+	"L13_1": {
+		"level": 13,
+		"title": "Warning: The Four False Mouths",
+		"author": "Scout Jarek",
+		"depth": "-1,560 M",
+		"text": "The crossroads split into four branches, but three terminate in dead-end nest hollows choked with slumbering beasts. Only the northeast branch held the bypass switch. If you are lost, do not shout for rescue. An echo from a dead end bounces back hollow and flat. Listen for the open draft."
+	},
+	"L13_2": {
+		"level": 13,
+		"title": "Personal Diary: The Halfway Ascent",
+		"author": "Maya Lin",
+		"depth": "-1,560 M",
+		"text": "We have climbed more than 2,600 vertical meters from the crash site. My boots are worn through, and our skin is pale as lime. But Jarek insists he smelled wet moss today—not the sulfur of the deep mantle, but surface moisture seeped through karst. We are drawing closer."
+	},
+	"L14_1": {
+		"level": 14,
+		"title": "Crypt Protocol: The Sprint Corridor",
+		"author": "Dr. Aris Thorne",
+		"depth": "-1,340 M",
+		"text": "This was an ancient trial corridor designed for speed. The instant the key was lifted, the crypt alcoves shuddered open behind us. Three apex predators chased us down sixty meters of unbroken stone. If Vance had not hurled pebbles into the side alcoves to deflect their lunges, none of us would have cleared the trench."
+	},
+	"L14_2": {
+		"level": 14,
+		"title": "Medical Log: Adrenaline Reserve",
+		"author": "Maya Lin",
+		"depth": "-1,340 M",
+		"text": "My fingers tremble as I write this. Sprints like that push the cardiovascular system to its absolute redline in oxygen-starved air. But the human spirit is stubborn: when silence fails, instinct takes the reins. We refuse to die down here."
+	},
+	"L15_1": {
+		"level": 15,
+		"title": "Ecology: The Drowned Gallery",
+		"author": "Elena • Antiquities Scholar",
+		"depth": "-1,120 M",
+		"text": "A suspended stone catwalk spans across an expansive flooded gallery. The walkway is infested with dormant Screamers hanging from ceiling alcoves; the black water below is infested with Sleepers. We split our route: crawling along dry beams where voice was fatal, then dropping into the cold lake where speed was choked."
+	},
+	"L15_2": {
+		"level": 15,
+		"title": "Geothermal Survey: Crustal Thinning",
+		"author": "Engineer Kaelen",
+		"depth": "-1,120 M",
+		"text": "The water here is glacial runoff that percolated through surface limestone millennia ago. The ambient air temperature is climbing—from four degrees at the crash site to nearly eleven degrees here. The crust above us is thinning. The surface is real."
+	},
+	"L16_1": {
+		"level": 16,
+		"title": "Fortress Protocol: The Triple Airlock",
+		"author": "Dr. Aris Thorne",
+		"depth": "-900 M",
+		"text": "Less than a kilometer beneath the open sky. An ancient bastion seals the vertical shaft with three consecutive airlock gates. The architects knew that abyssal predators must never breach the sunlit world. Each gate requires a key from a separate wing. We had to divide our courage and move like phantoms."
+	},
+	"L16_2": {
+		"level": 16,
+		"title": "The Crossing: Invisible in Air",
+		"author": "Scout Jarek",
+		"depth": "-900 M",
+		"text": "The Listener sits dead center at the four-way crossing. Every trip between the wings brings you within arm's reach of its acoustic core. I held my breath until my vision blurred black. To conquer the three locks, you must become invisible to the very air itself."
+	},
+	"L17_1": {
+		"level": 17,
+		"title": "The Four Ordeals: Ancient Trial",
+		"author": "Elena • Antiquities Scholar",
+		"depth": "-680 M",
+		"text": "Four wings, four ancient trials. Northwest tests stealth against hunters; south tests timing against sentries; west tests silence against screechers; east tests endurance through water. Whoever engineered this sanctuary was testing whether an explorer had mastered every principle of subterranean survival."
+	},
+	"L17_2": {
+		"level": 17,
+		"title": "Letter to the Surface: Almost Home",
+		"author": "Maya Lin",
+		"depth": "-680 M",
+		"text": "If anyone ever recovers this journal, know that we did not give in to despair. In the dark, you discover what you are truly made of. When you cannot rely on sight, you learn to see with your mind. We are climbing toward the morning."
+	},
+	"L18_1": {
+		"level": 18,
+		"title": "The Spiral: Geometry of Composure",
+		"author": "Dr. Aris Thorne",
+		"depth": "-460 M",
+		"text": "A massive concentric spiral carved into the granite core. Three concentric patrol rings, each watched by a relentless sentry. The path winds inward, forcing you to pass within inches of their routes. It requires supreme composure: advance one step, wait for the patrol to pass, then slip into the inner ring."
+	},
+	"L18_2": {
+		"level": 18,
+		"title": "The Karst Draft: Wind of the Living",
+		"author": "Engineer Kaelen",
+		"depth": "-460 M",
+		"text": "The breeze is unmistakable now. For the first time in weeks, we can feel a faint cyclical current—the planet inhaling and exhaling through karst fissures above. Four hundred and sixty meters. We can hear the distant hum of wind in the trees."
+	},
+	"L19_1": {
+		"level": 19,
+		"title": "The Black Lake: The Shrine Island",
+		"author": "Elena • Antiquities Scholar",
+		"depth": "-240 M",
+		"text": "A vast underground lake stretches beneath a vaulted limestone cavern. In the center lies a shrine island guarded by the Listener, flanked by patrolling sentinels along both shores. Crossing this freezing expanse without disturbing the water is the final barrier. Beyond the eastern bank lies the breach."
+	},
+	"L19_2": {
+		"level": 19,
+		"title": "Final Camp: The Pearlescent Crack",
+		"author": "Dr. Aris Thorne",
+		"depth": "-240 M",
+		"text": "We made camp on the dry limestone ledge of the Black Lake. Our rations are exhausted, our clothes are rags. But above us, through a hairline fracture in the ceiling, I saw something that brought tears to my eyes: not a flashlight, but the faint, pearlescent glimmer of dawn on wet stone. One last climb."
+	},
+	"L20_1": {
+		"level": 20,
+		"title": "The Breach: Forty Meters",
+		"author": "Dr. Aris Thorne",
+		"depth": "-40 M",
+		"text": "Forty meters beneath the open sky. The cavern ascends in six colossal tiers toward the sanctum of the final key. The air is warm and smells of pine and ozone. But the abyss will not let go easily—the ancient guardians and apex hunters guard the breach in force. We will throw our last pebbles and run for the sun."
+	},
+	"L20_2": {
+		"level": 20,
+		"title": "Elena's Message: To the One Who Follows",
+		"author": "Elena • Antiquities Scholar",
+		"depth": "-40 M",
+		"text": "To the wanderer who finds this note in the shadows: you have made it this far. You have learned that silence is strength, that calmness overcomes fear, and that an echo can guide the lost. Take courage. The sun is waiting just beyond the stone. Step through the gate and breathe."
+	}
+}
+
+func collect_note(note_id: String) -> bool:
+	if not LORE_NOTES.has(note_id):
+		return false
+	if collected_notes.has(note_id):
+		return false
+	collected_notes[note_id] = true
+	var cfg := ConfigFile.new()
+	cfg.load(PROGRESS_PATH)
+	cfg.set_value("lore", "collected_notes", collected_notes.keys())
+	cfg.save(PROGRESS_PATH)
+	return true
+
+func is_note_collected(note_id: String) -> bool:
+	return collected_notes.has(note_id)
+
+func get_collected_note_count() -> int:
+	return collected_notes.size()
+
+func get_total_note_count() -> int:
+	return LORE_NOTES.size()
+
+func get_notes_for_level(lvl: int) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for nid in LORE_NOTES:
+		if int(LORE_NOTES[nid].get("level", 0)) == lvl:
+			var item: Dictionary = LORE_NOTES[nid].duplicate()
+			item["id"] = nid
+			item["collected"] = is_note_collected(nid)
+			result.append(item)
+	return result
+
+func get_all_notes() -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for nid in LORE_NOTES:
+		var item: Dictionary = LORE_NOTES[nid].duplicate()
+		item["id"] = nid
+		item["collected"] = is_note_collected(nid)
+		result.append(item)
+	return result
 
 # Audio Settings
 var master_volume := 1.0
@@ -570,11 +964,7 @@ func change_level(target) -> void:
 
 func start_game(level_index: int = 0) -> void:
 	current_level = level_index
-	if is_level_0_story_mode():
-		# Slowly darken interface over 1.2s, hold complete black for 1.0s, then reveal story mode
-		transition_to_scene(MAIN_SCENE, 1.2, 0.45, Callable(), 1.0)
-	else:
-		transition_to_scene(MAIN_SCENE, 0.22, 0.28)
+	transition_to_scene(MAIN_SCENE, 0.28, 0.32)
 
 
 func next_level() -> void:
@@ -679,6 +1069,9 @@ func reset_progress() -> void:
 	force_level_0_story = false
 	current_level = 0
 	level_records.clear()
+	collected_notes.clear()
+	seen_act_milestones.clear()
+	seen_campaign_endings.clear()
 	var cfg := ConfigFile.new()
 	cfg.set_value("progress", "highest_unlocked_level", 1)
 	cfg.set_value("progress", "story_highest_unlocked", 1)
@@ -686,6 +1079,9 @@ func reset_progress() -> void:
 	cfg.set_value("progress", "story_completed", false)
 	cfg.set_value("progress", "has_seen_intro", false)
 	cfg.set_value("progress", "story_tutorial_completed", false)
+	cfg.set_value("lore", "collected_notes", [])
+	cfg.set_value("narrative", "seen_act_milestones", [])
+	cfg.set_value("narrative", "seen_campaign_endings", [])
 	cfg.save(PROGRESS_PATH)
 
 
@@ -700,6 +1096,9 @@ func mark_intro_seen() -> void:
 func load_progress() -> void:
 	var cfg := ConfigFile.new()
 	level_records.clear()
+	collected_notes.clear()
+	seen_act_milestones.clear()
+	seen_campaign_endings.clear()
 	if cfg.load(PROGRESS_PATH) != OK:
 		story_highest_unlocked = 1
 		challenge_highest_unlocked = 1
@@ -708,6 +1107,27 @@ func load_progress() -> void:
 		story_tutorial_completed = false
 		force_level_0_story = false
 		return
+
+	var raw_notes: Array = cfg.get_value("lore", "collected_notes", [])
+	for nid in raw_notes:
+		collected_notes[str(nid)] = true
+
+	var raw_act_milestones: Array = cfg.get_value("narrative", "seen_act_milestones", [])
+	for lvl in raw_act_milestones:
+		seen_act_milestones[int(lvl)] = true
+
+	var raw_endings: Array = cfg.get_value("narrative", "seen_campaign_endings", [])
+	for end_key in raw_endings:
+		seen_campaign_endings[str(end_key)] = true
+
+	if not cfg.has_section("narrative"):
+		for m_lvl in ACT_MILESTONES.keys():
+			if story_highest_unlocked > int(m_lvl):
+				seen_act_milestones[int(m_lvl)] = true
+		if story_completed or story_highest_unlocked > STORY_LEVELS.size():
+			seen_campaign_endings["story"] = true
+		if challenge_highest_unlocked > CHALLENGE_LEVELS.size():
+			seen_campaign_endings["challenge"] = true
 
 	var legacy_highest: int = int(cfg.get_value("progress", "highest_unlocked_level", 1))
 	story_highest_unlocked = clampi(
@@ -739,6 +1159,9 @@ func load_progress() -> void:
 
 
 func get_level_par(lvl: int) -> Dictionary:
+	var par_key: int = lvl - 1 if (current_mode == GameMode.STORY and lvl > 0) else lvl
+	if LEVEL_PARS.has(par_key):
+		return LEVEL_PARS[par_key]
 	if LEVEL_PARS.has(lvl):
 		return LEVEL_PARS[lvl]
 	return { "par_time": 45.0, "par_pings": 12 }

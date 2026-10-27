@@ -189,7 +189,7 @@ static func build_controls_panel(scene: Control) -> VBoxContainer:
 	scene.call("wire_juice", pulse_btn)
 	root.add_child(SettingsUIFactory.create_setting_row(
 		"FAST PULSE DOUBLE CLICK",
-		"Double click or double tap mouse to instantly trigger a maximum radius acoustic wave.",
+		"Double-click or double-tap to instantly emit a quick sonar pulse without holding Space.",
 		pulse_btn
 	))
 

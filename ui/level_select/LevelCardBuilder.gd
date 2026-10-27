@@ -168,7 +168,7 @@ static func build_level_card(
 	if not is_unlocked:
 		# Conceal locked level names and depths for unprobed sectors
 		if is_king_sector:
-			display_title = "👑 KING SECTOR"
+			display_title = "KING SECTOR"
 			display_subtitle = "---"
 		else:
 			display_title = "???"

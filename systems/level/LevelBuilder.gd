@@ -8,6 +8,7 @@ extends RefCounted
 ##   P  player start         E  exit                             K  exit key (exit stays locked until stepped on)
 ##   A-D  doors              a-d  floor switches (a opens A, b opens B ...)
 ##   Z  sleeper              H  sleeping chaser (hunter)         X  screamer        L  listener
+##   N  lore note / expedition journal
 ##   1-9, e-y   route waypoints, used by the `routes` block below
 ##
 ## ROUTES (one enemy per line):   <type> <waypoints> [wake=<switch id>]
@@ -78,6 +79,8 @@ static func build(root: Node2D) -> void:
 					_marker(root, LevelMarker.Kind.DOOR, cell, ch)
 				"a", "b", "c", "d":
 					_marker(root, LevelMarker.Kind.SWITCH, cell, ch)
+				"N":
+					_marker(root, LevelMarker.Kind.NOTE, cell)
 				"Z", "H", "X", "L":
 					static_enemies.append([STATIC_ENEMIES[ch], cell])
 				_:

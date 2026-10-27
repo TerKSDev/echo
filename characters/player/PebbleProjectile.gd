@@ -35,9 +35,9 @@ func setup(arg1, arg2 = null) -> void:
 
 	for i in range(path_points.size() - 1):
 		var d: float = path_points[i].distance_to(path_points[i + 1])
-		var dur: float = clampf(d / 240.0, 0.42, 0.85)
+		var dur: float = clampf(d / 240.0, 0.15 if i > 0 else 0.32, 0.85)
 		seg_durations.append(dur)
-		var h: float = clampf(d * 0.22, 22.0, 55.0) * (0.65 if i > 0 else 1.0)
+		var h: float = clampf(d * 0.22, 10.0 if i > 0 else 22.0, 55.0) * (0.65 if i > 0 else 1.0)
 		seg_heights.append(h)
 
 
@@ -107,9 +107,17 @@ func _on_hit_ground() -> void:
 	_impact_time = 0.0
 	var final_pos: Vector2 = path_points[path_points.size() - 1]
 	global_position = final_pos
+	var in_water := false
+	var main_node := get_parent()
+	if main_node != null and "water_cells" in main_node and "_level_root" in main_node and main_node._level_root != null and main_node._level_root.walls != null:
+		var wc: Vector2i = main_node._level_root.walls.local_to_map(main_node._level_root.walls.to_local(final_pos))
+		in_water = main_node.water_cells.has(wc)
 	var sb := get_tree().get_first_node_in_group("sound_bus") as SoundBus
 	if sb != null and is_instance_valid(sb):
-		sb.emit_decoy_sound(final_pos, 0.4, 280.0)
+		if in_water:
+			sb.emit_decoy_sound(final_pos, 0.58, 360.0)
+		else:
+			sb.emit_decoy_sound(final_pos, 0.4, 280.0)
 	landed.emit(final_pos)
 
 	# Spawn subtle stone impact chips

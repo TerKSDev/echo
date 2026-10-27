@@ -423,10 +423,10 @@ func show_debrief(data: Dictionary, sfx: SfxManager = null) -> void:
 	_update_hms_button_state()
 
 	# Format level title with sector name
-	if lvl_num == 0:
+	if GameState.current_mode == GameState.GameMode.STORY and GameState.current_level == 0:
 		_title_lbl.text = "PROLOGUE CLEARED"
 	else:
-		_title_lbl.text = "%s CLEARED" % GameState.get_level_name(lvl_num)
+		_title_lbl.text = "%s CLEARED" % GameState.get_level_name(GameState.current_level)
 
 	# Update telemetry stats
 	var mins := floori(clear_time / 60.0)
@@ -470,7 +470,7 @@ func show_debrief(data: Dictionary, sfx: SfxManager = null) -> void:
 			_rank_badge.add_theme_color_override("font_color", Color(0.85, 0.88, 0.95))
 
 	# Next button label for final depth
-	if lvl_num >= 13:
+	if not GameState.has_next_level():
 		_btn_next.text = "FINALE VICTORY >"
 	else:
 		_btn_next.text = "NEXT SECTOR >"

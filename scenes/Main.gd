@@ -24,6 +24,9 @@ var water_cells: Dictionary = {}  # Vector2i -> true
 var switch_cells: Dictionary = {} # Vector2i -> String
 var door_nodes: Dictionary = {}   # String -> Array[StaticBody2D]
 var pressed: Dictionary = {}
+var note_cells: Dictionary = {}   # Vector2i -> String
+var _read_notes_this_run: Dictionary = {} # Vector2i -> bool
+var _temp_note_markers: Array[Vector2i] = []
 var _echo_features_cache: Array = []
 var _echo_features_dirty := true
 
@@ -45,6 +48,7 @@ class TutorialBeacon extends Node2D:
 	var beacon_label := ""
 	var active := false
 	var time := 0.0
+	var player_ref: Node2D = null
 
 	func _process(delta: float) -> void:
 		if active:
@@ -64,6 +68,24 @@ class TutorialBeacon extends Node2D:
 		draw_circle(Vector2.ZERO, 3.5, Color(0.9, 0.98, 1.0, 0.95))
 		if beacon_label != "":
 			draw_string(ThemeDB.fallback_font, Vector2(-60.0, -22.0), beacon_label, HORIZONTAL_ALIGNMENT_CENTER, 120, 11, Color(0.75, 0.96, 1.0, 0.95))
+
+		# Draw subtle directional guide chevrons near the player when the beacon is far away
+		if player_ref != null and is_instance_valid(player_ref):
+			var to_beacon: Vector2 = target_pos - player_ref.global_position
+			var dist: float = to_beacon.length()
+			if dist > 145.0:
+				var dir: Vector2 = to_beacon / dist
+				var perp: Vector2 = dir.orthogonal()
+				var p_local: Vector2 = to_local(player_ref.global_position)
+				for i in range(3):
+					var wave_phase: float = fposmod(time * 2.4 - float(i) * 0.28, 1.0)
+					var chev_alpha: float = sin(wave_phase * PI) * 0.65
+					var tip: Vector2 = p_local + dir * (44.0 + float(i) * 18.0)
+					var wing_a: Vector2 = tip - dir * 6.0 + perp * 5.5
+					var wing_b: Vector2 = tip - dir * 6.0 - perp * 5.5
+					var c_col := Color(0.40, 0.92, 1.0, chev_alpha)
+					draw_line(wing_a, tip, c_col, 1.8)
+					draw_line(wing_b, tip, c_col, 1.8)
 
 
 
@@ -114,17 +136,21 @@ func _play_entry_sequence() -> void:
 	# Format level title & evocative philosophical subtitle banner
 	var cur_lvl: int = GameState.current_level
 	var title_text: String = ""
+	var subtitle_text: String = ""
+
 	if GameState.current_mode == GameState.GameMode.CHALLENGE:
-		title_text = GameState.get_level_name(cur_lvl + 1)
+		title_text = GameState.get_level_name(cur_lvl)
+		if _level_root != null and _level_root.hint != "":
+			subtitle_text = _level_root.hint
+		else:
+			subtitle_text = "Listen closely. The deepest chasm awaits."
 	else:
 		title_text = GameState.get_level_name(cur_lvl)
-	var subtitle_text: String = GameState.get_sector_log(cur_lvl)
+		subtitle_text = GameState.get_sector_log(cur_lvl)
 
-	if _level_root != null:
+	if title_text == "" and _level_root != null:
 		if _level_root.level_name != "" and _level_root.level_name != "UNTITLED" and _level_root.level_name != "未命名":
 			title_text = _level_root.level_name
-		if _level_root.hint != "":
-			subtitle_text = _level_root.hint
 
 	hud.play_level_intro(title_text, subtitle_text)
 
@@ -150,6 +176,7 @@ func _set_tutorial_beacon(pos: Vector2, label: String) -> void:
 		_tutorial_beacon.name = "TutorialBeacon"
 		_tutorial_beacon.z_index = 25
 		add_child(_tutorial_beacon)
+	_tutorial_beacon.player_ref = player
 	_tutorial_beacon.target_pos = pos
 	_tutorial_beacon.beacon_label = label
 	_tutorial_beacon.active = true
@@ -177,14 +204,14 @@ func _play_tutorial_level_0_sequence() -> void:
 		player.can_sound = false
 		player.can_sneak = false
 		player.can_pebble = false
-		player.modulate.a = 0.0
 		if player.mic != null:
 			player.mic.enabled = false
 
-	# Hold on complete black for ~1.0 second in pure darkness and dead silence, then begin story
-	var tw := create_tween()
-	tw.tween_interval(1.0)
-	tw.tween_callback(_level_0_story_step_1)
+	# Play cinematic waking-up sequence (blinking eyelids, blurry double-vision to focus, slowly rising from the ground)
+	if hud != null:
+		hud.play_wake_up_sequence(player, sfx, _level_0_story_step_1)
+	else:
+		_level_0_story_step_1()
 
 
 func _level_0_story_step_1() -> void:
@@ -193,15 +220,13 @@ func _level_0_story_step_1() -> void:
 	hud.story_overlay.play_sequence([
 		"Total darkness surrounds you.",
 		"You try to call into the void."
-	], _level_0_prompt_sound_button)
+	], _level_0_prompt_sound_button, false)
 
 
 func _level_0_prompt_sound_button() -> void:
-	# Reveal player light dot in the darkness and unlock sound/Space
+	# Unlock sound/Space
 	if player != null:
 		player.can_sound = true
-		var p_tw := create_tween()
-		p_tw.tween_property(player, "modulate:a", 1.0, 0.8).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 	var sound_btn := hud.get_node_or_null("SoundBtn") as Button
 	if sound_btn == null:
@@ -216,6 +241,10 @@ func _level_0_prompt_sound_button() -> void:
 	var tw := create_tween()
 	tw.tween_property(sound_btn, "modulate:a", 1.0, 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
+	if hud != null:
+		var title: String = "TAP [SOUND] BUTTON" if GameState.is_touch_or_mobile() else "TAP [SPACE] OR [SOUND]"
+		hud.show_tutorial_callout(0, title, "Emit a sound wave to illuminate the dark")
+
 	# Listen for single voice sound emission via member Callable
 	if is_instance_valid(player):
 		if not player.sound_emitted.is_connected(_on_tutorial_sound_emitted):
@@ -229,6 +258,9 @@ func _on_tutorial_sound_emitted(_pos: Vector2, _loudness: float, is_voice: bool,
 		player.can_sound = false
 		if player.sound_emitted.is_connected(_on_tutorial_sound_emitted):
 			player.sound_emitted.disconnect(_on_tutorial_sound_emitted)
+
+	if hud != null:
+		hud.hide_tutorial_callout()
 
 	var sound_btn := hud.get_node_or_null("SoundBtn") as Button
 	if sound_btn != null:
@@ -250,122 +282,144 @@ func _level_0_story_step_2() -> void:
 		"No one answers...",
 		"Only your own echo returns.",
 		"You must move forward."
-	], _level_0_start_movement_teaching)
+	], _level_0_start_movement_teaching, false)
 
 
 func _level_0_start_movement_teaching() -> void:
 	if player != null:
 		player.can_move = true
 	_tutorial_step = 1
-	_set_tutorial_beacon(Vector2(260.0, 144.0), "MOVE")
-
-
-func _level_0_reached_first_marker() -> void:
-	_clear_tutorial_beacon()
-	_tutorial_step = 2
-	if player != null:
-		player.can_move = false
-		player.velocity = Vector2.ZERO
-
-	if hud != null and hud.story_overlay != null:
-		hud.story_overlay.play_sequence([
-			"Through the echoes, you sense an enclosed cavern.",
-			"A dark pool of water blocks the way ahead."
-		], func():
-			if player != null:
-				player.can_move = true
-			_set_tutorial_beacon(Vector2(432.0, 144.0), "WATER")
-			_tutorial_step = 3
-		)
+	_set_tutorial_beacon(Vector2(456.0, 144.0), "EXPLORE")
+	if hud != null:
+		var title: String = "TOUCH & DRAG TO MOVE" if GameState.is_touch_or_mobile() else "[WASD] / ARROW KEYS"
+		var sub: String = "Slide anywhere to guide your explorer" if GameState.is_touch_or_mobile() else "Or touch & drag anywhere to move"
+		hud.show_tutorial_callout(2, title, sub)
 
 
 func _level_0_reached_water_edge() -> void:
 	_clear_tutorial_beacon()
+	if hud != null:
+		hud.hide_tutorial_callout()
 	_tutorial_step = 4
 	if player != null:
 		player.can_move = false
 		player.velocity = Vector2.ZERO
+
+	# Visually reveal the water pool ahead and the sleeping beast's rhythmic breathing across the pool
+	if is_instance_valid(echo_layer):
+		echo_layer.emit_echo(Vector2(544.0, 144.0), 145.0, [], false)
+		echo_layer.emit_echo(Vector2(720.0, 208.0), 125.0, [], false)
 
 	if sfx != null:
 		sfx.play_sleeper_snore(Vector2(720.0, 208.0))
 
 	if hud != null and hud.story_overlay != null:
 		hud.story_overlay.play_sequence([
-			"A guttural breathing rumbles from the other side.",
-			"A presence that does not belong in the light..."
+			"Through the echoes, a dark pool of water blocks the way ahead.",
+			"From the far shore, a guttural breathing rumbles in the dark..."
 		], func():
 			if player != null:
 				player.can_move = true
+			_set_tutorial_beacon(Vector2(620.0, 144.0), "CROSS")
 			_tutorial_step = 5 # Waiting for player to wade into water
-		)
+		, false)
 
 
 func _level_0_trigger_chase() -> void:
-	_tutorial_step = 6
+	_tutorial_step = 7
 	_clear_tutorial_beacon()
+
+	# Emit an unmistakable loud water splash wave from the player's feet so cause-and-effect is 100% clear
+	if player != null and player.has_method("make_sound"):
+		player.make_sound(0.55, false, false)
+
+	if hud != null:
+		hud.hide_tutorial_callout()
+		hud.flash_threat(1.2)
+		hud.show_tutorial_callout(2, "THE SPLASH WOKE IT! RUN!", "Retreat left into the narrow passage!")
+
 	if player != null:
-		player.can_move = false
-		player.velocity = Vector2.ZERO
 		player.set_meta("tutorial_invulnerable", true)
 		player.camera_shake(0.5, 6.0)
 
 	if sfx != null:
-		sfx.play_screamer_shriek(Vector2(720.0, 208.0))
-	if hud != null:
-		hud.flash_threat(1.2)
+		sfx.play_monster_roar(Vector2(720.0, 208.0), 0)
 
-	# Wake up Sleeper but keep it frozen in roaring shock during dialogue (cinematic time-stop)
 	var sleeper := get_tree().get_first_node_in_group("enemy") as Enemy
 	if sleeper != null and is_instance_valid(sleeper):
 		_tutorial_sleeper = sleeper
 		sleeper.chase_speed = 105.0
 		sleeper.state = Enemy.State.ALERT
-		sleeper.alert_time = 999.0
-		sleeper.velocity = Vector2.ZERO
+		sleeper.alert_time = 0.65
 		sleeper.reveal(1.0)
+		if player != null:
+			sleeper.force_alert_to(player.global_position)
 
-	if hud != null and hud.story_overlay != null:
-		hud.story_overlay.play_sequence([
-			"The splash echoed too loudly!",
-			"IT HEARD YOU. RUN!"
-		], func():
-			# Time-stop ends: Sleeper charges, player flees
-			if _tutorial_sleeper != null and is_instance_valid(_tutorial_sleeper):
-				_tutorial_sleeper.alert_time = 0.2
-				if player != null:
-					_tutorial_sleeper.force_alert_to(player.global_position)
-			if player != null:
-				player.can_move = true
-			_set_tutorial_beacon(Vector2(120.0, 144.0), "RETREAT!")
-			_tutorial_step = 7 # Chase active, player fleeing to x <= 200
-		)
+	_set_tutorial_beacon(Vector2(180.0, 144.0), "RETREAT!")
 
 
 func _level_0_retreat_safe() -> void:
 	_tutorial_step = 8
 	_clear_tutorial_beacon()
+	if hud != null:
+		hud.hide_tutorial_callout()
 	if player != null:
 		player.can_move = false
 		player.velocity = Vector2.ZERO
 		player.set_meta("tutorial_invulnerable", false)
 
-	# Sleeper drops aggro at the water line and turns into a slow patroller
+	# Sleeper loses the acoustic trail in the dark corridor and smoothly returns to its alcove to sleep
 	if _tutorial_sleeper != null and is_instance_valid(_tutorial_sleeper):
-		_tutorial_sleeper.chase_speed = 135.0
-		_tutorial_sleeper.patrol_speed = 65.0
-		_tutorial_sleeper.enemy_type = Enemy.EnemyType.PATROLLER
-		_tutorial_sleeper.patrol_points = [Vector2(624.0, 208.0), Vector2(768.0, 208.0)]
-		_tutorial_sleeper.state = Enemy.State.PATROL
-		_tutorial_sleeper.target = Vector2(624.0, 208.0)
+		_tutorial_sleeper.state = Enemy.State.RETURN
+		_tutorial_sleeper.target = Vector2(720.0, 208.0)
+		_tutorial_sleeper.home = Vector2(720.0, 208.0)
+		_tutorial_sleeper.velocity = Vector2.ZERO
+		var s_tw := create_tween()
+		s_tw.tween_property(_tutorial_sleeper, "global_position", Vector2(720.0, 208.0), 1.2).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+		s_tw.tween_callback(func():
+			if is_instance_valid(_tutorial_sleeper):
+				_tutorial_sleeper.state = Enemy.State.SLEEP
+				_tutorial_sleeper.velocity = Vector2.ZERO
+				_tutorial_sleeper.alert_time = 0.85
+		)
 
 	if hud != null:
-		hud.reset_vignette(0.5)
+		hud.reset_vignette(0.6)
 
+	if sfx != null:
+		sfx.play_sleeper_snore(Vector2(720.0, 208.0))
+
+	# Cohesive narrative: the beast settles down, player learns that enemies are blind and water amplifies sound
 	if hud != null and hud.story_overlay != null:
 		hud.story_overlay.play_sequence([
-			"You barely escaped into the darkness.",
-			"Exhaustion overwhelms you..."
-		], _level_0_slumber_sequence)
+			"You barely escaped into the narrow stone passage.",
+			"Blind in the dark, the beast hunts only by sound—and slips back into slumber.",
+			"Water amplifies every footstep. Tread softly to cross unheard."
+		], func():
+			_tutorial_checkpoint = 1
+			_tutorial_step = 9
+			if player != null:
+				player.can_move = true
+				player.can_sneak = true
+				player.can_sound = false
+				player.can_pebble = false
+
+			var sneak_btn := hud.get_node_or_null("SneakBtn") as Button
+			if sneak_btn != null:
+				sneak_btn.visible = true
+				sneak_btn.modulate.a = 1.0
+				sneak_btn.set("tutorial_pulse", true)
+
+			if hud != null:
+				var title: String
+				if GameState.sneak_hold_mode:
+					title = "HOLD [SNEAK] BUTTON" if GameState.is_touch_or_mobile() else "HOLD [SHIFT] OR [SNEAK]"
+				else:
+					title = "TAP [SNEAK] BUTTON" if GameState.is_touch_or_mobile() else "PRESS [SHIFT] OR [SNEAK]"
+				hud.show_tutorial_callout(1, title, "Move silently to cross the water without waking it")
+
+			_set_tutorial_beacon(Vector2(560.0, 144.0), "SNEAK ACROSS")
+		, false)
 
 
 func _create_blackout_curtain() -> ColorRect:
@@ -384,47 +438,6 @@ func _create_blackout_curtain() -> ColorRect:
 	return curtain
 
 
-func _level_0_slumber_sequence() -> void:
-	if hud != null:
-		hud.reset_vignette(0.3)
-	# Dream / Inner monologue on pure black
-	if hud != null and hud.story_overlay != null:
-		hud.story_overlay.play_sequence([
-			"In the cold silence, a voice within speaks...",
-			"To surrender to the dark is worse than death."
-		], func():
-			# Reposition standing before the water pool
-			if player != null:
-				player.global_position = Vector2(432.0, 144.0)
-				player.velocity = Vector2.ZERO
-				player.can_move = false
-
-			_tutorial_checkpoint = 1
-
-			if sfx != null:
-				sfx.play_enemy_step(Vector2(650.0, 208.0), false, true)
-
-			hud.story_overlay.play_sequence([
-				"It paces the passage on the other side.",
-				"Walk softly. Water amplifies every sound."
-			], func():
-				# Unlock Sneak Button and start stealth crossing
-				_tutorial_step = 9
-				if player != null:
-					player.can_move = true
-					player.can_sneak = true
-					player.can_sound = false
-					player.can_pebble = false
-				var sneak_btn := hud.get_node_or_null("SneakBtn") as Button
-				if sneak_btn != null:
-					sneak_btn.visible = true
-					sneak_btn.set("tutorial_pulse", true)
-				# Clear guide beacon showing the way out through Room 2
-				_set_tutorial_beacon(Vector2(912.0, 144.0), "WAY OUT")
-			)
-		)
-
-
 func _seal_room_2_passage() -> void:
 	if _level_root == null or _level_root.walls == null:
 		return
@@ -435,8 +448,10 @@ func _seal_room_2_passage() -> void:
 
 func _level_0_enter_room_3() -> void:
 	_tutorial_checkpoint = 2
-	_tutorial_step = 10
+	_tutorial_step = 11
 	_clear_tutorial_beacon()
+	if hud != null:
+		hud.hide_tutorial_callout()
 
 	if player != null:
 		player.can_move = false
@@ -464,57 +479,50 @@ func _level_0_enter_room_3() -> void:
 	if hud != null:
 		hud.reset_vignette(0.3)
 
-	# 4. Audio & tactile impact for the falling stone barrier
+	# 4. Audio, tactile & visual echo impact for the falling stone barrier + faint key shimmer ahead
 	if sfx != null:
 		sfx.play_door_open(Vector2(864.0, 144.0))
 	if player != null:
 		player.camera_shake(0.35, 4.0)
+	if is_instance_valid(echo_layer):
+		echo_layer.emit_echo(Vector2(864.0, 144.0), 220.0, [], false)
+		echo_layer.emit_echo(Vector2(1104.0, 144.0), 120.0, [], false)
 
-	# 5. Narrative: Sealed passage
+	# 5. Unified Narrative: Sealed passage & sensing the dormant resonator key ahead
 	if hud != null and hud.story_overlay != null:
 		hud.story_overlay.play_sequence([
 			"Fallen stone crashes down, sealing the passage behind you.",
-			"There is no going back."
-		], func():
-			if player != null:
-				player.can_move = true
-			_set_tutorial_beacon(Vector2(1040.0, 144.0), "INVESTIGATE")
-		)
+			"Ahead in the dark, an ancient resonator key hums faintly.",
+			"A weak call cannot wake it. Hold to unleash a full echo."
+		], _level_0_activate_charge_prompt, false)
+	else:
+		_level_0_activate_charge_prompt()
 
 
-func _level_0_prompt_charge_sound() -> void:
-	_clear_tutorial_beacon()
+func _level_0_activate_charge_prompt() -> void:
 	_tutorial_step = 11
-
-	if player != null:
-		player.can_move = false
-		player.velocity = Vector2.ZERO
-
 	if sfx != null:
 		sfx.play_assist_toggle(true)
 
-	if hud != null and hud.story_overlay != null:
-		hud.story_overlay.play_sequence([
-			"Ahead, an ancient resonator key rests in stillness.",
-			"A gentle sound will not wake it.",
-			"Hold [SOUND] or [SPACE] to unleash a resonant surge!"
-		], func():
-			var sound_btn := hud.get_node_or_null("SoundBtn") as Button
-			if sound_btn != null:
-				sound_btn.visible = true
-				sound_btn.modulate.a = 1.0 # Fully visible and opaque!
-				sound_btn.mouse_filter = Control.MOUSE_FILTER_STOP
-				sound_btn.set("tutorial_pulse", true)
-				sound_btn.set("tutorial_hold_mode", true)
+	var sound_btn := hud.get_node_or_null("SoundBtn") as Button
+	if sound_btn != null:
+		sound_btn.visible = true
+		sound_btn.modulate.a = 1.0
+		sound_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+		sound_btn.set("tutorial_pulse", true)
+		sound_btn.set("tutorial_hold_mode", true)
 
-			_set_tutorial_beacon(Vector2(1104.0, 144.0), "RESONATE")
+	if hud != null:
+		var title: String = "HOLD [SOUND] BUTTON" if GameState.is_touch_or_mobile() else "HOLD [SPACE] OR [SOUND]"
+		hud.show_tutorial_callout(0, title, "Hold until full charge, then release to awaken the key")
 
-			if is_instance_valid(player):
-				player.can_move = true
-				player.can_sound = true
-				if not player.sound_emitted.is_connected(_on_tutorial_charge_emitted):
-					player.sound_emitted.connect(_on_tutorial_charge_emitted)
-		)
+	_set_tutorial_beacon(Vector2(1104.0, 144.0), "RESONATE")
+
+	if is_instance_valid(player):
+		player.can_move = false
+		player.can_sound = true
+		if not player.sound_emitted.is_connected(_on_tutorial_charge_emitted):
+			player.sound_emitted.connect(_on_tutorial_charge_emitted)
 
 
 func _on_tutorial_charge_emitted(_pos: Vector2, loudness: float, is_voice: bool, _is_sneak: bool = false) -> void:
@@ -522,6 +530,9 @@ func _on_tutorial_charge_emitted(_pos: Vector2, loudness: float, is_voice: bool,
 		return
 	if is_instance_valid(player) and player.sound_emitted.is_connected(_on_tutorial_charge_emitted):
 		player.sound_emitted.disconnect(_on_tutorial_charge_emitted)
+
+	if hud != null:
+		hud.hide_tutorial_callout()
 
 	var sound_btn := hud.get_node_or_null("SoundBtn") as Button
 	if sound_btn != null:
@@ -531,29 +542,52 @@ func _on_tutorial_charge_emitted(_pos: Vector2, loudness: float, is_voice: bool,
 
 	if sfx != null:
 		sfx.play_assist_toggle(true)
+	if is_instance_valid(echo_layer):
+		echo_layer.emit_echo(Vector2(1104.0, 144.0), 210.0, [], false)
 
 	_clear_tutorial_beacon()
 
-	get_tree().create_timer(1.2).timeout.connect(func():
-		if hud != null and hud.story_overlay != null:
-			hud.story_overlay.play_sequence([
-				"The resonator key awakened!",
-				"Step on it to unseal the stone gate."
-			], func():
-				_tutorial_step = 12
-				if player != null:
-					player.can_move = true
-				_set_tutorial_beacon(Vector2(1104.0, 144.0), "KEY")
-			)
+	get_tree().create_timer(0.85).timeout.connect(func():
+		_tutorial_step = 12
+		if is_instance_valid(player):
+			player.can_move = true
+		_set_tutorial_beacon(Vector2(1104.0, 144.0), "TOUCH KEY")
 	)
 
 
 func _level_0_key_activated() -> void:
-	_clear_tutorial_beacon()
+	if _tutorial_step >= 13:
+		return
 	_tutorial_step = 13
+	_clear_tutorial_beacon()
+	if hud != null:
+		hud.hide_tutorial_callout()
+
+	var key_cell := Vector2i(34, 4)
+	if switch_cells.has(key_cell) and not pressed.has(key_cell):
+		pressed[key_cell] = true
+		_echo_features_dirty = true
+
 	if player != null:
 		player.can_move = false
 		player.velocity = Vector2.ZERO
+
+	if sfx != null:
+		sfx.play_door_open(Vector2(1264.0, 144.0))
+	if is_instance_valid(echo_layer):
+		echo_layer.emit_echo(Vector2(1264.0, 144.0), 260.0, [], false)
+
+	# Ensure door 'A' opens visually and functionally
+	for body in door_nodes.get("A", []):
+		if is_instance_valid(body) and not body.has_meta("open"):
+			body.set_meta("open", true)
+			var tw := create_tween()
+			tw.tween_property(body, "modulate:a", 0.0, 0.45)
+			tw.tween_callback(func():
+				if is_instance_valid(body):
+					body.process_mode = Node.PROCESS_MODE_DISABLED
+					body.visible = false
+			)
 
 	if hud != null and hud.story_overlay != null:
 		hud.story_overlay.play_sequence([
@@ -563,13 +597,24 @@ func _level_0_key_activated() -> void:
 			_tutorial_step = 14
 			if player != null:
 				player.can_move = true
+				player.can_sound = true
+				player.can_sneak = true
 			_set_tutorial_beacon(Vector2(1488.0, 144.0), "ASCENT")
-		)
+		, false)
+	else:
+		_tutorial_step = 14
+		if player != null:
+			player.can_move = true
+			player.can_sound = true
+			player.can_sneak = true
+		_set_tutorial_beacon(Vector2(1488.0, 144.0), "ASCENT")
 
 
 func _level_0_cinematic_exit() -> void:
 	_changing = true
 	_clear_tutorial_beacon()
+	if hud != null:
+		hud.hide_tutorial_callout()
 	if is_instance_valid(player):
 		player.can_move = false
 		player.velocity = Vector2.ZERO
@@ -597,27 +642,45 @@ func _level_0_physics_process(_delta: float) -> void:
 
 	match _tutorial_step:
 		1:
-			if px >= 235.0:
-				_level_0_reached_first_marker()
-		3:
-			if px >= 415.0:
+			if px >= 240.0 and hud != null:
+				hud.hide_tutorial_callout()
+			if px >= 448.0:
 				_level_0_reached_water_edge()
 		5:
-			if px >= 485.0:
+			if px >= 532.0:
 				_level_0_trigger_chase()
 		7:
-			if px <= 200.0:
+			if px <= 210.0:
 				_level_0_retreat_safe()
 		9:
 			if player.sneaking:
 				var sneak_btn := hud.get_node_or_null("SneakBtn") as Button
 				if sneak_btn != null and sneak_btn.get("tutorial_pulse"):
 					sneak_btn.set("tutorial_pulse", false)
-			if px >= 912.0:
+				if hud != null:
+					hud.hide_tutorial_callout()
+			elif _tutorial_sleeper != null and is_instance_valid(_tutorial_sleeper) and _tutorial_sleeper.state != Enemy.State.SLEEP and px <= 210.0:
+				# Player retreated again after waking it: Sleeper loses sound and smoothly returns to sleep
+				_tutorial_sleeper.state = Enemy.State.RETURN
+				_tutorial_sleeper.target = Vector2(720.0, 208.0)
+				_tutorial_sleeper.home = Vector2(720.0, 208.0)
+				_tutorial_sleeper.velocity = Vector2.ZERO
+				var s_tw := create_tween()
+				s_tw.tween_property(_tutorial_sleeper, "global_position", Vector2(720.0, 208.0), 1.0).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+				s_tw.tween_callback(func():
+					if is_instance_valid(_tutorial_sleeper):
+						_tutorial_sleeper.state = Enemy.State.SLEEP
+						_tutorial_sleeper.velocity = Vector2.ZERO
+				)
+				if hud != null:
+					hud.reset_vignette(0.5)
+			if px >= 540.0 and _tutorial_beacon != null and _tutorial_beacon.beacon_label == "SNEAK ACROSS":
+				_set_tutorial_beacon(Vector2(940.0, 144.0), "PASSAGE")
+			if px >= 936.0:
 				_level_0_enter_room_3()
-		10:
-			if px >= 1020.0:
-				_level_0_prompt_charge_sound()
+		12:
+			if player.global_position.distance_to(Vector2(1104.0, 144.0)) <= 26.0:
+				_level_0_key_activated()
 		14:
 			if px >= 1470.0:
 				_level_0_cinematic_exit()
@@ -629,6 +692,9 @@ func _load_level(path: String) -> void:
 	switch_cells.clear()
 	door_nodes.clear()
 	pressed.clear()
+	note_cells.clear()
+	_read_notes_this_run.clear()
+	_temp_note_markers.clear()
 	_echo_features_cache.clear()
 	_echo_features_dirty = true
 	has_exit = false
@@ -690,6 +756,24 @@ func _ingest_markers() -> void:
 				var did: String = m.link_id.strip_edges().to_upper()
 				if did != "":
 					_make_door(cell, did)
+			LevelMarker.Kind.NOTE:
+				if GameState.current_mode == GameState.GameMode.STORY:
+					_temp_note_markers.append(cell)
+
+	if GameState.current_mode == GameState.GameMode.STORY and _temp_note_markers.size() > 0:
+		_temp_note_markers.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+			if a.y != b.y:
+				return a.y < b.y
+			return a.x < b.x
+		)
+		var cur_lvl: int = GameState.current_level
+		for idx in range(_temp_note_markers.size()):
+			var mcell: Vector2i = _temp_note_markers[idx]
+			var nid := "L%02d_%d" % [cur_lvl, idx + 1]
+			if GameState.LORE_NOTES.has(nid):
+				note_cells[mcell] = nid
+			else:
+				note_cells[mcell] = "L%02d_1" % cur_lvl
 
 
 func _make_door(cell: Vector2i, id: String) -> void:
@@ -756,12 +840,15 @@ func _physics_process(delta: float) -> void:
 
 	if switch_cells.has(c) and not pressed.has(c):
 		_press_switch(c)
+	if note_cells.has(c) and not _read_notes_this_run.has(c):
+		_trigger_read_note(c)
 	if has_exit and c == exit_cell and not is_exit_locked():
 		if _is_tutorial_level:
 			_level_0_cinematic_exit()
 			return
 		_changing = true
-		var level_num: int = GameState.current_level + 1
+		var cur_sector: int = GameState.current_level
+		var level_num: int = cur_sector + 1
 		var debrief_data := GameState.record_level_clear(
 			level_num,
 			_level_time,
@@ -772,11 +859,31 @@ func _physics_process(delta: float) -> void:
 			debrief_data,
 			func(): # On Next
 				if GameState.has_next_level():
-					hud.play_level_exit_transition(func():
-						GameState.next_level()
-					)
+					var milestone: Array = GameState.get_act_milestone_lines(cur_sector)
+					if milestone.size() > 0 and hud != null and hud.story_overlay != null:
+						GameState.mark_act_milestone_seen(cur_sector)
+						var act_hdr: String = GameState.get_act_milestone_header(cur_sector)
+						hud.story_overlay.play_sequence(milestone, func():
+							hud.play_level_exit_transition(func():
+								GameState.next_level()
+							)
+						, true, act_hdr, "milestone")
+					else:
+						hud.play_level_exit_transition(func():
+							GameState.next_level()
+						)
 				else:
-					hud.show_victory_screen(),
+					var ending_lines: Array = GameState.get_campaign_ending_lines()
+					if ending_lines.size() > 0 and hud != null and hud.story_overlay != null:
+						GameState.mark_campaign_ending_seen()
+						var is_chal: bool = (GameState.current_mode == GameState.GameMode.CHALLENGE)
+						var end_hdr: String = "◈   K I N G   S E C T O R   •   D E P T H   - 9 , 9 9 9   M   ◈" if is_chal else "◈   S U R F A C E   B R E A C H   •   D E P T H   0   M   ◈"
+						var end_theme: String = "singularity" if is_chal else "daylight"
+						hud.story_overlay.play_sequence(ending_lines, func():
+							hud.show_victory_screen()
+						, true, end_hdr, end_theme)
+					else:
+						hud.show_victory_screen(),
 			func(): # On Retry
 				GameState.restart_level(),
 			func(): # On Level Select
@@ -813,8 +920,40 @@ func _press_switch(cell: Vector2i) -> void:
 			if sleeper_enemy != null and is_instance_valid(sleeper_enemy) and str(sleeper_enemy.get_meta("wake_on", "")).to_upper() == id:
 				sleeper_enemy.force_alert_to(player.global_position)
 
-	if _is_tutorial_level and _tutorial_step == 12:
+	if _is_tutorial_level:
 		_level_0_key_activated()
+
+
+func _trigger_read_note(cell: Vector2i) -> void:
+	_read_notes_this_run[cell] = true
+	var nid: String = str(note_cells.get(cell, ""))
+	if nid == "" or not GameState.LORE_NOTES.has(nid):
+		return
+	var note_data: Dictionary = GameState.LORE_NOTES[nid].duplicate()
+	note_data["id"] = nid
+	GameState.collect_note(nid)
+	_echo_features_dirty = true
+
+	if echo_layer != null and is_instance_valid(echo_layer):
+		var exclude: Array[RID] = [player.get_rid()] if (player != null and is_instance_valid(player)) else []
+		echo_layer.emit_echo(cell_to_world(cell), 190.0, exclude, true, Color(1.0, 0.84, 0.35))
+
+	get_tree().paused = true
+	if player != null and is_instance_valid(player):
+		player.can_move = false
+		player.velocity = Vector2.ZERO
+
+	var script: GDScript = load("res://ui/modals/NoteReadModal.gd") as GDScript
+	if script != null:
+		script.open_note(self, note_data, func():
+			get_tree().paused = false
+			if player != null and is_instance_valid(player):
+				player.can_move = true
+		)
+	else:
+		get_tree().paused = false
+		if player != null and is_instance_valid(player):
+			player.can_move = true
 
 
 func echo_features() -> Array:
@@ -825,6 +964,14 @@ func echo_features() -> Array:
 	_echo_features_cache.clear()
 	for c in water_cells:
 		_echo_features_cache.append({"type": "water", "pos": cell_to_world(c)})
+	for c in note_cells:
+		var nid: String = str(note_cells[c])
+		_echo_features_cache.append({
+			"type": "note",
+			"pos": cell_to_world(c),
+			"id": nid,
+			"collected": GameState.is_note_collected(nid)
+		})
 	for c in switch_cells:
 		var sid: String = str(switch_cells[c]).to_upper()
 		_echo_features_cache.append({"type": "switch", "pos": cell_to_world(c), "pressed": pressed.has(c), "id": sid, "color": link_color(sid)})
@@ -895,28 +1042,32 @@ func _handle_tutorial_checkpoint_respawn() -> void:
 
 		var respawn_pos: Vector2
 		if _tutorial_checkpoint == 1:
-			respawn_pos = Vector2(432.0, 144.0)
+			respawn_pos = Vector2(456.0, 144.0)
 			_tutorial_step = 9
-			# Reset Sleeper to patrol state in Room 2
+			# Reset Sleeper to dormant state in its alcove
 			if _tutorial_sleeper != null and is_instance_valid(_tutorial_sleeper):
 				_tutorial_sleeper.global_position = Vector2(720.0, 208.0)
-				_tutorial_sleeper.enemy_type = Enemy.EnemyType.PATROLLER
-				_tutorial_sleeper.chase_speed = 135.0
-				_tutorial_sleeper.patrol_speed = 65.0
-				_tutorial_sleeper.patrol_points = [Vector2(624.0, 208.0), Vector2(768.0, 208.0)]
-				_tutorial_sleeper.state = Enemy.State.PATROL
-				_tutorial_sleeper.target = Vector2(624.0, 208.0)
+				_tutorial_sleeper.home = Vector2(720.0, 208.0)
+				_tutorial_sleeper.enemy_type = Enemy.EnemyType.SLEEPER
+				_tutorial_sleeper.state = Enemy.State.SLEEP
 				_tutorial_sleeper.velocity = Vector2.ZERO
-				_tutorial_sleeper.alert_time = 0.0
+				_tutorial_sleeper.alert_time = 0.85
 				_tutorial_sleeper.reveal(0.0)
 			# Ensure Sneak button is visible & enabled
 			var sneak_btn := hud.get_node_or_null("SneakBtn") as Button
 			if sneak_btn != null:
 				sneak_btn.visible = true
 				sneak_btn.set("tutorial_pulse", true)
-			_set_tutorial_beacon(Vector2(912.0, 144.0), "WAY OUT")
+			if hud != null:
+				var title: String
+				if GameState.sneak_hold_mode:
+					title = "HOLD [SNEAK] BUTTON" if GameState.is_touch_or_mobile() else "HOLD [SHIFT] OR [SNEAK]"
+				else:
+					title = "TAP [SNEAK] BUTTON" if GameState.is_touch_or_mobile() else "PRESS [SHIFT] OR [SNEAK]"
+				hud.show_tutorial_callout(1, title, "Move silently to cross the water without waking it")
+			_set_tutorial_beacon(Vector2(560.0, 144.0), "SNEAK ACROSS")
 		else:
-			respawn_pos = Vector2(980.0, 144.0)
+			respawn_pos = Vector2(960.0, 144.0)
 			_seal_room_2_passage()
 			if _tutorial_step <= 11:
 				_tutorial_step = 11
@@ -927,19 +1078,22 @@ func _handle_tutorial_checkpoint_respawn() -> void:
 					sound_btn.set("tutorial_pulse", true)
 					sound_btn.set("tutorial_hold_mode", true)
 					sound_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+				if hud != null:
+					var title: String = "HOLD [SOUND] BUTTON" if GameState.is_touch_or_mobile() else "HOLD [SPACE] OR [SOUND]"
+					hud.show_tutorial_callout(0, title, "Hold until full charge, then release to awaken the key")
 				_set_tutorial_beacon(Vector2(1104.0, 144.0), "RESONATE")
 				if is_instance_valid(player) and not player.sound_emitted.is_connected(_on_tutorial_charge_emitted):
 					player.sound_emitted.connect(_on_tutorial_charge_emitted)
 			elif _tutorial_step == 12 or _tutorial_step == 13:
 				_tutorial_step = 12
-				_set_tutorial_beacon(Vector2(1104.0, 144.0), "KEY")
+				_set_tutorial_beacon(Vector2(1104.0, 144.0), "TOUCH KEY")
 			else:
 				_tutorial_step = 14
 				_set_tutorial_beacon(Vector2(1488.0, 144.0), "ASCENT")
 
 		if is_instance_valid(player):
 			player.reset(respawn_pos)
-			player.can_move = true
+			player.can_move = (_tutorial_checkpoint != 2 or _tutorial_step >= 12)
 			player.can_pebble = false
 			player.can_sneak = true
 			player.can_sound = (_tutorial_checkpoint == 2)

@@ -102,4 +102,5 @@ func _draw() -> void:
 	elif is_stunned:
 		label_col = Color(1.0, 0.38, 0.55, 0.85)
 	draw_string(ThemeDB.fallback_font, Vector2(0.0, 114.0), label_text, HORIZONTAL_ALIGNMENT_CENTER, int(size.x), 11, label_col)
-	draw_string(ThemeDB.fallback_font, Vector2(0.0, 127.0), "[SPACE / HOLD]", HORIZONTAL_ALIGNMENT_CENTER, int(size.x), 9, Color(label_col, 0.45))
+	if not GameState.is_touch_or_mobile():
+		draw_string(ThemeDB.fallback_font, Vector2(0.0, 127.0), "[SPACE / HOLD]", HORIZONTAL_ALIGNMENT_CENTER, int(size.x), 9, Color(label_col, 0.45))

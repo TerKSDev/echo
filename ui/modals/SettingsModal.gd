@@ -23,6 +23,7 @@ var _sens_slider: HSlider
 var _sens_val: Label
 var _calib_btn: Button
 var _meter_canvas: Control
+var _sneak_mode_btn: Button
 var _blind_btn: Button
 
 
@@ -60,6 +61,7 @@ func _ready() -> void:
 	_player = get_tree().get_first_node_in_group("player")
 	_update_mute_toggle_ui()
 	_update_mic_toggle_ui()
+	_refresh_sneak_mode_btn_ui()
 	_refresh_blind_btn_ui()
 
 
@@ -300,7 +302,7 @@ func _build_extra_ui() -> void:
 	vbox.add_child(hint_lbl)
 	vbox.move_child(hint_lbl, insert_idx)
 
-	# Divider + Category Header: ACCESSIBILITY & BLIND NAVIGATION
+	# Divider + Category Header: CONTROLS & ACCESSIBILITY
 	var act_idx: int = $CenterContainer/Panel/VBox/Actions.get_index()
 	var assist_div := ColorRect.new()
 	assist_div.custom_minimum_size = Vector2(0, 1)
@@ -309,9 +311,34 @@ func _build_extra_ui() -> void:
 	vbox.move_child(assist_div, act_idx)
 	act_idx += 1
 
+	var sneak_row := HBoxContainer.new()
+	var sneak_lbl := Label.new()
+	sneak_lbl.text = "SNEAK INPUT MODE"
+	sneak_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sneak_lbl.add_theme_color_override("font_color", Color(0.65, 0.85, 1.0, 0.9))
+	sneak_lbl.add_theme_font_size_override("font_size", 13)
+	sneak_row.add_child(sneak_lbl)
+
+	_sneak_mode_btn = Button.new()
+	_sneak_mode_btn.custom_minimum_size = Vector2(130, 32)
+	_sneak_mode_btn.focus_mode = Control.FOCUS_NONE
+	_sneak_mode_btn.theme = close_btn.theme
+	_sneak_mode_btn.add_theme_font_size_override("font_size", 12)
+	_refresh_sneak_mode_btn_ui()
+	_sneak_mode_btn.pressed.connect(func():
+		GameState.sneak_hold_mode = not GameState.sneak_hold_mode
+		GameState.save_settings()
+		_refresh_sneak_mode_btn_ui()
+	)
+	_wire_btn_anim(_sneak_mode_btn)
+	sneak_row.add_child(_sneak_mode_btn)
+	vbox.add_child(sneak_row)
+	vbox.move_child(sneak_row, act_idx)
+	act_idx += 1
+
 	var blind_row := HBoxContainer.new()
 	var blind_lbl := Label.new()
-	blind_lbl.text = "BLIND ASSIST / 视障声学导航"
+	blind_lbl.text = "UNIVERSAL ACCESSIBILITY"
 	blind_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	blind_lbl.add_theme_color_override("font_color", Color(0.65, 0.85, 1.0, 0.9))
 	blind_lbl.add_theme_font_size_override("font_size", 13)
@@ -424,6 +451,7 @@ func open() -> void:
 		_sens_slider.value = GameState.mic_sensitivity
 	_update_mute_toggle_ui()
 	_update_mic_toggle_ui()
+	_refresh_sneak_mode_btn_ui()
 	_refresh_blind_btn_ui()
 
 	var subtitle_lbl := get_node_or_null("CenterContainer/Panel/VBox/Header/Titles/Subtitle") as Label
@@ -506,6 +534,17 @@ func _on_restart_pressed() -> void:
 
 func _on_menu_pressed() -> void:
 	GameState.go_to_level_select()
+
+
+func _refresh_sneak_mode_btn_ui() -> void:
+	if _sneak_mode_btn == null:
+		return
+	if GameState.sneak_hold_mode:
+		_sneak_mode_btn.text = "HOLD"
+		_sneak_mode_btn.self_modulate = Color(0.35, 1.2, 1.8, 1.0)
+	else:
+		_sneak_mode_btn.text = "TOGGLE"
+		_sneak_mode_btn.self_modulate = Color(0.85, 0.92, 1.0, 0.9)
 
 
 func _refresh_blind_btn_ui() -> void:
