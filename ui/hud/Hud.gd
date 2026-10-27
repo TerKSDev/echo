@@ -3,6 +3,7 @@ extends CanvasLayer
 const DebriefModal = preload("res://ui/modals/DebriefModal.gd")
 
 @onready var player: Node2D = get_node_or_null("../Player")
+@onready var story_overlay: Control = get_node_or_null("StoryOverlay")
 
 var _base_inner_radius := 0.42
 var _sector_badge: Label = null
@@ -66,6 +67,24 @@ func flash_death() -> void:
 	var tw := create_tween()
 	tw.tween_property(mat, "shader_parameter/vignette_color", Color(0.65, 0.05, 0.08, 0.95), 0.08)
 	tw.tween_property(mat, "shader_parameter/vignette_color", Color(0.28, 0.02, 0.04, 0.85), 0.6)
+
+# Momentary crimson alert flash during surprise danger / chase triggers
+func flash_threat(hold_dur: float = 0.4) -> void:
+	var mat := _vignette_material()
+	if mat == null:
+		return
+	var tw := create_tween()
+	tw.tween_property(mat, "shader_parameter/vignette_color", Color(0.55, 0.05, 0.08, 0.90), 0.1)
+	tw.tween_interval(hold_dur)
+	tw.tween_property(mat, "shader_parameter/vignette_color", Color(0.01, 0.035, 0.07, 0.7), 0.6)
+
+# Reset vignette color back to calm abyssal blue-black
+func reset_vignette(fade_duration: float = 0.5) -> void:
+	var mat := _vignette_material()
+	if mat == null:
+		return
+	var tw := create_tween()
+	tw.tween_property(mat, "shader_parameter/vignette_color", Color(0.01, 0.035, 0.07, 0.7), fade_duration)
 
 func set_gameplay_buttons_visible(buttons_visible: bool) -> void:
 	if has_node("PauseBtn"):

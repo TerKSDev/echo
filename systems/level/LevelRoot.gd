@@ -1,3 +1,4 @@
+@tool
 extends Node2D
 class_name LevelRoot
 ## 单关场景的根节点。在编辑器中打开 levels/level_XX.tscn 即可改地形与标记。
@@ -6,6 +7,24 @@ class_name LevelRoot
 @export_multiline var hint: String = ""
 
 @onready var walls: TileMapLayer = $Walls
+
+## Text-defined levels: when `ascii_map` is set, the walls, markers and enemies are generated
+## at load time (legend and `routes` syntax: see systems/level/LevelBuilder.gd).
+@export_multiline var ascii_map: String = "":
+	set(val):
+		ascii_map = val
+		if Engine.is_editor_hint() and is_inside_tree():
+			LevelBuilder.build(self)
+
+@export_multiline var routes: String = "":
+	set(val):
+		routes = val
+		if Engine.is_editor_hint() and is_inside_tree():
+			LevelBuilder.build(self)
+
+func _ready() -> void:
+	if ascii_map.strip_edges() != "":
+		LevelBuilder.build(self)
 
 func get_markers() -> Array[LevelMarker]:
 	var out: Array[LevelMarker] = []

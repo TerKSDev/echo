@@ -292,3 +292,39 @@ static func draw_back_arrow_icon(canvas: Control) -> void:
 
 static func draw_headphone_icon(canvas: Control) -> void:
 	draw_headphone(canvas)
+
+
+static func draw_diamond(canvas: Control, pulse: float = 1.0, col: Color = Color(0.55, 0.92, 1.0, 0.95)) -> void:
+	var c := canvas.size * 0.5
+	var r_w := 9.0
+	var r_h := 12.0
+
+	var glow_col := Color(col.r * 0.35, col.g * 0.7, col.b, 0.30 * pulse)
+	var glow_pts := PackedVector2Array([
+		c + Vector2(0.0, -r_h - 3.0),
+		c + Vector2(r_w + 3.0, 0.0),
+		c + Vector2(0.0, r_h + 3.0),
+		c + Vector2(-r_w - 3.0, 0.0)
+	])
+	canvas.draw_colored_polygon(glow_pts, glow_col)
+
+	var pts := PackedVector2Array([
+		c + Vector2(0.0, -r_h),
+		c + Vector2(r_w, 0.0),
+		c + Vector2(0.0, r_h),
+		c + Vector2(-r_w, 0.0)
+	])
+	canvas.draw_colored_polygon(pts, Color(0.05, 0.20, 0.38, 0.85 * pulse))
+	var closed := pts.duplicate()
+	closed.append(pts[0])
+	canvas.draw_polyline(closed, Color(col.r, col.g, col.b, col.a * pulse), 2.0)
+
+	var core_w := 3.6
+	var core_h := 5.0
+	var core_pts := PackedVector2Array([
+		c + Vector2(0.0, -core_h),
+		c + Vector2(core_w, 0.0),
+		c + Vector2(0.0, core_h),
+		c + Vector2(-core_w, 0.0)
+	])
+	canvas.draw_colored_polygon(core_pts, Color(1.0, 1.0, 1.0, 0.95 * pulse))

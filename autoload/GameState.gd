@@ -90,25 +90,25 @@ const LEVELS: Array[String] = [
 
 # Story Mode: Even, satisfying ~220m depth steps ascending from -4,200M (Abyss Origin) to -40M (Surface Breach)
 const STORY_SECTORS: Array[Dictionary] = [
-	{"name": "ABYSS ORIGIN", "depth": "-4,200 M"},
-	{"name": "VOID CAVITY", "depth": "-3,980 M"},
-	{"name": "SUB-CRUST TRENCH", "depth": "-3,760 M"},
-	{"name": "LURKING VAULT", "depth": "-3,540 M"},
-	{"name": "OBSIDIAN LABYRINTH", "depth": "-3,320 M"},
-	{"name": "ECHO CHAMBER", "depth": "-3,100 M"},
-	{"name": "BASALT TUNNELS", "depth": "-2,880 M"},
-	{"name": "SCREAMER NEST", "depth": "-2,660 M"},
-	{"name": "THE SILENT POOL", "depth": "-2,440 M"},
-	{"name": "CRYSTAL DRIFT", "depth": "-2,220 M"},
-	{"name": "BONE HOLLOW", "depth": "-2,000 M"},
-	{"name": "WHISPER CHASM", "depth": "-1,780 M"},
-	{"name": "MUDDY DUNGEON", "depth": "-1,560 M"},
-	{"name": "BLIND SHAFTS", "depth": "-1,340 M"},
-	{"name": "THE LISTENING EYE", "depth": "-1,120 M"},
-	{"name": "DROWNED RETURN", "depth": "-900 M"},
-	{"name": "THREE CROSSINGS", "depth": "-680 M"},
-	{"name": "RIPPLES IN THE DARK", "depth": "-460 M"},
-	{"name": "ECHOING PASSAGE", "depth": "-240 M"},
+	{"name": "SHALLOW RING", "depth": "-4,200 M"},
+	{"name": "SLEEPING GIANT", "depth": "-3,980 M"},
+	{"name": "THE LIVING DOOR", "depth": "-3,760 M"},
+	{"name": "DEAD QUIET", "depth": "-3,540 M"},
+	{"name": "THE TOLLKEEPER", "depth": "-3,320 M"},
+	{"name": "HUSH HALL", "depth": "-3,100 M"},
+	{"name": "SHRIEK GALLERY", "depth": "-2,880 M"},
+	{"name": "THE FLOODED STAIRS", "depth": "-2,660 M"},
+	{"name": "THE WRONG ALARM", "depth": "-2,440 M"},
+	{"name": "TWIN VAULTS", "depth": "-2,220 M"},
+	{"name": "WHAT SLEEPS ABOVE", "depth": "-2,000 M"},
+	{"name": "CATHEDRAL OF PILLARS", "depth": "-1,780 M"},
+	{"name": "THE BLIND FORKS", "depth": "-1,560 M"},
+	{"name": "TOMB RUN", "depth": "-1,340 M"},
+	{"name": "THE DROWNED GALLERY", "depth": "-1,120 M"},
+	{"name": "THREE LOCKS", "depth": "-900 M"},
+	{"name": "THE LISTENING EYE", "depth": "-680 M"},
+	{"name": "THE SPIRAL", "depth": "-460 M"},
+	{"name": "THE BLACK LAKE", "depth": "-240 M"},
 	{"name": "SURFACE BREACH", "depth": "-40 M"},
 ]
 
@@ -144,6 +144,9 @@ var current_level := 0
 var story_highest_unlocked := 1
 var challenge_highest_unlocked := 1
 var story_completed := false
+var has_seen_intro := false
+var story_tutorial_completed := false
+var force_level_0_story := false
 
 var highest_unlocked_level: int:
 	get:
@@ -158,6 +161,27 @@ var highest_unlocked_level: int:
 
 func is_story_completed() -> bool:
 	return story_completed or story_highest_unlocked > STORY_LEVELS.size()
+
+func is_story_tutorial_completed() -> bool:
+	return story_tutorial_completed or story_highest_unlocked > 1 or is_level_cleared(1)
+
+func is_level_0_story_mode() -> bool:
+	if current_mode != GameMode.STORY or current_level != 0:
+		return false
+	if force_level_0_story:
+		return true
+	return not is_story_tutorial_completed()
+
+func is_level_cleared(lvl: int) -> bool:
+	return get_level_stars(lvl) > 0 or lvl < highest_unlocked_level
+
+func mark_story_tutorial_completed() -> void:
+	story_tutorial_completed = true
+	force_level_0_story = false
+	var cfg := ConfigFile.new()
+	cfg.load(PROGRESS_PATH)
+	cfg.set_value("progress", "story_tutorial_completed", true)
+	cfg.save(PROGRESS_PATH)
 
 func get_current_levels() -> Array[String]:
 	if current_mode == GameMode.CHALLENGE:
@@ -485,7 +509,7 @@ func has_next_level() -> bool:
 var _is_transitioning := false
 
 
-func transition_to_scene(scene_path: String, fade_out_dur: float = 0.22, fade_in_dur: float = 0.28, on_mid_transition: Callable = Callable()) -> void:
+func transition_to_scene(scene_path: String, fade_out_dur: float = 0.22, fade_in_dur: float = 0.28, on_mid_transition: Callable = Callable(), hold_black_dur: float = 0.0) -> void:
 	if _is_transitioning:
 		return
 	_is_transitioning = true
@@ -514,7 +538,7 @@ func transition_to_scene(scene_path: String, fade_out_dur: float = 0.22, fade_in
 		_sync_bgm_for_scene(scene_path)
 		var fade_in := curtain.create_tween()
 		fade_in.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-		fade_in.tween_interval(0.04)
+		fade_in.tween_interval(0.04 + hold_black_dur)
 		fade_in.tween_property(curtain, "color:a", 0.0, fade_in_dur).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 		fade_in.tween_callback(func():
 			_is_transitioning = false
@@ -546,7 +570,11 @@ func change_level(target) -> void:
 
 func start_game(level_index: int = 0) -> void:
 	current_level = level_index
-	transition_to_scene(MAIN_SCENE, 0.22, 0.28)
+	if is_level_0_story_mode():
+		# Slowly darken interface over 1.2s, hold complete black for 1.0s, then reveal story mode
+		transition_to_scene(MAIN_SCENE, 1.2, 0.45, Callable(), 1.0)
+	else:
+		transition_to_scene(MAIN_SCENE, 0.22, 0.28)
 
 
 func next_level() -> void:
@@ -646,6 +674,9 @@ func reset_progress() -> void:
 	story_highest_unlocked = 1
 	challenge_highest_unlocked = 1
 	story_completed = false
+	has_seen_intro = false
+	story_tutorial_completed = false
+	force_level_0_story = false
 	current_level = 0
 	level_records.clear()
 	var cfg := ConfigFile.new()
@@ -653,6 +684,16 @@ func reset_progress() -> void:
 	cfg.set_value("progress", "story_highest_unlocked", 1)
 	cfg.set_value("progress", "challenge_highest_unlocked", 1)
 	cfg.set_value("progress", "story_completed", false)
+	cfg.set_value("progress", "has_seen_intro", false)
+	cfg.set_value("progress", "story_tutorial_completed", false)
+	cfg.save(PROGRESS_PATH)
+
+
+func mark_intro_seen() -> void:
+	has_seen_intro = true
+	var cfg := ConfigFile.new()
+	cfg.load(PROGRESS_PATH)
+	cfg.set_value("progress", "has_seen_intro", true)
 	cfg.save(PROGRESS_PATH)
 
 
@@ -663,6 +704,9 @@ func load_progress() -> void:
 		story_highest_unlocked = 1
 		challenge_highest_unlocked = 1
 		story_completed = false
+		has_seen_intro = false
+		story_tutorial_completed = false
+		force_level_0_story = false
 		return
 
 	var legacy_highest: int = int(cfg.get_value("progress", "highest_unlocked_level", 1))
@@ -677,6 +721,8 @@ func load_progress() -> void:
 		CHALLENGE_LEVELS.size() + 1
 	)
 	story_completed = bool(cfg.get_value("progress", "story_completed", story_highest_unlocked > STORY_LEVELS.size()))
+	has_seen_intro = bool(cfg.get_value("progress", "has_seen_intro", false))
+	story_tutorial_completed = bool(cfg.get_value("progress", "story_tutorial_completed", story_highest_unlocked > 1))
 
 	var max_entries := maxi(STORY_LEVELS.size(), CHALLENGE_LEVELS.size()) + 2
 	for i in range(1, max_entries + 1):
@@ -894,7 +940,7 @@ func _play_bgm_sfx(stream: AudioStreamWAV, vol_db: float, pitch: float) -> void:
 
 
 func _sync_bgm_for_scene(target_path: String) -> void:
-	if "headphone_warning" in target_path:
+	if "headphone_warning" in target_path or "intro_cutscene" in target_path:
 		stop_menu_bgm(0.1)
 	elif target_path == MAIN_SCENE or target_path.begins_with("res://levels/"):
 		stop_menu_bgm(0.35)

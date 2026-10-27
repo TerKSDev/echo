@@ -6,6 +6,7 @@ var _player: Node = null
 var _press_scale := 1.0
 var _timer := 0.0
 var _active_blend := 0.0
+var tutorial_pulse := false
 
 func _ready() -> void:
 	flat = true
@@ -48,9 +49,16 @@ func _draw() -> void:
 	var pulse := 0.5 + 0.5 * sin(_timer * 3.5)
 
 	# Outer aura (blended smoothly)
-	var halo_r: float = radius + lerpf(3.0, 4.0 + 3.0 * pulse, b)
-	var halo_col: Color = Color(0.1, 0.35, 0.6, 0.1).lerp(Color(0.18, 0.65, 1.0, 0.15 + 0.12 * pulse), b)
-	draw_circle(center, halo_r, halo_col)
+	if tutorial_pulse:
+		var t_wave := fposmod(_timer * 1.6, 1.0)
+		var t_r := radius + 4.0 + t_wave * 26.0
+		var t_a := (1.0 - t_wave) * 0.85
+		draw_arc(center, t_r, 0.0, TAU, 36, Color(0.45, 0.92, 1.0, t_a), 2.2)
+		draw_circle(center, radius + 4.0, Color(0.20, 0.70, 1.0, 0.16 + 0.10 * sin(_timer * 6.0)))
+	else:
+		var halo_r: float = radius + lerpf(3.0, 4.0 + 3.0 * pulse, b)
+		var halo_col: Color = Color(0.1, 0.35, 0.6, 0.1).lerp(Color(0.18, 0.65, 1.0, 0.15 + 0.12 * pulse), b)
+		draw_circle(center, halo_r, halo_col)
 
 	# Glass disc
 	var disc_col: Color = Color(0.04, 0.11, 0.2, 0.72).lerp(Color(0.06, 0.22, 0.36, 0.9), b)
@@ -69,7 +77,7 @@ func _draw() -> void:
 	_draw_stealth_icon(center, icon_col)
 
 	# Label below
-	var lbl_text := "STUNNED" if is_stunned else ("SNEAKING" if is_sneaking else "SNEAK")
+	var lbl_text := "STUNNED" if is_stunned else ("SNEAKING" if is_sneaking else ("TAP TO SNEAK" if tutorial_pulse else "SNEAK"))
 	var lbl_col: Color = Color(0.48, 0.72, 0.92, 0.7).lerp(Color(0.5, 0.95, 1.0, 0.95), b)
 	if is_stunned:
 		lbl_col = Color(1.0, 0.38, 0.55, 0.85)

@@ -132,8 +132,15 @@ func _is_stationary() -> bool:
 	return enemy_type == EnemyType.SCREAMER or enemy_type == EnemyType.LISTENER
 
 
-# Patrol route: patrol_points, else Marker2D children of "EnemyPath" (if moved away from the enemy)
+# Patrol route: PatrolPath node, patrol_points array, or Marker2D children of "EnemyPath"
 func _collect_patrol_points() -> void:
+	var patrol_path := get_node_or_null("PatrolPath") as PatrolPath
+	if patrol_path != null:
+		var pts: Array[Vector2] = patrol_path.get_global_waypoints()
+		if not pts.is_empty():
+			patrol_points = pts
+			return
+
 	var path := get_node_or_null("EnemyPath")
 	if path == null:
 		return

@@ -354,12 +354,6 @@ static func build_level_card(
 		status_chip.text = "KING" if is_king_sector else "LOCKED"
 		status_chip.add_theme_color_override("font_color", Color(0.95, 0.55, 0.65) if is_king_sector else Color(0.55, 0.68, 0.82, 0.90))
 		status_box.add_child(status_chip)
-		status_chip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		status_chip.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		status_chip.add_theme_font_size_override("font_size", 13)
-		status_chip.text = "LOCKED"
-		status_chip.add_theme_color_override("font_color", Color(0.55, 0.68, 0.82, 0.90))
-		status_box.add_child(status_chip)
 
 	# --- Row 2: Depth Subtitle + Stars/Time ---
 	var row2 := HBoxContainer.new()
@@ -384,7 +378,7 @@ static func build_level_card(
 		sub_lbl.add_theme_color_override("font_color", Color(0.46, 0.58, 0.72, 0.88))
 	row2.add_child(sub_lbl)
 
-	# Display earned stars and best time exclusively on cleared levels
+	# Display earned stars and best time on cleared levels
 	if is_unlocked and stars > 0:
 		var best_time: float = GameState.get_level_best_time(level_number)
 		var is_ghost: bool = GameState.is_level_ghost_cleared(level_number)
@@ -421,6 +415,15 @@ static func build_level_card(
 			star_box.add_child(time_lbl)
 
 		row2.add_child(star_box)
+	elif is_unlocked and is_cleared:
+		var clear_lbl := Label.new()
+		clear_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		clear_lbl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		clear_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		clear_lbl.text = "CLEARED"
+		clear_lbl.add_theme_font_size_override("font_size", 12)
+		clear_lbl.add_theme_color_override("font_color", Color(0.4, 0.9, 0.7, 0.9))
+		row2.add_child(clear_lbl)
 
 	if is_unlocked:
 		button.pressed.connect(func(): on_select.call(level_number))

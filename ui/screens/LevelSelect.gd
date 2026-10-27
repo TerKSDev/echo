@@ -14,9 +14,9 @@ const LevelCardBuilder = preload("res://ui/level_select/LevelCardBuilder.gd")
 @onready var status_pill: PanelContainer = $TopBar/StatusPill
 @onready var progress_label: Label = $TopBar/StatusPill/StatusBox/ProgressLabel
 @onready var mode_toggle: Button = get_node_or_null("TopBar/ModeToggle")
-@onready var tracker_label: Label = get_node_or_null("MainArea/HeaderBox/TrackerLabel")
-@onready var title_label: Label = get_node_or_null("MainArea/HeaderBox/Title")
-@onready var subtitle_label: Label = get_node_or_null("MainArea/HeaderBox/Subtitle")
+@onready var tracker_label: Label = get_node_or_null("HeaderBox/TrackerLabel") if has_node("HeaderBox/TrackerLabel") else get_node_or_null("MainArea/HeaderBox/TrackerLabel")
+@onready var title_label: Label = get_node_or_null("HeaderBox/Title") if has_node("HeaderBox/Title") else get_node_or_null("MainArea/HeaderBox/Title")
+@onready var subtitle_label: Label = get_node_or_null("HeaderBox/Subtitle") if has_node("HeaderBox/Subtitle") else get_node_or_null("MainArea/HeaderBox/Subtitle")
 @onready var sector_label: Label = get_node_or_null("TopBar/StatusPill/StatusBox/SectorLabel")
 @onready var sonar_backdrop: Control = $SonarBackdrop
 
@@ -115,12 +115,15 @@ func _apply_safe_area() -> void:
 	var vp_sz := get_viewport_rect().size
 	if screen_sz.y > 0 and safe.position.y > 0:
 		var top_pad := (float(safe.position.y) / float(screen_sz.y)) * vp_sz.y
-		var target_top := maxf(top_pad + 6.0, 26.0)
+		var target_top := maxf(top_pad + 6.0, 29.0)
 		if has_node("TopBar"):
 			$TopBar.position.y = target_top
+		if has_node("HeaderBox"):
+			var hdr := $HeaderBox as Control
+			hdr.offset_top = target_top + 66.0
 		if has_node("MainArea"):
 			var main := $MainArea as Control
-			main.offset_top = target_top + 72.0
+			main.offset_top = target_top + 153.0
 		if has_node("DepthGauge"):
 			var gauge := $DepthGauge as Control
 			gauge.offset_top = target_top + 76.0

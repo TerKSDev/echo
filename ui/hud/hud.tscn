@@ -9,6 +9,7 @@
 [ext_resource type="PackedScene" path="res://ui/modals/settings_modal.tscn" id="7_modal"]
 [ext_resource type="PackedScene" path="res://ui/modals/death_screen.tscn" id="8_death"]
 [ext_resource type="Script" path="res://ui/hud/PebbleButton.gd" id="9_pebble"]
+[ext_resource type="PackedScene" path="res://ui/story/story_overlay.tscn" id="10_story"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_vignette"]
 shader = ExtResource("2_shader")
@@ -102,4 +103,7 @@ script = ExtResource("9_pebble")
 visible = false
 
 [node name="DeathScreen" parent="." instance=ExtResource("8_death")]
+visible = false
+
+[node name="StoryOverlay" parent="." instance=ExtResource("10_story")]
 visible = false

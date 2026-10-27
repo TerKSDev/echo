@@ -3,6 +3,8 @@ extends Button
 var _player: Node = null
 var _press_scale := 1.0
 var _ripple_time := 0.0
+var tutorial_pulse := false
+var tutorial_hold_mode := false
 
 func _ready() -> void:
 	flat = true
@@ -31,8 +33,15 @@ func _draw() -> void:
 	var center := Vector2(size.x * 0.5, 48.0)
 	var radius := 44.0
 
-	# 1. Subtle Outer Glow halo
-	draw_circle(center, radius + 5.0, Color(0.12, 0.45, 0.8, 0.15))
+	# 1. Subtle Outer Glow halo / Tutorial beacon
+	if tutorial_pulse:
+		var t_wave := fposmod(_ripple_time * 1.6, 1.0)
+		var t_r := radius + 4.0 + t_wave * 26.0
+		var t_a := (1.0 - t_wave) * 0.85
+		draw_arc(center, t_r, 0.0, TAU, 36, Color(0.45, 0.92, 1.0, t_a), 2.2)
+		draw_circle(center, radius + 4.0, Color(0.20, 0.70, 1.0, 0.16 + 0.10 * sin(_ripple_time * 6.0)))
+	else:
+		draw_circle(center, radius + 5.0, Color(0.12, 0.45, 0.8, 0.15))
 
 	# 2. Main Cavern Glass Disc
 	draw_circle(center, radius, Color(0.04, 0.12, 0.22, 0.78))
@@ -86,9 +95,11 @@ func _draw() -> void:
 	draw_arc(center, 22.0, PI * 0.72, PI * 1.28, 16, outer_wave_col, 1.8)
 
 	# 6. Micro Label Below
-	var label_text := "STUNNED" if is_stunned else ("CALLING..." if charging else "ECHO")
+	var label_text := "STUNNED" if is_stunned else ("CALLING..." if charging else ("HOLD TO CHARGE" if tutorial_hold_mode else ("TAP TO CALL" if tutorial_pulse else "ECHO")))
 	var label_col := Color(0.55, 0.8, 1.0, 0.7 if not charging else 0.95)
-	if is_stunned:
+	if tutorial_pulse:
+		label_col = Color(0.75, 0.96, 1.0, 0.95)
+	elif is_stunned:
 		label_col = Color(1.0, 0.38, 0.55, 0.85)
 	draw_string(ThemeDB.fallback_font, Vector2(0.0, 114.0), label_text, HORIZONTAL_ALIGNMENT_CENTER, int(size.x), 11, label_col)
 	draw_string(ThemeDB.fallback_font, Vector2(0.0, 127.0), "[SPACE / HOLD]", HORIZONTAL_ALIGNMENT_CENTER, int(size.x), 9, Color(label_col, 0.45))

@@ -1,0 +1,36 @@
+[gd_scene format=3 uid="uid://l5dmv78u1lmh"]
+
+[ext_resource type="PackedScene" path="res://characters/enemy/enemy_sleeper.tscn" id="5_85g3d"]
+[ext_resource type="PackedScene" path="res://characters/enemy/enemy_listener.tscn" id="6_choun"]
+[ext_resource type="PackedScene" path="res://characters/enemy/enemy_chaser.tscn" id="7_ya4ey"]
+[ext_resource type="PackedScene" path="res://characters/enemy/enemy_patroller.tscn" id="8_eb6dy"]
+[ext_resource type="PackedScene" path="res://characters/enemy/enemy_screamer.tscn" id="9_trceg"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_sugp2"]
+size = Vector2(400, 20)
+
+[node name="LevelTest" type="Node2D" unique_id=886962156]
+
+[node name="PlayerStart" type="Marker2D" parent="." unique_id=2115666167]
+
+[node name="Wall_01" type="StaticBody2D" parent="." unique_id=368362989]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Wall_01" unique_id=549961634]
+position = Vector2(-82, -420)
+shape = SubResource("RectangleShape2D_sugp2")
+
+[node name="EnemySleeper" parent="." unique_id=231329783 instance=ExtResource("5_85g3d")]
+position = Vector2(238, -153)
+
+[node name="EnemyListener" parent="." unique_id=181666148 instance=ExtResource("6_choun")]
+position = Vector2(-231, 40)
+
+[node name="EnemyChaser" parent="." unique_id=239292321 instance=ExtResource("7_ya4ey")]
+position = Vector2(10, 264)
+
+[node name="EnemyPatroller" parent="." unique_id=1799336940 instance=ExtResource("8_eb6dy")]
+position = Vector2(196, 112)
+patrol_points = Array[Vector2]([Vector2(196, 112), Vector2(196, 300), Vector2(60, 300), Vector2(60, 112)])
+
+[node name="EnemyScreamer" parent="." unique_id=165700116 instance=ExtResource("9_trceg")]
+position = Vector2(-61, -344)

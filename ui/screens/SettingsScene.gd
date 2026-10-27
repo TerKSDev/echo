@@ -68,7 +68,7 @@ func _apply_safe_area() -> void:
 	var vp_sz := get_viewport_rect().size
 	if screen_sz.y > 0 and safe.position.y > 0:
 		var top_pad := (float(safe.position.y) / float(screen_sz.y)) * vp_sz.y
-		var target_top := maxf(top_pad + 6.0, 26.0)
+		var target_top := maxf(top_pad + 6.0, 29.0)
 		if has_node("TopBar"):
 			$TopBar.position.y = target_top
 		if has_node("TabBar"):

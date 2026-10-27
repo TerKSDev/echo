@@ -7,6 +7,7 @@ const TOTAL_LEVEL_COUNT := 20
 @onready var title_label: Label = $Content/HeaderBox/Title
 @onready var touch_cue: Label = $Content/StartCue/TouchToStart
 @onready var credits_button: Button = $Content/CreditsButton
+@onready var prologue_button: Button = get_node_or_null("Content/PrologueButton")
 @onready var touch_area: Button = $TouchArea
 
 var _time := 0.0
@@ -37,6 +38,10 @@ func _ready() -> void:
 
 	_wire_button_Juice(credits_button)
 	credits_button.pressed.connect(_on_credits_pressed)
+
+	if prologue_button != null:
+		_wire_button_Juice(prologue_button)
+		prologue_button.pressed.connect(_on_prologue_pressed)
 
 	if touch_area != null:
 		touch_area.pressed.connect(_on_touch_area_pressed)
@@ -207,12 +212,18 @@ func _start_game_sequence() -> void:
 	get_tree().root.add_child(curtain)
 
 	var c_tw := curtain.create_tween()
-	# Wait ~0.75s so the sound wave ripples out, chime resonates, and feedback is fully seen
-	c_tw.tween_interval(0.75)
-	# Smoothly fade to black over 0.35s (total elapsed time ≈ 1.1s)
-	c_tw.tween_property(curtain, "modulate:a", 1.0, 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	c_tw.tween_interval(0.4)
+	var is_first_time := not GameState.has_seen_intro
+	var fade_dur := 1.2 if is_first_time else 0.4
+	c_tw.tween_property(curtain, "modulate:a", 1.0, fade_dur).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	if is_first_time:
+		c_tw.tween_interval(1.0) # Hold on complete darkness for ~1.0s before showing story
 	c_tw.tween_callback(func():
-		get_tree().change_scene_to_file("res://ui/screens/level_select.tscn")
+		var target_scene := "res://ui/screens/level_select.tscn"
+		if is_first_time:
+			GameState.stop_menu_bgm(0.4)
+			target_scene = "res://ui/screens/intro_cutscene.tscn"
+		get_tree().change_scene_to_file(target_scene)
 		var fade_in := curtain.create_tween()
 		fade_in.tween_interval(0.08)
 		fade_in.tween_property(curtain, "modulate:a", 0.0, 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
@@ -222,6 +233,11 @@ func _start_game_sequence() -> void:
 
 func _on_start_pressed() -> void:
 	_start_game_sequence()
+
+
+func _on_prologue_pressed() -> void:
+	GameState.stop_menu_bgm(0.4)
+	GameState.transition_to_scene("res://ui/screens/intro_cutscene.tscn", 1.2, 0.35, Callable(), 1.0)
 
 
 func _on_credits_pressed() -> void:

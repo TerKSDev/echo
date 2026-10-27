@@ -48,6 +48,10 @@ const ENTRY_ZOOM_LEVEL := 2.35 # Initial close-up zoom on level entry
 
 # Player States
 var alive := true
+var can_move := true
+var can_sound := true
+var can_sneak := true
+var can_pebble := true
 var killed_by_type := -1
 var target := Vector2.ZERO
 var desired := Vector2.ZERO
@@ -139,6 +143,10 @@ func reset_for_level() -> void:
 	_stun_timer = 0.0
 	water_count = 0
 	alive = true
+	can_move = true
+	can_sound = true
+	can_sneak = true
+	can_pebble = true
 	queue_redraw()
 
 # Handle Player Input
@@ -147,8 +155,17 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not alive or _stun_timer > 0.0:
 		return
 
+	if not can_move:
+		# Allow keyboard Space / Enter to charge sound only if sound is unlocked
+		if can_sound:
+			if event.is_action_pressed("ui_accept"):
+				start_charge()
+			elif event.is_action_released("ui_accept"):
+				release_charge()
+		return
+
 	# Handle Pebble Aiming inputs (Key E, Right Mouse)
-	if event is InputEventKey and event.keycode == KEY_E:
+	if can_pebble and event is InputEventKey and event.keycode == KEY_E:
 		if event.pressed and not event.echo:
 			if not is_aiming_pebble:
 				if pebbles <= 0 or _stun_timer > 0.0:
@@ -160,7 +177,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				finish_aim_pebble()
 		return
 
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT:
+	if can_pebble and event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT:
 		if event.pressed:
 			if is_aiming_pebble:
 				cancel_aim_pebble()
@@ -261,17 +278,18 @@ func _unhandled_input(event: InputEvent) -> void:
 			mic.suppress_timer = 0.08
 	
 	# Handle keyboard input (on desktop)
-	if event.is_action_pressed("ui_accept"):
-		start_charge()
-	elif event.is_action_released("ui_accept"):
-		release_charge()
+	if can_sound:
+		if event.is_action_pressed("ui_accept"):
+			start_charge()
+		elif event.is_action_released("ui_accept"):
+			release_charge()
 	
-	# Fast Pulse: double tap / double click triggers an instant burst of sonar sound
-	if GameState.fast_pulse_mode and is_new_tap and event is InputEventMouseButton and event.double_click:
-		make_sound(160.0, true)
+		# Fast Pulse: double tap / double click triggers an instant burst of sonar sound
+		if GameState.fast_pulse_mode and is_new_tap and event is InputEventMouseButton and event.double_click:
+			make_sound(160.0, true)
 
 	# Handle sneaking with Shift key (supports Toggle or Hold mode)
-	if event is InputEventKey and event.keycode == KEY_SHIFT:
+	if can_sneak and event is InputEventKey and event.keycode == KEY_SHIFT:
 		if GameState.sneak_hold_mode:
 			if event.pressed and not event.echo:
 				sneaking = true
@@ -326,6 +344,16 @@ func _physics_process(delta: float) -> void:
 		if _death_alpha > 0.0:
 			_death_alpha = move_toward(_death_alpha, 0.0, delta * 1.5)
 			queue_redraw()
+		return
+
+	# Handle movement lock during story sequences
+	if not can_move:
+		moving = false
+		desired = Vector2.ZERO
+		velocity = Vector2.ZERO
+		move_and_slide()
+		_update_trail()
+		queue_redraw()
 		return
 
 	# Handle immobilization / stun
@@ -543,8 +571,8 @@ func _physics_process(delta: float) -> void:
 	queue_redraw()
 
 func make_voice_sound(k: float):
-	# Ignore mic while dead or stunned
-	if not alive or _stun_timer > 0.0:
+	# Ignore mic while dead, stunned, or movement/input is locked
+	if not alive or _stun_timer > 0.0 or not can_move:
 		return
 	make_sound(lerpf(MIN_LOUDNESS, MAX_LOUDNESS, k), true)
 
@@ -618,7 +646,7 @@ func _emit_wall_echos(loudness: float) -> void:
 
 # Handle Sneak Toggle
 func toggle_sneak():
-	if not alive or _stun_timer > 0.0:
+	if not alive or _stun_timer > 0.0 or not can_sneak:
 		return
 	sneaking = not sneaking
 	var sfx_node := get_node_or_null("../SfxManager") as SfxManager
@@ -628,7 +656,7 @@ func toggle_sneak():
 
 # Handle Voice Charging
 func start_charge():
-	if not alive or _stun_timer > 0.0:
+	if not alive or _stun_timer > 0.0 or not can_sound:
 		return
 	if is_aiming_pebble:
 		cancel_aim_pebble()
@@ -663,6 +691,14 @@ func _update_trail() -> void:
 func die(killer_type: int = -1) -> void:
 	# Ignore death if the player is already dead
 	if not alive:
+		return
+	if has_meta("tutorial_invulnerable") and bool(get_meta("tutorial_invulnerable")):
+		# Cinematic protection during tutorial chase: knock player backward without killing
+		moving = false
+		target = global_position + Vector2(-120.0, 0.0)
+		velocity = Vector2(-320.0, 0.0)
+		camera_shake(0.3, 5.0)
+		Input.vibrate_handheld(60)
 		return
 	
 	# Stop all movement and actions
@@ -896,7 +932,7 @@ func _trigger_pebble_deny() -> void:
 
 
 func start_aim_pebble() -> void:
-	if pebbles <= 0 or not alive or _stun_timer > 0.0:
+	if pebbles <= 0 or not alive or _stun_timer > 0.0 or not can_pebble:
 		return
 	if charging:
 		charging = false

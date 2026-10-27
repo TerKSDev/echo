@@ -384,6 +384,24 @@ static func build_advanced_panel(scene: Control) -> VBoxContainer:
 	diag_card.add_child(diag_box)
 	root.add_child(diag_card)
 
+	# Replay Prologue / Opening Story
+	var prologue_btn := Button.new()
+	prologue_btn.custom_minimum_size = Vector2(170, 36)
+	prologue_btn.focus_mode = Control.FOCUS_NONE
+	prologue_btn.text = "REPLAY PROLOGUE"
+	SettingsUIFactory.style_action_button(prologue_btn, Color(0.35, 0.75, 1.0, 0.9), Color(0.04, 0.14, 0.24, 0.85))
+	prologue_btn.pressed.connect(func():
+		scene.call("play_click")
+		GameState.transition_to_scene("res://ui/screens/intro_cutscene.tscn")
+	)
+	scene.call("wire_juice", prologue_btn)
+
+	root.add_child(SettingsUIFactory.create_setting_row(
+		"OPENING PROLOGUE",
+		"Re-experience the initial awakening at the bottom of the abyss and the tutorial sequence.",
+		prologue_btn
+	))
+
 	root.add_child(SettingsUIFactory.create_category_divider())
 
 	# Danger Zone: Reset Progress / Return to Abyss

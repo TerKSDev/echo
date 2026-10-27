@@ -111,9 +111,9 @@ mouse_filter = 2
 [node name="TopBar" type="HBoxContainer" parent="." unique_id=336351312]
 layout_mode = 0
 offset_left = 25.0
-offset_top = 26.0
+offset_top = 29.0
 offset_right = 695.0
-offset_bottom = 78.0
+offset_bottom = 81.0
 theme_override_constants/separation = 22
 
 [node name="StatusPill" type="PanelContainer" parent="TopBar" unique_id=1501365221]
@@ -194,31 +194,23 @@ focus_mode = 0
 flat = true
 theme_override_font_sizes/font_size = 20
 
-[node name="MainArea" type="VBoxContainer" parent="." unique_id=2067062267]
+[node name="HeaderBox" type="VBoxContainer" parent="."]
 layout_mode = 1
-anchors_preset = 15
+anchors_preset = 10
 anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 26.0
-offset_top = 98.0
-offset_right = -58.0
-offset_bottom = -20.0
+offset_top = 95.0
+offset_bottom = 175.0
 grow_horizontal = 2
-grow_vertical = 2
-theme_override_constants/separation = 16
-
-[node name="HeaderBox" type="VBoxContainer" parent="MainArea"]
-layout_mode = 2
 theme_override_constants/separation = 3
 
-[node name="TrackerLabel" type="Label" parent="MainArea/HeaderBox"]
+[node name="TrackerLabel" type="Label" parent="HeaderBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.38, 0.75, 1, 0.85)
 theme_override_font_sizes/font_size = 11
 text = "((   E S C A P E   T H E   A B Y S S   ))"
 horizontal_alignment = 1
 
-[node name="Title" type="Label" parent="MainArea/HeaderBox" unique_id=858087850]
+[node name="Title" type="Label" parent="HeaderBox" unique_id=858087850]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.88, 0.96, 1, 1)
 theme_override_colors/font_shadow_color = Color(0.04, 0.22, 0.48, 0.85)
@@ -229,15 +221,32 @@ theme_override_font_sizes/font_size = 28
 text = "ESCAPE THE ABYSS"
 horizontal_alignment = 1
 
-[node name="Subtitle" type="Label" parent="MainArea/HeaderBox" unique_id=848432811]
+[node name="Subtitle" type="Label" parent="HeaderBox" unique_id=848432811]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.55, 0.76, 0.92, 0.8)
 theme_override_font_sizes/font_size = 13
 text = "Stay calm. Stay silent. Find the way out."
 horizontal_alignment = 1
 
+[node name="MainArea" type="Control" parent="." unique_id=2067062267]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = 182.0
+offset_right = -58.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 2
+
 [node name="ScrollContainer" type="ScrollContainer" parent="MainArea" unique_id=894529486]
-layout_mode = 2
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 horizontal_scroll_mode = 0
@@ -245,7 +254,7 @@ horizontal_scroll_mode = 0
 [node name="GridMargin" type="MarginContainer" parent="MainArea/ScrollContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_constants/margin_left = 12
+theme_override_constants/margin_left = 10
 theme_override_constants/margin_top = 14
 theme_override_constants/margin_right = 12
 theme_override_constants/margin_bottom = 28
@@ -264,7 +273,7 @@ anchor_left = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = -72.0
-offset_top = 102.0
+offset_top = 105.0
 offset_right = -6.0
 offset_bottom = -25.0
 grow_horizontal = 0
