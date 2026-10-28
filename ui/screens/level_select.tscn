@@ -109,11 +109,14 @@ grow_vertical = 2
 mouse_filter = 2
 
 [node name="TopBar" type="HBoxContainer" parent="." unique_id=336351312]
-layout_mode = 0
-offset_left = 25.0
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 32.0
 offset_top = 29.0
-offset_right = 695.0
+offset_right = -32.0
 offset_bottom = 81.0
+grow_horizontal = 2
 theme_override_constants/separation = 22
 
 [node name="StatusPill" type="PanelContainer" parent="TopBar" unique_id=1501365221]
@@ -153,12 +156,12 @@ text = "ESCAPE DIRECTORY"
 horizontal_alignment = 1
 
 [node name="ModeToggle" type="Button" parent="TopBar" unique_id=778899112]
-custom_minimum_size = Vector2(148, 48)
+custom_minimum_size = Vector2(150, 50)
 layout_mode = 2
 size_flags_horizontal = 4
 size_flags_vertical = 4
 focus_mode = 0
-theme_override_font_sizes/font_size = 13
+theme_override_font_sizes/font_size = 16
 text = "◈ STORY"
 
 [node name="Spacer" type="Control" parent="TopBar"]
@@ -198,10 +201,12 @@ theme_override_font_sizes/font_size = 20
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
+offset_left = 32.0
 offset_top = 95.0
-offset_bottom = 175.0
+offset_right = -32.0
+offset_bottom = 180.0
 grow_horizontal = 2
-theme_override_constants/separation = 3
+theme_override_constants/separation = 6
 
 [node name="TrackerLabel" type="Label" parent="HeaderBox"]
 layout_mode = 2
@@ -233,8 +238,8 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 24.0
-offset_top = 182.0
+offset_left = 22.0
+offset_top = 192.0
 offset_right = -58.0
 offset_bottom = -20.0
 grow_horizontal = 2
@@ -255,7 +260,7 @@ horizontal_scroll_mode = 0
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/margin_left = 10
-theme_override_constants/margin_top = 14
+theme_override_constants/margin_top = 12
 theme_override_constants/margin_right = 12
 theme_override_constants/margin_bottom = 28
 

@@ -113,15 +113,15 @@ mouse_filter = 2
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_left = 34.0
+offset_left = 32.0
 offset_top = 29.0
-offset_right = -34.0
+offset_right = -32.0
 offset_bottom = 79.0
 grow_horizontal = 2
 theme_override_constants/separation = 14
 
 [node name="BackButton" type="Button" parent="TopBar"]
-custom_minimum_size = Vector2(44, 44)
+custom_minimum_size = Vector2(32, 44)
 layout_mode = 2
 size_flags_vertical = 4
 focus_mode = 0
@@ -148,9 +148,9 @@ text = "EXPEDITION SUIT & ACOUSTIC SENSORS"
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_left = 34.0
+offset_left = 32.0
 offset_top = 99.0
-offset_right = -34.0
+offset_right = -32.0
 offset_bottom = 143.0
 grow_horizontal = 2
 theme_override_constants/separation = 14
@@ -203,9 +203,9 @@ grow_vertical = 2
 [node name="ContentMargin" type="MarginContainer" parent="MainArea/ScrollContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_constants/margin_left = 34
+theme_override_constants/margin_left = 32
 theme_override_constants/margin_top = 16
-theme_override_constants/margin_right = 34
+theme_override_constants/margin_right = 32
 theme_override_constants/margin_bottom = 40
 
 [node name="ContentBox" type="VBoxContainer" parent="MainArea/ScrollContainer/ContentMargin"]

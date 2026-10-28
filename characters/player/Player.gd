@@ -74,6 +74,8 @@ var _death_alpha := 0.0
 var _shake_timer := 0.0
 var _shake_intensity := 0.0
 var _stun_timer := 0.0
+var _slow_timer := 0.0
+var _slow_mult := 1.0
 var _idle_timer := 0.0
 var _entry_timer := 1.2 # Prevents idle zoom during the initial level entry pull-back
 var _sneak_blend := 0.0 # Smooth 0..1 transition between normal and sneak visual state
@@ -83,10 +85,26 @@ var _tap_flash := 0.0 # Crisp ripple animation at destination marker when tapped
 var _wall_bump_pos := Vector2.ZERO
 var _wall_bump_normal := Vector2.UP
 var _wall_bump_alpha := 0.0
+var _second_wind_used := false
+var _second_wind_burst_timer := 0.0
+var _terror_shiver_timer := 0.0
+
+
+func trigger_terror_shiver(duration: float = 3.0) -> void:
+	if GameState.current_mode == GameState.GameMode.CHALLENGE and ChallengeModifiers.has_curse("curse_terror_shiver"):
+		_terror_shiver_timer = maxf(_terror_shiver_timer, duration)
 var _stuck_timer := 0.0
 var _last_progress_pos := Vector2.ZERO
 var _water_splash_timer := 0.0
 var _facing_dir := Vector2.DOWN
+var joystick_direction := Vector2.ZERO
+
+
+func set_joystick_direction(dir: Vector2) -> void:
+	joystick_direction = dir
+	if joystick_direction != Vector2.ZERO:
+		moving = false
+		marker = 0.0
 var _cane_timer := 0.0
 var _wall_bump_sound_cooldown := 0.0
 var _last_touch_time := 0
@@ -130,6 +148,15 @@ func immobilize(duration: float = 1.6) -> void:
 	Input.vibrate_handheld(80)
 	queue_redraw()
 
+
+# Slow down player (e.g. hit or acoustic resonance from Listener)
+func apply_slow(duration: float = 3.0, multiplier: float = 0.5) -> void:
+	if not alive:
+		return
+	_slow_timer = maxf(_slow_timer, duration)
+	_slow_mult = multiplier
+	queue_redraw()
+
 func _ready() -> void:
 	add_to_group("player")
 	trail.top_level = true
@@ -151,13 +178,23 @@ func _ready() -> void:
 
 func reset_for_level() -> void:
 	pebbles = MAX_PEBBLES
+	if GameState.current_mode == GameState.GameMode.CHALLENGE:
+		if ChallengeModifiers.has_curse("curse_single_stone"):
+			pebbles = 1
+		elif ChallengeModifiers.has_boon("boon_deep_pockets"):
+			pebbles = 4
 	pebble_count_changed.emit(pebbles)
+	_second_wind_used = false
+	_second_wind_burst_timer = 0.0
+	_terror_shiver_timer = 0.0
 	is_aiming_pebble = false
 	moving = false
 	charging = false
 	charge = 0.0
 	was_full = false
 	_stun_timer = 0.0
+	_slow_timer = 0.0
+	_slow_mult = 1.0
 	water_count = 0
 	alive = true
 	can_move = true
@@ -266,24 +303,27 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Handle touch / mouse tap & drag steering
 	var pressed_pos = null
 	var is_new_tap := false
-	if event is InputEventScreenTouch and event.pressed:
-		pressed_pos = get_canvas_transform().affine_inverse() * event.position
-		is_new_tap = true
-		# Mobile double-tap detection for Fast Pulse Mode
-		if GameState.fast_pulse_mode and event.index == 0:
-			var now_ms: int = Time.get_ticks_msec()
-			if now_ms - _last_touch_time < 320:
-				make_sound(MIN_LOUDNESS, true)
-				_last_touch_time = 0
-			else:
-				_last_touch_time = now_ms
-	elif event is InputEventScreenDrag:
-		pressed_pos = get_canvas_transform().affine_inverse() * event.position
-	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		pressed_pos = get_global_mouse_position()
-		is_new_tap = true
-	elif event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
-		pressed_pos = get_global_mouse_position()
+	var is_joy_zone: bool = GameState.virtual_joystick_enabled and (event is InputEventScreenTouch or event is InputEventScreenDrag or event is InputEventMouseButton or event is InputEventMouseMotion)
+
+	if not is_joy_zone:
+		if event is InputEventScreenTouch and event.pressed:
+			pressed_pos = get_canvas_transform().affine_inverse() * event.position
+			is_new_tap = true
+			# Mobile double-tap detection for Fast Pulse Mode
+			if GameState.fast_pulse_mode and event.index == 0:
+				var now_ms: int = Time.get_ticks_msec()
+				if now_ms - _last_touch_time < 320:
+					make_sound(MIN_LOUDNESS, true)
+					_last_touch_time = 0
+				else:
+					_last_touch_time = now_ms
+		elif event is InputEventScreenDrag:
+			pressed_pos = get_canvas_transform().affine_inverse() * event.position
+		elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			pressed_pos = get_global_mouse_position()
+			is_new_tap = true
+		elif event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
+			pressed_pos = get_global_mouse_position()
 	
 	# Move the player to the pressed/dragged position
 	if pressed_pos != null:
@@ -387,12 +427,22 @@ func _physics_process(delta: float) -> void:
 		return
 
 	# Handle movement with fluid drag in water
-	var speed: float = SNEAK_SPEED if sneaking else WALK_SPEED
+	var base_sneak := SNEAK_SPEED * (1.25 if (GameState.current_mode == GameState.GameMode.CHALLENGE and ChallengeModifiers.has_boon("boon_phantom_tread")) else 1.0)
+	var speed: float = base_sneak if sneaking else WALK_SPEED
+	if _second_wind_burst_timer > 0.0:
+		speed *= 1.40
 	if water_count > 0:
-		speed *= 0.55
+		if GameState.current_mode == GameState.GameMode.CHALLENGE and ChallengeModifiers.has_boon("boon_water_strider"):
+			speed *= 1.20
+		else:
+			speed *= 0.55
 
-	# Direct directional input (WASD / Arrow Keys)
-	var input_vec := Vector2.ZERO
+	if _slow_timer > 0.0:
+		_slow_timer -= delta
+		speed *= _slow_mult
+
+	# Direct directional input (WASD / Arrow Keys or Virtual Joystick)
+	var input_vec := joystick_direction
 	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
 		input_vec.y -= 1.0
 	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
@@ -538,8 +588,20 @@ func _physics_process(delta: float) -> void:
 			_step_dist_accum = 0.0
 			var is_sneak := sneaking
 			var step_loud: float = STEP_LOUDNESS_SNEAK if is_sneak else STEP_LOUDNESS_WALK
+			if is_sneak and GameState.current_mode == GameState.GameMode.CHALLENGE and ChallengeModifiers.has_boon("boon_phantom_tread"):
+				step_loud *= 0.50
+			elif not is_sneak and GameState.current_mode == GameState.GameMode.CHALLENGE and ChallengeModifiers.has_boon("boon_silent_stride"):
+				step_loud *= 0.65
+
 			if water_count > 0:
-				step_loud *= 1.6 if is_sneak else 2.5
+				var water_mult := 1.6 if is_sneak else 2.5
+				if GameState.current_mode == GameState.GameMode.CHALLENGE and ChallengeModifiers.has_curse("curse_treacherous_waters"):
+					water_mult *= 2.0
+				step_loud *= water_mult
+
+			if _terror_shiver_timer > 0.0 and GameState.current_mode == GameState.GameMode.CHALLENGE and ChallengeModifiers.has_curse("curse_terror_shiver"):
+				step_loud *= 1.50
+
 			make_sound(step_loud, false, is_sneak)
 	else:
 		# Gradually relax residual stride accumulation when standing still (prevents premature step on next micro-tap)
@@ -549,10 +611,16 @@ func _physics_process(delta: float) -> void:
 
 
 func _update_charging_and_visuals(delta: float) -> void:
+	if _second_wind_burst_timer > 0.0:
+		_second_wind_burst_timer = maxf(0.0, _second_wind_burst_timer - delta)
+	if _terror_shiver_timer > 0.0:
+		_terror_shiver_timer = maxf(0.0, _terror_shiver_timer - delta)
+
 	# Voice charging
 	var sfx_mgr := _get_sfx()
 	if charging:
-		charge = min(charge + delta / CHARGE_TIME, 1.0)
+		var charge_dur := CHARGE_TIME * (1.40 if (GameState.current_mode == GameState.GameMode.CHALLENGE and ChallengeModifiers.has_curse("curse_fragile_breath")) else 1.0)
+		charge = min(charge + delta / charge_dur, 1.0)
 		if charge >= 1.0 and not was_full:
 			was_full = true
 			full_charge = 1.0
@@ -607,9 +675,19 @@ func _update_charging_and_visuals(delta: float) -> void:
 
 
 func make_voice_sound(k: float):
-	# Ignore mic while dead, stunned, or sound input is locked
-	if not alive or _stun_timer > 0.0 or not can_sound:
+	# Ignore mic while dead, stunned, sound input locked, paused, or during story/level transitions
+	if not alive or _stun_timer > 0.0 or not can_sound or get_tree().paused:
 		return
+	var main := get_parent()
+	if main != null:
+		if "_changing" in main and main._changing:
+			return
+		if main.has_node("Hud"):
+			var hud = main.get_node("Hud")
+			if hud != null and hud.has_node("StoryOverlay"):
+				var so = hud.get_node("StoryOverlay")
+				if so != null and (so.visible or (so.has_method("is_active") and so.is_active()) or so.get("_is_active") == true):
+					return
 	make_sound(lerpf(MIN_LOUDNESS, MAX_LOUDNESS, k), true)
 
 # Handle Vocalize
@@ -620,18 +698,32 @@ func make_sound(loudness: float, is_voice := false, force_sneak := false) -> voi
 
 	# Emit the sound signal with explicit sneaking state
 	var is_sneak: bool = force_sneak or (sneaking and not is_voice)
-	sound_emitted.emit(global_position, loudness, is_voice, is_sneak)
+	var final_loudness := loudness
+	if is_voice and GameState.current_mode == GameState.GameMode.CHALLENGE and ChallengeModifiers.has_curse("curse_acoustic_decay"):
+		final_loudness *= 0.75
+	sound_emitted.emit(global_position, final_loudness, is_voice, is_sneak)
 
 	# Trigger acoustic burst ring on the player core
 	_burst_radius = 8.0
-	_burst_alpha = clampf(loudness * 2.0, 0.4, 1.0)
+	_burst_alpha = clampf(final_loudness * 2.0, 0.4, 1.0)
 
 	if is_voice:
-		camera_shake(0.16, lerpf(1.4, 4.2, clampf(loudness, 0.0, 1.0)))
+		if GameState.current_mode == GameState.GameMode.CHALLENGE and ChallengeModifiers.has_boon("boon_sonic_stagger") and final_loudness >= 0.50:
+			for node in get_tree().get_nodes_in_group("enemy"):
+				var enemy_node := node as Enemy
+				if enemy_node != null and is_instance_valid(enemy_node):
+					if global_position.distance_to(enemy_node.global_position) <= 135.0:
+						enemy_node.stun(1.5)
+						var push: Vector2 = (enemy_node.global_position - global_position).normalized()
+						if push.is_zero_approx():
+							push = Vector2.UP
+						enemy_node.velocity = push * 200.0
+
+		camera_shake(0.16, lerpf(1.4, 4.2, clampf(final_loudness, 0.0, 1.0)))
 		var tween := create_tween()
-		pulse_scale = 1.0 + loudness * 0.8
+		pulse_scale = 1.0 + final_loudness * 0.8
 		tween.tween_property(self, "pulse_scale", 1.0, 0.25).set_ease(Tween.EASE_OUT)
-		_emit_wall_echos(loudness)
+		_emit_wall_echos(final_loudness)
 	else:
 		var ripple_r: float = (16.0 if sneaking else 30.0) * (1.45 if water_count > 0 else 1.0)
 		var ripple_a: float = (0.24 if sneaking else 0.46) * (1.35 if water_count > 0 else 1.0)
@@ -728,13 +820,33 @@ func die(killer_type: int = -1) -> void:
 	# Ignore death if the player is already dead
 	if not alive:
 		return
-	if has_meta("tutorial_invulnerable") and bool(get_meta("tutorial_invulnerable")):
+	if has_meta("tutorial_invulnerable") and get_meta("tutorial_invulnerable") == true:
 		# Cinematic protection during tutorial chase: knock player backward without killing
 		moving = false
 		target = global_position + Vector2(-120.0, 0.0)
 		velocity = Vector2(-320.0, 0.0)
 		camera_shake(0.3, 5.0)
 		Input.vibrate_handheld(60)
+		return
+
+	if GameState.current_mode == GameState.GameMode.CHALLENGE and ChallengeModifiers.has_boon("boon_second_wind") and not _second_wind_used:
+		_second_wind_used = true
+		_second_wind_burst_timer = 3.0
+		# Stun all nearby enemies within 220px and knock them away
+		for node in get_tree().get_nodes_in_group("enemy"):
+			var e := node as Enemy
+			if e != null and is_instance_valid(e):
+				if global_position.distance_to(e.global_position) <= 220.0:
+					e.stun(2.5)
+					var p_dir := (e.global_position - global_position).normalized()
+					if p_dir.is_zero_approx():
+						p_dir = Vector2.UP
+					e.velocity = p_dir * 260.0
+		camera_shake(0.4, 8.0)
+		Input.vibrate_handheld(120)
+		var sfx_m := _get_sfx()
+		if sfx_m != null:
+			sfx_m.play_charge_full()
 		return
 	
 	# Stop all movement and actions
@@ -796,7 +908,7 @@ func _draw() -> void:
 		var rad: float = lerpf(3.0, float(r["max_r"]), ease_p)
 		var a: float = float(r["alpha"]) * (1.0 - p_ratio)
 		var local_pos: Vector2 = to_local(Vector2(r["pos"]))
-		var is_water_ripple: bool = bool(r.get("is_water", false))
+		var is_water_ripple: bool = (r.get("is_water", false) == true)
 		var ripple_col: Color = Color(0.24, 0.76, 1.0, a) if is_water_ripple else Color(0.32, 0.86, 1.0, a)
 		draw_arc(local_pos, rad, 0.0, TAU, 24, ripple_col, 1.6 if is_water_ripple else 1.4)
 		if p_ratio < 0.45 or is_water_ripple:
@@ -897,6 +1009,10 @@ func _draw() -> void:
 			var ang := i * PI * 0.5 + t * 6.0
 			var spark := Vector2.from_angle(ang) * (stun_pulse + 4.0)
 			draw_circle(spark, 2.0, Color(1.0, 0.85, 0.9, 0.9))
+	elif _slow_timer > 0.0:
+		var slow_pulse := 15.0 + 1.8 * sin(t * 10.0)
+		draw_arc(Vector2.ZERO, slow_pulse, 0.0, TAU, 24, Color(0.2, 0.94, 0.68, 0.70), 1.6)
+		draw_circle(Vector2.ZERO, 5.0, Color(0.1, 0.65, 0.45, 0.25))
 
 	# Pebble Aiming trajectory arc & noise landing reticle
 	if is_aiming_pebble:

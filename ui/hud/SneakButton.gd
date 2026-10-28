@@ -30,7 +30,7 @@ func _process(delta: float) -> void:
 	_timer += delta
 	var is_sneaking := false
 	if _player != null and is_instance_valid(_player):
-		is_sneaking = bool(_player.get("sneaking"))
+		is_sneaking = (_player.get("sneaking") == true)
 	_active_blend = move_toward(_active_blend, 1.0 if is_sneaking else 0.0, delta * 9.0)
 	scale = Vector2(_press_scale, _press_scale)
 	queue_redraw()
@@ -41,7 +41,7 @@ func _draw() -> void:
 	var is_sneaking := false
 	var is_stunned := false
 	if _player != null and is_instance_valid(_player):
-		is_sneaking = bool(_player.get("sneaking"))
+		is_sneaking = (_player.get("sneaking") == true)
 		if "_stun_timer" in _player and float(_player._stun_timer) > 0.0:
 			is_stunned = true
 
@@ -56,22 +56,30 @@ func _draw() -> void:
 		draw_arc(center, t_r, 0.0, TAU, 36, Color(0.45, 0.92, 1.0, t_a), 2.2)
 		draw_circle(center, radius + 4.0, Color(0.20, 0.70, 1.0, 0.16 + 0.10 * sin(_timer * 6.0)))
 	else:
-		var halo_r: float = radius + lerpf(3.0, 4.0 + 3.0 * pulse, b)
-		var halo_col: Color = Color(0.1, 0.35, 0.6, 0.1).lerp(Color(0.18, 0.65, 1.0, 0.15 + 0.12 * pulse), b)
+		var halo_r: float = radius + lerpf(5.0, 6.0 + 3.0 * pulse, b)
+		var halo_col: Color = Color(0.12, 0.45, 0.8, 0.15).lerp(Color(0.20, 0.72, 1.0, 0.22 + 0.12 * pulse), b)
 		draw_circle(center, halo_r, halo_col)
 
-	# Glass disc
-	var disc_col: Color = Color(0.04, 0.11, 0.2, 0.72).lerp(Color(0.06, 0.22, 0.36, 0.9), b)
+	# Dual-layer abyssal glass disc (matching SoundButton)
+	var disc_col: Color = Color(0.04, 0.12, 0.22, 0.78).lerp(Color(0.06, 0.24, 0.38, 0.92), b)
+	var inner_col: Color = Color(0.08, 0.22, 0.36, 0.35).lerp(Color(0.12, 0.34, 0.52, 0.50), b)
 	draw_circle(center, radius, disc_col)
+	draw_circle(center, radius * 0.78, inner_col)
 
-	# Border rim
-	var rim_col: Color = Color(0.24, 0.48, 0.72, 0.55).lerp(Color(0.38, 0.88, 1.0, 0.95), b)
+	# Border rim & cardinal sonar bezel ticks
+	var rim_col: Color = Color(0.26, 0.54, 0.82, 0.65).lerp(Color(0.42, 0.92, 1.0, 0.98), b)
 	if is_stunned:
 		rim_col = Color(1.0, 0.28, 0.5, 0.75)
-	draw_arc(center, radius, 0.0, TAU, 40, rim_col, lerpf(1.6, 2.2, b))
+	draw_arc(center, radius, 0.0, TAU, 48, rim_col, lerpf(1.8, 2.4, b))
+
+	var tick_col := Color(rim_col, lerpf(0.35, 0.75, b))
+	for i in range(4):
+		var ang := i * PI * 0.5
+		var dir := Vector2.from_angle(ang)
+		draw_line(center + dir * (radius - 5.5), center + dir * (radius - 1.5), tick_col, 1.4)
 
 	# Center Icons
-	var icon_col: Color = Color(0.7, 0.85, 0.98, 0.6).lerp(Color(0.5, 0.95, 1.0, 1.0), b)
+	var icon_col: Color = Color(0.85, 0.94, 1.0, 0.88).lerp(Color(0.55, 0.98, 1.0, 1.0), b)
 	if is_stunned:
 		icon_col = Color(1.0, 0.45, 0.6, 0.45)
 	_draw_stealth_icon(center, icon_col)
@@ -79,7 +87,7 @@ func _draw() -> void:
 	# Label below
 	var tut_lbl := "HOLD TO SNEAK" if GameState.sneak_hold_mode else "TAP TO SNEAK"
 	var lbl_text := "STUNNED" if is_stunned else ("SNEAKING" if is_sneaking else (tut_lbl if tutorial_pulse else "SNEAK"))
-	var lbl_col: Color = Color(0.48, 0.72, 0.92, 0.7).lerp(Color(0.5, 0.95, 1.0, 0.95), b)
+	var lbl_col: Color = Color(0.55, 0.80, 1.0, 0.72).lerp(Color(0.5, 0.95, 1.0, 0.95), b)
 	if is_stunned:
 		lbl_col = Color(1.0, 0.38, 0.55, 0.85)
 	draw_string(ThemeDB.fallback_font, Vector2(0.0, 114.0), lbl_text, HORIZONTAL_ALIGNMENT_CENTER, int(size.x), 11, lbl_col)

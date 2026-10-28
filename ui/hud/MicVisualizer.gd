@@ -10,8 +10,8 @@ var _bg_box := StyleBoxFlat.new()
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_player = get_tree().get_first_node_in_group("player")
-	_bg_box.bg_color = Color(0.03, 0.08, 0.16, 0.65)
-	_bg_box.border_color = Color(0.25, 0.52, 0.78, 0.45)
+	_bg_box.bg_color = Color(0.025, 0.075, 0.15, 0.72)
+	_bg_box.border_color = Color(0.25, 0.54, 0.82, 0.48)
 	_bg_box.set_border_width_all(1)
 	_bg_box.set_corner_radius_all(16)
 
@@ -44,8 +44,8 @@ func pulse_flash() -> void:
 	_flash = 1.0
 
 func _draw() -> void:
-	var w := 120.0
-	var h := 32.0
+	var w := 96.0
+	var h := 28.0
 	var rect := Rect2(-w * 0.5, -h * 0.5, w, h)
 	var t := Time.get_ticks_msec() / 1000.0
 
@@ -64,14 +64,14 @@ func _draw() -> void:
 					calibrating = true
 
 	# 1. Subtle dark glass capsule background
-	_bg_box.border_color = Color(1.0, 0.28, 0.5, 0.85) if is_stunned else Color(0.25, 0.52, 0.78, 0.45)
+	_bg_box.border_color = Color(1.0, 0.28, 0.5, 0.85) if is_stunned else Color(0.25, 0.52, 0.78, 0.42)
 	draw_style_box(_bg_box, rect)
 
-	# 2. 5 dynamic acoustic equalizer bars
-	var bar_w := 3.0
-	var gap := 12.0
-	var max_h := 18.0
-	var min_h := 6.0
+	# 2. 5 clean dynamic acoustic equalizer bars
+	var bar_w := 2.8
+	var gap := 10.5
+	var max_h := 16.0
+	var min_h := 5.5
 
 	var bar_weights := [0.55, 0.8, 1.0, 0.8, 0.55]
 	var base_col := Color(0.35, 0.75, 1.0, 0.75) if not is_muted else Color(0.5, 0.5, 0.5, 0.4)
@@ -82,7 +82,7 @@ func _draw() -> void:
 	for i in range(5):
 		var x_offset := (i - 2) * gap
 		var idle_breathe := 0.5 + 0.5 * sin(t * (22.0 if is_stunned else 3.0) + i * 0.9) if not is_muted else 0.0
-		var bar_h: float = lerpf(min_h + 2.5 * idle_breathe, max_h * bar_weights[i], _energy)
+		var bar_h: float = lerpf(min_h + 2.2 * idle_breathe, max_h * bar_weights[i], _energy)
 		var c := base_col.lerp(active_col, _energy + _flash)
 		draw_line(
 			Vector2(x_offset, -bar_h * 0.5),
@@ -108,6 +108,6 @@ func _draw() -> void:
 		text_col = Color(0.4, 0.95, 1.0, 1.0)
 	else:
 		text = "VOICE SENSOR"
-		text_col = Color(0.45, 0.72, 0.95, 0.65)
+		text_col = Color(0.45, 0.72, 0.95, 0.55)
 
-	draw_string(ThemeDB.fallback_font, Vector2(-w * 0.5, h * 0.5 + 14.0), text, HORIZONTAL_ALIGNMENT_CENTER, int(w), 11, text_col)
+	draw_string(ThemeDB.fallback_font, Vector2(-w * 0.5, h * 0.5 + 12.0), text, HORIZONTAL_ALIGNMENT_CENTER, int(w), 9, text_col)

@@ -94,6 +94,9 @@ var speed_boost_mult := 1.0
 var is_in_water := false
 var is_investigating_decoy := false
 var _snore_timer := 2.5
+var eye_linger_timer := 0.0
+var spasm_timer := 0.0
+var spasm_offset := Vector2.ZERO
 
 # Data for EnemyVisual & AI steering
 var trail_points: Array[Vector2] = []
@@ -111,6 +114,7 @@ var _ray_query: PhysicsRayQueryParameters2D = null
 var _last_occ_self_pos := Vector2(-99999.0, -99999.0)
 var _last_occ_player_pos := Vector2(-99999.0, -99999.0)
 var _was_visually_active := true
+var _stun_timer := 0.0
 
 
 func _init() -> void:
@@ -132,6 +136,27 @@ func _ready() -> void:
 	add_child(_visual)
 
 	$CatchArea.body_entered.connect(_on_catch)
+
+	if GameState.current_mode == GameState.GameMode.CHALLENGE:
+		_apply_challenge_modifiers()
+
+
+func _apply_challenge_modifiers() -> void:
+	if ChallengeModifiers.has_curse("curse_swift_predators"):
+		patrol_speed *= 1.15
+		chase_speed *= 1.15
+	if ChallengeModifiers.has_curse("curse_extended_hunt"):
+		investigate_timeout *= 1.75
+	if ChallengeModifiers.has_curse("curse_acute_hearing"):
+		hearing_range *= 1.30
+	if ChallengeModifiers.has_curse("curse_predator_instinct"):
+		sneak_wake_radius *= 1.80
+		sleep_wake_radius *= 1.35
+
+
+func stun(duration: float) -> void:
+	_stun_timer = maxf(_stun_timer, duration)
+	velocity = Vector2.ZERO
 
 
 func _is_stationary() -> bool:
@@ -169,9 +194,17 @@ func on_sound(pos: Vector2, loudness: float, radius: float, is_voice: bool = fal
 	var is_sneak_step := (not is_voice and (is_sneak or loudness <= 0.05))
 	var is_walk_step := (not is_voice and not is_sneak and loudness > 0.05)
 
+	var p_node := _get_player()
+	var player_in_water := p_node != null and is_instance_valid(p_node) and p_node.get("water_count") != null and int(p_node.water_count) > 0
+	var is_water_move := not is_voice and player_in_water and not is_sneak
+
 	if enemy_type == EnemyType.LISTENER:
-		# Deaf to all footsteps (walking and sneaking): only shouts count
+		# Listener ignores normal footsteps, but is alerted by shouts
 		if not is_voice:
+			return
+	elif enemy_type == EnemyType.SCREAMER:
+		# Screamer ignores dry footsteps and sneaking, but detects voice AND unsneaked water movement splashing
+		if not is_voice and not is_water_move:
 			return
 	else:
 		if is_sneak_step and not can_hear_sneak:
@@ -245,9 +278,6 @@ func _notice(pos: Vector2, wall_blocked: bool = false) -> void:
 
 # Decoy stone sound reaction: luring/distraction behavior
 func on_decoy_sound(pos: Vector2, loudness: float, radius: float, is_wall_clink: bool = false) -> void:
-	if enemy_type == EnemyType.LISTENER:
-		return
-
 	var dist: float = global_position.distance_to(pos)
 	var effective_max := minf(radius, hearing_range * 1.1)
 	if dist > effective_max:
@@ -272,7 +302,11 @@ func on_decoy_sound(pos: Vector2, loudness: float, radius: float, is_wall_clink:
 		facing_dir = to_sound
 
 	if enemy_type == EnemyType.SCREAMER:
-		reveal(0.7)
+		_handle_screamer_sound()
+		return
+
+	if enemy_type == EnemyType.LISTENER:
+		_handle_listener_sound(true)
 		return
 
 	# If blocked by wall: the monster perceives the knock/vibration through the rock,
@@ -360,15 +394,16 @@ func _handle_listener_sound(is_voice: bool) -> void:
 	if state == State.ALARM or listener_cooldown > 0.0:
 		return
 
-	# Only voices count, and not faster than one per LISTENER_MIN_GAP
-	if not is_voice or (listener_count > 0 and listener_gap_timer > 0.0):
+	# Voices and decoy pebbles count, but ignore triggers faster than one per LISTENER_MIN_GAP
+	if listener_count > 0 and listener_gap_timer > 0.0:
 		return
 
 	listener_count += 1
 	listener_gap_timer = LISTENER_MIN_GAP
 	reveal(1.2)
 
-	if listener_count >= 5:
+	var max_count := 2 if (GameState.current_mode == GameState.GameMode.CHALLENGE and ChallengeModifiers.has_curse("curse_listener_feedback")) else 3
+	if listener_count >= max_count:
 		_trigger_listener_alarm()
 	else:
 		_enter(State.ALERT)
@@ -379,6 +414,10 @@ func _trigger_listener_alarm() -> void:
 	_enter(State.ALARM)
 	alarm_wave_radius = 0.0
 	alarmed.emit(global_position, global_position)
+	if GameState.current_mode == GameState.GameMode.CHALLENGE and ChallengeModifiers.has_curse("curse_listener_feedback"):
+		var p := _get_player() as Player
+		if p != null and is_instance_valid(p) and p.alive:
+			p.immobilize(1.2)
 
 
 # --- State machine -----------------------------------------------------------
@@ -539,7 +578,7 @@ func get_threat_level(player_pos: Vector2) -> float:
 			if enemy_type == EnemyType.SCREAMER and screamer_count > 0:
 				raw_threat = clampf(1.0 - dist / 320.0, 0.45, 0.98)
 			elif enemy_type == EnemyType.LISTENER and listener_count > 0:
-				raw_threat = clampf(0.25 * listener_count + (1.0 - dist / 300.0) * 0.45, 0.0, 0.95)
+				raw_threat = clampf(0.35 * listener_count + (1.0 - dist / 300.0) * 0.45, 0.0, 0.95)
 			else:
 				# Sleeper proximity: heart quickens steadily as you approach its slumber radius
 				raw_threat = prox * 0.85
@@ -555,8 +594,25 @@ func get_threat_level(player_pos: Vector2) -> float:
 
 
 func _physics_process(delta: float) -> void:
+	if _stun_timer > 0.0:
+		_stun_timer = maxf(0.0, _stun_timer - delta)
+		velocity = Vector2.ZERO
+		return
+
 	timer += delta
 	visible_alpha = move_toward(visible_alpha, 0.0, delta * 0.7)
+	if visible_alpha > 0.05:
+		eye_linger_timer = 0.45
+	elif eye_linger_timer > 0.0:
+		eye_linger_timer = maxf(0.0, eye_linger_timer - delta)
+
+	if spasm_timer > 0.0:
+		spasm_timer = maxf(0.0, spasm_timer - delta)
+		if spasm_timer > 0.0:
+			var spasm_prog := spasm_timer / 0.16
+			spasm_offset = Vector2(randf_range(-2.8, 2.8), randf_range(-2.8, 2.8)) * spasm_prog
+		else:
+			spasm_offset = Vector2.ZERO
 
 	var player := _get_player()
 	if player != null and is_instance_valid(player):
@@ -576,7 +632,11 @@ func _physics_process(delta: float) -> void:
 	_tick_timers(delta)
 
 	var boost := speed_boost_mult if speed_boost_timer > 0.0 else 1.0
-	var water_drag := 0.72 if is_in_water else 1.0
+	var water_drag: float
+	if is_in_water:
+		water_drag = 1.25 if (GameState.current_mode == GameState.GameMode.CHALLENGE and ChallengeModifiers.has_curse("curse_treacherous_waters")) else 0.72
+	else:
+		water_drag = 1.0
 	_run_state(delta, patrol_speed * boost * water_drag, chase_speed * boost * water_drag)
 
 	if not _is_stationary():
@@ -587,7 +647,8 @@ func _physics_process(delta: float) -> void:
 		var w_idx := 0
 		for i in step_ripples.size():
 			var r: Dictionary = step_ripples[i]
-			var next_age: float = float(r["age"]) + delta
+			var speed_factor: float = 1.35 if (r.get("is_breath", false) == true) else 1.0
+			var next_age: float = float(r["age"]) + delta * speed_factor
 			if next_age < 1.0:
 				r["age"] = next_age
 				step_ripples[w_idx] = r
@@ -599,7 +660,8 @@ func _physics_process(delta: float) -> void:
 
 	var is_visually_active: bool = (
 		visible_alpha > 0.01
-		or proximity > 0.005
+		or eye_linger_timer > 0.0
+		or spasm_timer > 0.0
 		or not step_ripples.is_empty()
 		or not trail_points.is_empty()
 		or speed_boost_timer > 0.0
@@ -641,6 +703,13 @@ func _run_state(delta: float, cur_patrol: float, cur_chase: float) -> void:
 				_snore_timer -= delta
 				if _snore_timer <= 0.0:
 					_snore_timer = randf_range(3.6, 5.4)
+					step_ripples.append({
+						"pos": global_position,
+						"age": 0.0,
+						"max_r": 28.0,
+						"is_breath": true,
+						"is_water": false
+					})
 					var p_node := get_tree().get_first_node_in_group("player")
 					if p_node != null and is_instance_valid(p_node):
 						if global_position.distance_to(p_node.global_position) <= 240.0:
@@ -816,6 +885,8 @@ func _on_catch(body: Node) -> void:
 	if body.is_in_group("player") and body.has_method("die"):
 		if enemy_type == EnemyType.LISTENER and state != State.ALARM:
 			_handle_listener_sound(true)
+			if body.has_method("apply_slow"):
+				body.apply_slow(3.0, 0.45)
 			if state != State.ALARM:
 				var push_dir: Vector2 = (body.global_position - global_position).normalized()
 				if push_dir.is_zero_approx():
@@ -829,4 +900,12 @@ func _on_catch(body: Node) -> void:
 
 
 func reveal(amount: float = 1.0) -> void:
+	if visible_alpha < 0.12 and amount > 0.15:
+		spasm_timer = 0.16
+		spasm_offset = Vector2(randf_range(-3.2, 3.2), randf_range(-3.2, 3.2))
 	visible_alpha = clampf(visible_alpha + amount, 0.0, 1.0)
+	if GameState.current_mode == GameState.GameMode.CHALLENGE and ChallengeModifiers.has_boon("boon_acoustic_amplifier"):
+		eye_linger_timer = 4.0
+		visible_alpha = 1.0
+	else:
+		eye_linger_timer = 0.45

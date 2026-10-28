@@ -130,6 +130,18 @@ func _on_hit_ground() -> void:
 			sb.emit_decoy_sound(final_pos, 0.4, 280.0)
 	landed.emit(final_pos)
 
+	if GameState.current_mode == GameState.GameMode.CHALLENGE and ChallengeModifiers.has_boon("boon_ricochet_pebble"):
+		var origin_pt: Vector2 = path_points[0] if path_points.size() > 0 else final_pos
+		var bounce_dir := (final_pos - origin_pt).normalized().rotated(randf_range(-0.35, 0.35))
+		if bounce_dir.is_zero_approx():
+			bounce_dir = Vector2.RIGHT
+		var bounce_dest := final_pos + bounce_dir * randf_range(65.0, 105.0)
+		get_tree().create_timer(0.25).timeout.connect(func():
+			var bus := get_tree().get_first_node_in_group("sound_bus") as SoundBus
+			if bus != null and is_instance_valid(bus):
+				bus.emit_decoy_sound(bounce_dest, 0.42, 290.0)
+		)
+
 	# Spawn subtle stone impact chips
 	for i in 6:
 		var ang := randf() * TAU

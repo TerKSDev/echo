@@ -286,7 +286,7 @@ func _reveal_features(space: PhysicsDirectSpaceState2D, origin: Vector2, max_dis
 			var f_type: String = String(f["type"])
 			var s: float = (1.0 if f_type == "exit" else clampf(1.0 - path_len / max_dist, 0.38, 1.0)) * s_mult
 			var new_age: float = -path_len / WAVE_SPEED
-			var is_pressed: bool = bool(f.get("pressed", false))
+			var is_pressed: bool = (f.get("pressed", false) == true)
 			var m_key := Vector2i(round(f_pos.x), round(f_pos.y))
 			if _marks_by_pos.has(m_key):
 				var existing: Dictionary = _marks_by_pos[m_key]
@@ -296,9 +296,9 @@ func _reveal_features(space: PhysicsDirectSpaceState2D, origin: Vector2, max_dis
 					existing["age"] = minf(existing["age"], new_age)
 				existing["strength"] = maxf(float(existing["strength"]), s)
 				existing["pressed"] = is_pressed
-				existing["open"] = bool(f.get("open", false))
-				existing["locked"] = bool(f.get("locked", false))
-				existing["collected"] = bool(f.get("collected", false))
+				existing["open"] = (f.get("open", false) == true)
+				existing["locked"] = (f.get("locked", false) == true)
+				existing["collected"] = (f.get("collected", false) == true)
 				existing["color"] = f.get("color", Color.WHITE)
 			else:
 				var new_mark := {
@@ -307,9 +307,9 @@ func _reveal_features(space: PhysicsDirectSpaceState2D, origin: Vector2, max_dis
 					"age": new_age,
 					"strength": s,
 					"pressed": is_pressed,
-					"open": bool(f.get("open", false)),
-					"locked": bool(f.get("locked", false)),
-					"collected": bool(f.get("collected", false)),
+					"open": (f.get("open", false) == true),
+					"locked": (f.get("locked", false) == true),
+					"collected": (f.get("collected", false) == true),
 					"color": f.get("color", Color.WHITE)
 				}
 				marks.append(new_mark)
@@ -526,7 +526,7 @@ func _draw():
 				var base: Color = f.get("color", Color.WHITE)
 				var lp := to_local(f_pos)
 				if f_type == "door":
-					var is_open: bool = bool(f.get("open", false))
+					var is_open: bool = (f.get("open", false) == true)
 					var tex: Texture2D = icon_door_open if is_open else icon_door_closed
 					if not is_open:
 						draw_rect(Rect2(lp - Vector2(16, 16), Vector2(32, 32)), Color(base.r, base.g, base.b, 0.22), false, 1.5)
@@ -536,7 +536,7 @@ func _draw():
 					else:
 						draw_rect(Rect2(lp - Vector2(15, 15), Vector2(30, 30)), Color(base.r, base.g, base.b, 0.35 if is_open else 0.6), false, 2.0)
 				else:
-					var used: bool = bool(f.get("pressed", false))
+					var used: bool = (f.get("pressed", false) == true)
 					if not used:
 						draw_arc(lp, 18.0, 0.0, TAU, 24, Color(base.r, base.g, base.b, 0.25), 1.0)
 					if icon_key != null:
@@ -575,7 +575,7 @@ func _draw_mark(m: Dictionary, a: float) -> void:
 			draw_line(p + Vector2(5.0, 7.2), p + Vector2(9.5, 5.5), c, 1.5)
 		"switch":
 			# Resonator Key: Key icon with link color, plus acoustic harmonic resonance rings
-			var is_pressed: bool = bool(m.get("pressed", false))
+			var is_pressed: bool = (m.get("pressed", false) == true)
 			var base: Color = m.get("color", SWITCH_COLOR)
 			var c := Color(base.r, base.g, base.b, a * (0.35 if is_pressed else 1.0))
 			if not is_pressed:
@@ -597,7 +597,7 @@ func _draw_mark(m: Dictionary, a: float) -> void:
 		"door":
 			# Ancient Airlock / Sealed Gate with acoustic energy barrier
 			var base: Color = m.get("color", DOOR_COLOR)
-			var is_open: bool = bool(m.get("open", false))
+			var is_open: bool = (m.get("open", false) == true)
 			var c := Color(base.r, base.g, base.b, a * (0.55 if is_open else 1.0))
 			if not is_open:
 				var d_box := Rect2(p - Vector2(16, 16), Vector2(32, 32))
@@ -625,12 +625,12 @@ func _draw_mark(m: Dictionary, a: float) -> void:
 					draw_line(p + Vector2(-15, 15), p + Vector2(15, -15), c, 1.0)
 		"exit":
 			# Red while locked (no exit key yet), teal once unlocked.
-			var ec: Color = Color(1.0, 0.2, 0.2) if bool(m.get("locked", false)) else Color(0.55, 1.0, 0.92)
+			var ec: Color = Color(1.0, 0.2, 0.2) if (m.get("locked", false) == true) else Color(0.55, 1.0, 0.92)
 			draw_rect(Rect2(p - Vector2(16, 16), Vector2(32, 32)), Color(ec.r, ec.g, ec.b, a), false, 3.0)
 			draw_rect(Rect2(p - Vector2(22, 22), Vector2(44, 44)), Color(ec.r, ec.g, ec.b, a * 0.5), false, 1.5)
 		"note":
 			# Expedition archive / journal fragment: glowing golden parchment / diamond glyph
-			var is_collected: bool = bool(m.get("collected", false))
+			var is_collected: bool = (m.get("collected", false) == true)
 			if is_collected:
 				return
 			var nc := Color(1.0, 0.82, 0.35, a)

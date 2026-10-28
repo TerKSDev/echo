@@ -83,7 +83,7 @@ func _on_native_sign_out_success() -> void:
 func _load_auth_state() -> void:
 	var cfg := ConfigFile.new()
 	if cfg.load(AUTH_PATH) == OK:
-		is_logged_in = bool(cfg.get_value("hms", "is_logged_in", false))
+		is_logged_in = (cfg.get_value("hms", "is_logged_in", false) == true)
 		huawei_id = str(cfg.get_value("hms", "huawei_id", ""))
 		display_name = str(cfg.get_value("hms", "display_name", "Huawei Explorer"))
 		player_level = int(cfg.get_value("hms", "player_level", 1))
@@ -295,7 +295,7 @@ func unlock_achievement(ach_id: String, title: String) -> void:
 	if not is_sandbox and _native_hms != null:
 		_native_hms.call("unlockAchievement", ach_id)
 
-	show_hms_toast("🏆 Achievement Unlocked!", title)
+	show_hms_toast("Achievement Unlocked!", title)
 	achievement_unlocked.emit(ach_id, title)
 
 

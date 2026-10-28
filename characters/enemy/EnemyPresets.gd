@@ -33,7 +33,7 @@ const PRESETS: Array[Dictionary] = [
 		"init_state": 1, "sleep_wake_radius": 75.0, "sneak_wake_radius": 30.0, "sneak_sense_radius": 24.0,
 		"color": Color(1.0, 0.18, 0.18), # Crimson
 	},
-	{ # SCREAMER - stationary, shrieks on the 2nd voice (>= 1s apart), ignores footsteps
+	{ # SCREAMER - stationary, shrieks on 2nd voice/pebble/water splash (>= 1s apart), ignores dry footsteps
 		"hearing_range": 450.0, "hearing_threshold": 0.08,
 		"can_hear_sneak": false, "can_hear_walk": false, "can_hear_voice": true,
 		"patrol_speed": 0.0, "chase_speed": 0.0,
@@ -41,7 +41,7 @@ const PRESETS: Array[Dictionary] = [
 		"init_state": 0, "sleep_wake_radius": 50.0, "sneak_wake_radius": 25.0, "sneak_sense_radius": 24.0,
 		"color": Color(0.95, 0.28, 0.72), # Fuchsia
 	},
-	{ # LISTENER - stationary, deaf to ALL footsteps, counts voices (>= 0.8s apart) up to 5
+	{ # LISTENER - stationary, deaf to ALL footsteps, counts voices/pebbles (>= 0.8s apart) up to 3
 		"hearing_range": 500.0, "hearing_threshold": 0.02,
 		"can_hear_sneak": false, "can_hear_walk": false, "can_hear_voice": true,
 		"patrol_speed": 0.0, "chase_speed": 0.0,

@@ -90,7 +90,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func _setup_top_bar() -> void:
 	if back_button != null:
 		back_button.text = ""
-		back_button.custom_minimum_size = Vector2(44, 44)
+		back_button.custom_minimum_size = Vector2(32, 44)
 		back_button.focus_mode = Control.FOCUS_NONE
 		var empty_sb := StyleBoxEmpty.new()
 		back_button.add_theme_stylebox_override("normal", empty_sb)
@@ -107,7 +107,8 @@ func _setup_top_bar() -> void:
 		wire_juice(back_button)
 
 	if reset_defaults_btn != null:
-		SettingsUIFactory.style_action_button(reset_defaults_btn, Color(0.35, 0.65, 0.90, 0.65), Color(0.03, 0.09, 0.16, 0.85))
+		reset_defaults_btn.custom_minimum_size = Vector2(136, 32)
+		SettingsUIFactory.style_action_button(reset_defaults_btn, Color(0.35, 0.85, 1.0, 0.85), Color(0.04, 0.14, 0.25, 0.85), true)
 		reset_defaults_btn.pressed.connect(_on_reset_defaults_pressed)
 		wire_juice(reset_defaults_btn)
 
@@ -131,21 +132,28 @@ func _switch_tab(tab_idx: int) -> void:
 			continue
 		var is_active := (i == tab_idx)
 		var style := StyleBoxFlat.new()
-		style.set_corner_radius_all(8)
-		style.set_border_width_all(1)
+		style.set_corner_radius_all(10)
+		style.content_margin_left = 12.0
+		style.content_margin_right = 12.0
+		style.content_margin_top = 6.0
+		style.content_margin_bottom = 6.0
 		if is_active:
-			style.bg_color = Color(0.08, 0.24, 0.42, 0.95)
+			style.bg_color = Color(0.06, 0.22, 0.38, 0.95)
 			style.border_color = Color(0.35, 0.88, 1.0, 1.0)
-			btn.add_theme_color_override("font_color", Color(0.85, 0.96, 1.0, 1.0))
+			style.set_border_width_all(2)
+			style.shadow_color = Color(0.15, 0.55, 0.95, 0.35)
+			style.shadow_size = 4
+			btn.add_theme_color_override("font_color", Color(0.40, 1.0, 1.0, 1.0))
 		else:
-			style.bg_color = Color(0.03, 0.08, 0.15, 0.80)
-			style.border_color = Color(0.18, 0.38, 0.60, 0.45)
-			btn.add_theme_color_override("font_color", Color(0.55, 0.75, 0.92, 0.70))
+			style.bg_color = Color(0.025, 0.07, 0.13, 0.80)
+			style.border_color = Color(0.18, 0.38, 0.60, 0.50)
+			style.set_border_width_all(1)
+			btn.add_theme_color_override("font_color", Color(0.55, 0.72, 0.85, 0.75))
 		btn.add_theme_stylebox_override("normal", style)
 		btn.add_theme_stylebox_override("hover", style)
 		btn.add_theme_stylebox_override("pressed", style)
-		btn.add_theme_stylebox_override("focus", style)
-		btn.add_theme_font_size_override("font_size", 13)
+		btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+		btn.add_theme_font_size_override("font_size", 12)
 
 	for i in _panels.size():
 		var p := _panels[i]

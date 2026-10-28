@@ -13,18 +13,9 @@ extends Control
 var _is_open := false
 var _player: Node = null
 
-# Dynamic Audio & Mic Controls
-var _mute_btn: Button
-var _bgm_slider: HSlider
-var _bgm_val: Label
-var _sfx_slider: HSlider
-var _sfx_val: Label
-var _sens_slider: HSlider
-var _sens_val: Label
-var _calib_btn: Button
-var _meter_canvas: Control
-var _sneak_mode_btn: Button
-var _blind_btn: Button
+# Essential Quick Settings Controls
+var _scheme_btn: Button = null
+var _layout_btn: Button = null
 
 
 func _ready() -> void:
@@ -55,17 +46,16 @@ func _ready() -> void:
 				close()
 		)
 
-	_build_extra_ui()
+	_build_streamlined_ui()
 
-	for b: Button in [resume_btn, restart_btn, menu_btn, mic_toggle, close_btn, _calib_btn, _mute_btn]:
+	for b: Button in [resume_btn, restart_btn, menu_btn, mic_toggle, close_btn, _scheme_btn, _layout_btn]:
 		if b != null:
 			_wire_btn_anim(b)
 
 	_player = get_tree().get_first_node_in_group("player")
-	_update_mute_toggle_ui()
 	_update_mic_toggle_ui()
-	_refresh_sneak_mode_btn_ui()
-	_refresh_blind_btn_ui()
+	_refresh_scheme_btn_ui()
+	_refresh_layout_btn_ui()
 
 
 func _notification(what: int) -> void:
@@ -100,309 +90,130 @@ func _wire_btn_anim(btn: Button) -> void:
 	)
 
 
-func _process(_delta: float) -> void:
-	if not _is_open:
-		return
-	var mic := _get_mic()
-	if mic != null and _calib_btn != null:
-		if mic.is_calibrating():
-			_calib_btn.text = "SAMPLING..."
-			_calib_btn.disabled = true
-		else:
-			_calib_btn.text = "CALIBRATE ROOM"
-			_calib_btn.disabled = not GameState.mic_enabled
-	if _meter_canvas != null:
-		_meter_canvas.queue_redraw()
+func _build_streamlined_ui() -> void:
+	# 1. Style Primary Action Buttons
+	resume_btn.text = "RESUME GAME"
+	resume_btn.custom_minimum_size = Vector2(0, 44)
+	ModalTemplate.style_button(resume_btn, true, ModalTemplate.ThemeKind.SONAR)
 
+	restart_btn.text = "RESTART SECTOR"
+	restart_btn.custom_minimum_size = Vector2(0, 40)
+	ModalTemplate.style_danger_button(restart_btn, false, false)
 
-func _build_extra_ui() -> void:
-	# Category Header 1: AUDIO OUTPUT
-	var audio_idx: int = $CenterContainer/Panel/VBox/VolumeHeader.get_index()
-	var audio_lbl := Label.new()
-	audio_lbl.text = "AUDIO OUTPUT"
-	audio_lbl.add_theme_color_override("font_color", Color(0.35, 0.78, 1.0, 0.95))
-	audio_lbl.add_theme_font_size_override("font_size", 11)
-	vbox.add_child(audio_lbl)
-	vbox.move_child(audio_lbl, audio_idx)
-	audio_idx += 1
+	menu_btn.text = "ABANDON TO LEVEL SELECT"
+	menu_btn.custom_minimum_size = Vector2(0, 36)
+	ModalTemplate.style_button(menu_btn, false, ModalTemplate.ThemeKind.SONAR)
 
-	# Master Audio Output Mute Toggle Row
-	var mute_row := HBoxContainer.new()
-	var mute_lbl := Label.new()
-	mute_lbl.text = "MASTER AUDIO OUTPUT"
-	mute_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	mute_lbl.add_theme_color_override("font_color", Color(0.65, 0.85, 1.0, 0.9))
-	mute_lbl.add_theme_font_size_override("font_size", 13)
+	# 2. Reorganize VBox hierarchy:
+	# Index 0: Header (Title, Subtitle, Close)
+	# Index 1: Divider1
+	# Index 2: Primary Actions (Resume, Restart)
+	var actions_box := $CenterContainer/Panel/VBox/Actions
+	actions_box.remove_child(menu_btn)
+	vbox.move_child(actions_box, 2)
 
-	_mute_btn = Button.new()
-	_mute_btn.custom_minimum_size = Vector2(130, 32)
-	_mute_btn.focus_mode = Control.FOCUS_NONE
-	_mute_btn.theme = close_btn.theme
-	_mute_btn.add_theme_font_size_override("font_size", 12)
-	_mute_btn.pressed.connect(_on_mute_toggle_pressed)
-	mute_row.add_child(mute_lbl)
-	mute_row.add_child(_mute_btn)
-	vbox.add_child(mute_row)
-	vbox.move_child(mute_row, audio_idx)
+	# Index 3: Divider2 (Quick Settings Separator)
+	var div2 := $CenterContainer/Panel/VBox/Divider2
+	vbox.move_child(div2, 3)
 
-	# After VolumeRow: insert BGM and SFX volume sliders
-	var audio_insert: int = $CenterContainer/Panel/VBox/VolumeRow.get_index() + 1
+	# Index 4: Quick Settings Category Header
+	var quick_lbl := Label.new()
+	quick_lbl.text = "QUICK SYSTEM & CONTROLS"
+	quick_lbl.add_theme_color_override("font_color", Color(0.35, 0.78, 1.0, 0.95))
+	quick_lbl.add_theme_font_size_override("font_size", 11)
+	vbox.add_child(quick_lbl)
+	vbox.move_child(quick_lbl, 4)
 
-	# Ambience & Music (BGM)
-	var bgm_header := HBoxContainer.new()
-	var bgm_lbl := Label.new()
-	bgm_lbl.text = "AMBIENCE & MUSIC"
-	bgm_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	bgm_lbl.add_theme_color_override("font_color", Color(0.65, 0.85, 1.0, 0.9))
-	bgm_lbl.add_theme_font_size_override("font_size", 13)
+	# Index 5: Master Volume Header (Title + %)
+	var vol_hdr := $CenterContainer/Panel/VBox/VolumeHeader
+	vbox.move_child(vol_hdr, 5)
 
-	_bgm_val = Label.new()
-	_bgm_val.text = "%d%%" % int(round(GameState.bgm_volume * 100.0))
-	_bgm_val.add_theme_color_override("font_color", Color(0.85, 0.95, 1.0, 1.0))
-	_bgm_val.add_theme_font_size_override("font_size", 13)
-	bgm_header.add_child(bgm_lbl)
-	bgm_header.add_child(_bgm_val)
-	vbox.add_child(bgm_header)
-	vbox.move_child(bgm_header, audio_insert)
-	audio_insert += 1
+	# Index 6: Volume Slider Row
+	var vol_row := $CenterContainer/Panel/VBox/VolumeRow
+	vbox.move_child(vol_row, 6)
+	ModalTemplate.style_slider(volume_slider, ModalTemplate.ThemeKind.SONAR)
 
-	_bgm_slider = HSlider.new()
-	_bgm_slider.custom_minimum_size = Vector2(0, 24)
-	_bgm_slider.max_value = 1.0
-	_bgm_slider.step = 0.01
-	_bgm_slider.value = GameState.bgm_volume
-	_bgm_slider.focus_mode = Control.FOCUS_NONE
-	_bgm_slider.theme = close_btn.theme
-	_bgm_slider.value_changed.connect(func(v: float):
-		GameState.set_bgm_volume(v)
-		_bgm_val.text = "%d%%" % int(round(v * 100.0))
-	)
-	vbox.add_child(_bgm_slider)
-	vbox.move_child(_bgm_slider, audio_insert)
-	audio_insert += 1
-
-	# Sound Effects (SFX)
-	var sfx_header := HBoxContainer.new()
-	var sfx_lbl := Label.new()
-	sfx_lbl.text = "SOUND EFFECTS (SFX)"
-	sfx_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	sfx_lbl.add_theme_color_override("font_color", Color(0.65, 0.85, 1.0, 0.9))
-	sfx_lbl.add_theme_font_size_override("font_size", 13)
-
-	_sfx_val = Label.new()
-	_sfx_val.text = "%d%%" % int(round(GameState.sfx_volume * 100.0))
-	_sfx_val.add_theme_color_override("font_color", Color(0.85, 0.95, 1.0, 1.0))
-	_sfx_val.add_theme_font_size_override("font_size", 13)
-	sfx_header.add_child(sfx_lbl)
-	sfx_header.add_child(_sfx_val)
-	vbox.add_child(sfx_header)
-	vbox.move_child(sfx_header, audio_insert)
-	audio_insert += 1
-
-	_sfx_slider = HSlider.new()
-	_sfx_slider.custom_minimum_size = Vector2(0, 24)
-	_sfx_slider.max_value = 1.0
-	_sfx_slider.step = 0.01
-	_sfx_slider.value = GameState.sfx_volume
-	_sfx_slider.focus_mode = Control.FOCUS_NONE
-	_sfx_slider.theme = close_btn.theme
-	_sfx_slider.value_changed.connect(func(v: float):
-		GameState.set_sfx_volume(v)
-		_sfx_val.text = "%d%%" % int(round(v * 100.0))
-	)
-	vbox.add_child(_sfx_slider)
-	vbox.move_child(_sfx_slider, audio_insert)
-	audio_insert += 1
-
-	# Divider + Category Header 2: MICROPHONE INPUT
-	var mic_idx: int = $CenterContainer/Panel/VBox/MicRow.get_index()
-	var mic_div := ColorRect.new()
-	mic_div.custom_minimum_size = Vector2(0, 1)
-	mic_div.color = Color(0.2, 0.45, 0.7, 0.45)
-	vbox.add_child(mic_div)
-	vbox.move_child(mic_div, mic_idx)
-
-	var mic_sec_lbl := Label.new()
-	mic_sec_lbl.text = "MICROPHONE INPUT"
-	mic_sec_lbl.add_theme_color_override("font_color", Color(0.35, 0.78, 1.0, 0.95))
-	mic_sec_lbl.add_theme_font_size_override("font_size", 11)
-	vbox.add_child(mic_sec_lbl)
-	vbox.move_child(mic_sec_lbl, mic_idx + 1)
-
-	var insert_idx: int = $CenterContainer/Panel/VBox/MicRow.get_index() + 1
-
-	# 1. Microphone Sensitivity Header + Value (unified: MICROPHONE SENSITIVITY)
-	var sens_header := HBoxContainer.new()
-	var sens_lbl := Label.new()
-	sens_lbl.text = "MICROPHONE SENSITIVITY"
-	sens_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	sens_lbl.add_theme_color_override("font_color", Color(0.65, 0.85, 1.0, 0.9))
-	sens_lbl.add_theme_font_size_override("font_size", 13)
-
-	_sens_val = Label.new()
-	_sens_val.text = "%d%%" % int(round(GameState.mic_sensitivity * 100.0))
-	_sens_val.add_theme_color_override("font_color", Color(0.85, 0.95, 1.0, 1.0))
-	_sens_val.add_theme_font_size_override("font_size", 13)
-
-	sens_header.add_child(sens_lbl)
-	sens_header.add_child(_sens_val)
-	vbox.add_child(sens_header)
-	vbox.move_child(sens_header, insert_idx)
-	insert_idx += 1
-
-	# 2. Microphone Sensitivity Slider
-	_sens_slider = HSlider.new()
-	_sens_slider.custom_minimum_size = Vector2(0, 24)
-	_sens_slider.max_value = 1.0
-	_sens_slider.step = 0.01
-	_sens_slider.value = GameState.mic_sensitivity
-	_sens_slider.focus_mode = Control.FOCUS_NONE
-	_sens_slider.theme = close_btn.theme
-	_sens_slider.value_changed.connect(func(v: float):
-		GameState.mic_sensitivity = v
-		_sens_val.text = "%d%%" % int(round(v * 100.0))
-		GameState.save_settings()
-	)
-	vbox.add_child(_sens_slider)
-	vbox.move_child(_sens_slider, insert_idx)
-	insert_idx += 1
-
-	# 3. Live Microphone Meter + Calibrate Button Row
-	var calib_row := HBoxContainer.new()
-	calib_row.add_theme_constant_override("separation", 10)
-
-	_meter_canvas = Control.new()
-	_meter_canvas.custom_minimum_size = Vector2(0, 32)
-	_meter_canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_meter_canvas.draw.connect(_draw_mic_meter)
-	calib_row.add_child(_meter_canvas)
-
+	# Index 7: Microphone Row
+	var mic_row := $CenterContainer/Panel/VBox/MicRow
+	var mic_lbl := mic_row.get_node_or_null("MicLabel") as Label
+	if mic_lbl != null:
+		mic_lbl.text = "ACOUSTIC SENSOR"
 	mic_toggle.custom_minimum_size = Vector2(130, 32)
+	mic_toggle.theme = close_btn.theme
+	vbox.move_child(mic_row, 7)
 
-	_calib_btn = Button.new()
-	_calib_btn.custom_minimum_size = Vector2(130, 32)
-	_calib_btn.focus_mode = Control.FOCUS_NONE
-	_calib_btn.theme = close_btn.theme
-	_calib_btn.add_theme_font_size_override("font_size", 12)
-	_calib_btn.text = "CALIBRATE ROOM"
-	_calib_btn.pressed.connect(func():
-		var mic := _get_mic()
-		if mic != null:
-			mic.recalibrate()
-	)
-	calib_row.add_child(_calib_btn)
+	# Index 8: Movement Scheme Row (Joystick vs Drag & Tap)
+	var scheme_row := HBoxContainer.new()
+	var scheme_lbl := Label.new()
+	scheme_lbl.text = "MOVEMENT SCHEME"
+	scheme_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scheme_lbl.add_theme_color_override("font_color", Color(0.65, 0.85, 1.0, 0.9))
+	scheme_lbl.add_theme_font_size_override("font_size", 13)
+	scheme_row.add_child(scheme_lbl)
 
-	vbox.add_child(calib_row)
-	vbox.move_child(calib_row, insert_idx)
-	insert_idx += 1
-
-	var hint_lbl := Label.new()
-	hint_lbl.text = "SPEAK TO TEST  •  YELLOW LINE = TRIGGER THRESHOLD"
-	hint_lbl.add_theme_font_size_override("font_size", 10)
-	hint_lbl.add_theme_color_override("font_color", Color(0.42, 0.65, 0.85, 0.65))
-	vbox.add_child(hint_lbl)
-	vbox.move_child(hint_lbl, insert_idx)
-
-	# Divider + Category Header: CONTROLS & ACCESSIBILITY
-	var act_idx: int = $CenterContainer/Panel/VBox/Actions.get_index()
-	var assist_div := ColorRect.new()
-	assist_div.custom_minimum_size = Vector2(0, 1)
-	assist_div.color = Color(0.2, 0.45, 0.7, 0.45)
-	vbox.add_child(assist_div)
-	vbox.move_child(assist_div, act_idx)
-	act_idx += 1
-
-	var sneak_row := HBoxContainer.new()
-	var sneak_lbl := Label.new()
-	sneak_lbl.text = "SNEAK INPUT MODE"
-	sneak_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	sneak_lbl.add_theme_color_override("font_color", Color(0.65, 0.85, 1.0, 0.9))
-	sneak_lbl.add_theme_font_size_override("font_size", 13)
-	sneak_row.add_child(sneak_lbl)
-
-	_sneak_mode_btn = Button.new()
-	_sneak_mode_btn.custom_minimum_size = Vector2(130, 32)
-	_sneak_mode_btn.focus_mode = Control.FOCUS_NONE
-	_sneak_mode_btn.theme = close_btn.theme
-	_sneak_mode_btn.add_theme_font_size_override("font_size", 12)
-	_refresh_sneak_mode_btn_ui()
-	_sneak_mode_btn.pressed.connect(func():
-		GameState.sneak_hold_mode = not GameState.sneak_hold_mode
+	_scheme_btn = Button.new()
+	_scheme_btn.custom_minimum_size = Vector2(130, 32)
+	_scheme_btn.focus_mode = Control.FOCUS_NONE
+	_scheme_btn.theme = close_btn.theme
+	_scheme_btn.add_theme_font_size_override("font_size", 12)
+	_refresh_scheme_btn_ui()
+	_scheme_btn.pressed.connect(func():
+		GameState.virtual_joystick_enabled = not GameState.virtual_joystick_enabled
 		GameState.save_settings()
-		_refresh_sneak_mode_btn_ui()
+		_refresh_scheme_btn_ui()
+		var hud = get_parent()
+		if hud != null and hud.has_method("update_controls_layout"):
+			hud.update_controls_layout()
 	)
-	_wire_btn_anim(_sneak_mode_btn)
-	sneak_row.add_child(_sneak_mode_btn)
-	vbox.add_child(sneak_row)
-	vbox.move_child(sneak_row, act_idx)
-	act_idx += 1
+	scheme_row.add_child(_scheme_btn)
+	vbox.add_child(scheme_row)
+	vbox.move_child(scheme_row, 8)
 
-	var blind_row := HBoxContainer.new()
-	var blind_lbl := Label.new()
-	blind_lbl.text = "UNIVERSAL ACCESSIBILITY"
-	blind_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	blind_lbl.add_theme_color_override("font_color", Color(0.65, 0.85, 1.0, 0.9))
-	blind_lbl.add_theme_font_size_override("font_size", 13)
-	blind_row.add_child(blind_lbl)
+	# Index 9: Action Buttons Position (Right vs Left handedness)
+	var layout_row := HBoxContainer.new()
+	var layout_lbl := Label.new()
+	layout_lbl.text = "ACTION BUTTONS SIDE"
+	layout_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	layout_lbl.add_theme_color_override("font_color", Color(0.65, 0.85, 1.0, 0.9))
+	layout_lbl.add_theme_font_size_override("font_size", 13)
+	layout_row.add_child(layout_lbl)
 
-	_blind_btn = Button.new()
-	_blind_btn.custom_minimum_size = Vector2(130, 32)
-	_blind_btn.focus_mode = Control.FOCUS_NONE
-	_blind_btn.theme = close_btn.theme
-	_blind_btn.add_theme_font_size_override("font_size", 12)
-	_refresh_blind_btn_ui()
-	_blind_btn.pressed.connect(func():
-		GameState.blind_assist_mode = not GameState.blind_assist_mode
+	_layout_btn = Button.new()
+	_layout_btn.custom_minimum_size = Vector2(130, 32)
+	_layout_btn.focus_mode = Control.FOCUS_NONE
+	_layout_btn.theme = close_btn.theme
+	_layout_btn.add_theme_font_size_override("font_size", 12)
+	_refresh_layout_btn_ui()
+	_layout_btn.pressed.connect(func():
+		GameState.controls_layout = "left" if GameState.controls_layout == "right" else "right"
 		GameState.save_settings()
-		_refresh_blind_btn_ui()
-		var sfx_mgr = get_tree().get_first_node_in_group("sfx_manager")
-		if sfx_mgr == null:
-			sfx_mgr = get_node_or_null("../SfxManager")
-		if sfx_mgr != null and sfx_mgr.has_method("play_assist_toggle"):
-			sfx_mgr.play_assist_toggle(GameState.blind_assist_mode)
+		_refresh_layout_btn_ui()
+		var hud = get_parent()
+		if hud != null and hud.has_method("update_controls_layout"):
+			hud.update_controls_layout()
 	)
-	_wire_btn_anim(_blind_btn)
-	blind_row.add_child(_blind_btn)
-	vbox.add_child(blind_row)
-	vbox.move_child(blind_row, act_idx)
-	act_idx += 1
+	layout_row.add_child(_layout_btn)
+	vbox.add_child(layout_row)
+	vbox.move_child(layout_row, 9)
 
-	# Category Header 3: EXPEDITION NAVIGATION
-	var act_lbl := Label.new()
-	act_lbl.text = "EXPEDITION NAVIGATION"
-	act_lbl.add_theme_color_override("font_color", Color(0.35, 0.78, 1.0, 0.95))
-	act_lbl.add_theme_font_size_override("font_size", 11)
-	vbox.add_child(act_lbl)
-	vbox.move_child(act_lbl, act_idx)
+	# Index 10: Divider3
+	var div3 := ColorRect.new()
+	div3.custom_minimum_size = Vector2(0, 1)
+	div3.color = Color(0.2, 0.45, 0.7, 0.35)
+	vbox.add_child(div3)
+	vbox.move_child(div3, 10)
 
+	# Index 11: Abandon / Level Select
+	vbox.add_child(menu_btn)
+	vbox.move_child(menu_btn, 11)
 
-func _draw_mic_meter() -> void:
-	var w: float = _meter_canvas.size.x
-	var h: float = _meter_canvas.size.y
-	var bar_h: float = 16.0
-	var bar_y: float = (h - bar_h) * 0.5
-
-	# Track background (-70 dB .. -5 dB range)
-	_meter_canvas.draw_rect(Rect2(0.0, bar_y, w, bar_h), Color(0.02, 0.06, 0.12, 0.95), true)
-
-	var mic := _get_mic()
-	var cur_db: float = mic.level_db if (mic != null and GameState.mic_enabled) else -80.0
-	var trig_db: float = GameState.get_mic_trigger_db()
-
-	var fill_frac: float = clampf(inverse_lerp(-70.0, -5.0, cur_db), 0.0, 1.0)
-	var trig_frac: float = clampf(inverse_lerp(-70.0, -5.0, trig_db), 0.0, 1.0)
-
-	var active: bool = cur_db >= trig_db
-	var fill_col: Color = Color(0.35, 0.95, 1.0, 0.95) if active else Color(0.20, 0.55, 0.80, 0.80)
-	if fill_frac > 0.01:
-		_meter_canvas.draw_rect(Rect2(0.0, bar_y, w * fill_frac, bar_h), fill_col, true)
-
-	# Border
-	_meter_canvas.draw_rect(Rect2(0.0, bar_y, w, bar_h), Color(0.24, 0.52, 0.78, 0.65), false, 1.0)
-
-	# Trigger threshold marker line
-	var tx: float = clampf(w * trig_frac, 2.0, w - 2.0)
-	_meter_canvas.draw_line(Vector2(tx, bar_y - 2.5), Vector2(tx, bar_y + bar_h + 2.5), Color(1.0, 0.85, 0.30, 1.0), 2.0)
+	# Index 12: Footer hint
+	var hint := Label.new()
+	hint.text = "FULL AUDIO & CALIBRATION SETTINGS IN MAIN MENU"
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.add_theme_color_override("font_color", Color(0.35, 0.55, 0.75, 0.55))
+	hint.add_theme_font_size_override("font_size", 10)
+	vbox.add_child(hint)
 
 
 func _get_mic() -> MicInput:
@@ -445,29 +256,21 @@ func open() -> void:
 
 	volume_slider.value = GameState.master_volume
 	_update_volume_label(GameState.master_volume)
-	if _bgm_slider != null:
-		_bgm_slider.value = GameState.bgm_volume
-		_bgm_val.text = "%d%%" % int(round(GameState.bgm_volume * 100.0))
-	if _sfx_slider != null:
-		_sfx_slider.value = GameState.sfx_volume
-		_sfx_val.text = "%d%%" % int(round(GameState.sfx_volume * 100.0))
-	if _sens_slider != null:
-		_sens_slider.value = GameState.mic_sensitivity
-	_update_mute_toggle_ui()
 	_update_mic_toggle_ui()
-	_refresh_sneak_mode_btn_ui()
-	_refresh_blind_btn_ui()
+	_refresh_scheme_btn_ui()
+	_refresh_layout_btn_ui()
 
 	var subtitle_lbl := get_node_or_null("CenterContainer/Panel/VBox/Header/Titles/Subtitle") as Label
 	if subtitle_lbl != null:
 		var cur_lvl := GameState.current_level
 		var sec_name := GameState.get_level_name(cur_lvl)
-		subtitle_lbl.text = "%s   •   SETTINGS & SYSTEM" % sec_name
+		var depth_str := GameState.get_level_depth_str(cur_lvl)
+		subtitle_lbl.text = "%s   •   DEPTH %s" % [sec_name, depth_str]
 
 	var tw := create_tween().set_parallel(true)
 	tw.tween_property(self, "modulate:a", 1.0, 0.18).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	panel.scale = Vector2(0.92, 0.92)
-	panel.pivot_offset = panel.size * 0.5 if panel.size.x > 50.0 else Vector2(ModalTemplate.CARD_WIDTH * 0.5, 260.0)
+	panel.pivot_offset = panel.size * 0.5 if panel.size.x > 50.0 else Vector2(ModalTemplate.CARD_WIDTH * 0.5, 200.0)
 	tw.tween_property(panel, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
@@ -480,7 +283,7 @@ func close() -> void:
 	tw.tween_property(self, "modulate:a", 0.0, 0.15).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	await tw.finished
 	visible = false
-	if _player == null or not is_instance_valid(_player) or bool(_player.get("alive")):
+	if _player == null or not is_instance_valid(_player) or _player.get("alive") == true:
 		get_tree().paused = false
 
 
@@ -492,22 +295,6 @@ func _on_volume_changed(val: float) -> void:
 func _update_volume_label(val: float) -> void:
 	var pct := int(round(val * 100.0))
 	volume_val.text = "%d%%" % pct
-
-
-func _on_mute_toggle_pressed() -> void:
-	GameState.set_master_muted(not GameState.master_muted)
-	_update_mute_toggle_ui()
-
-
-func _update_mute_toggle_ui() -> void:
-	if _mute_btn == null:
-		return
-	if not GameState.master_muted:
-		_mute_btn.text = "ENABLED"
-		_mute_btn.self_modulate = Color(0.35, 1.2, 1.8, 1.0)
-	else:
-		_mute_btn.text = "MUTED"
-		_mute_btn.self_modulate = Color(0.9, 0.45, 0.45, 0.9)
 
 
 func _on_mic_toggle_pressed() -> void:
@@ -524,12 +311,8 @@ func _update_mic_toggle_ui() -> void:
 	var enabled: bool = GameState.mic_enabled
 	if mic != null:
 		mic.enabled = enabled
-	if enabled:
-		mic_toggle.text = "ENABLED"
-		mic_toggle.self_modulate = Color(0.35, 1.2, 1.8, 1.0)
-	else:
-		mic_toggle.text = "MUTED"
-		mic_toggle.self_modulate = Color(0.7, 0.7, 0.7, 0.7)
+	mic_toggle.self_modulate = Color.WHITE
+	ModalTemplate.style_toggle_button(mic_toggle, enabled, "ENABLED", "MUTED")
 
 
 func _on_restart_pressed() -> void:
@@ -540,23 +323,15 @@ func _on_menu_pressed() -> void:
 	GameState.go_to_level_select()
 
 
-func _refresh_sneak_mode_btn_ui() -> void:
-	if _sneak_mode_btn == null:
+func _refresh_scheme_btn_ui() -> void:
+	if _scheme_btn == null:
 		return
-	if GameState.sneak_hold_mode:
-		_sneak_mode_btn.text = "HOLD"
-		_sneak_mode_btn.self_modulate = Color(0.35, 1.2, 1.8, 1.0)
-	else:
-		_sneak_mode_btn.text = "TOGGLE"
-		_sneak_mode_btn.self_modulate = Color(0.85, 0.92, 1.0, 0.9)
+	_scheme_btn.self_modulate = Color.WHITE
+	ModalTemplate.style_toggle_button(_scheme_btn, GameState.virtual_joystick_enabled, "JOYSTICK", "DRAG & TAP")
 
 
-func _refresh_blind_btn_ui() -> void:
-	if _blind_btn == null:
+func _refresh_layout_btn_ui() -> void:
+	if _layout_btn == null:
 		return
-	if GameState.blind_assist_mode:
-		_blind_btn.text = "ACTIVE"
-		_blind_btn.self_modulate = Color(0.35, 1.2, 1.8, 1.0)
-	else:
-		_blind_btn.text = "OFF"
-		_blind_btn.self_modulate = Color(0.7, 0.7, 0.7, 0.7)
+	_layout_btn.self_modulate = Color.WHITE
+	ModalTemplate.style_toggle_button(_layout_btn, GameState.controls_layout == "right", "RIGHT SIDE", "LEFT SIDE")

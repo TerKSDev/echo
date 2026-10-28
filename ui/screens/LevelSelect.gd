@@ -20,6 +20,8 @@ const LevelCardBuilder = preload("res://ui/level_select/LevelCardBuilder.gd")
 @onready var sector_label: Label = get_node_or_null("TopBar/StatusPill/StatusBox/SectorLabel")
 @onready var sonar_backdrop: Control = $SonarBackdrop
 
+var reset_run_button: Button = null
+
 var _time := 0.0
 var _ambient_wave_timer := 2.5
 var _ripples: Array[Dictionary] = []
@@ -32,11 +34,14 @@ var _depth_tag_alpha: float = 0.0
 var _depth_tag_timer: float = 0.0
 var _is_dragging_gauge: bool = false
 var _overscroll_dist: float = 0.0
+var _abyss_arrow_canvas: Control = null
+var _is_mode_transitioning: bool = false
 
 # Procedural UI Audio
 var _wav_click: AudioStreamWAV
 var _wav_hover: AudioStreamWAV
 var _wav_error: AudioStreamWAV
+var _wav_launch: AudioStreamWAV
 
 
 func _ready() -> void:
@@ -72,30 +77,19 @@ func _ready() -> void:
 		depth_gauge.draw.connect(_draw_depth_gauge)
 		depth_gauge.gui_input.connect(_on_depth_gauge_gui_input)
 
-	# Status star display: subtle, cohesive translucent glass pill
+	# Status star display: hidden per user request to keep top bar clean and minimal
 	if status_pill != null:
-		var pill_style := StyleBoxFlat.new()
-		pill_style.bg_color = Color(0.04, 0.10, 0.18, 0.55)
-		pill_style.border_color = Color(0.35, 0.65, 0.90, 0.25)
-		pill_style.set_border_width_all(1)
-		pill_style.set_corner_radius_all(14)
-		pill_style.content_margin_left = 10.0
-		pill_style.content_margin_right = 14.0
-		pill_style.content_margin_top = 3.0
-		pill_style.content_margin_bottom = 3.0
-		status_pill.add_theme_stylebox_override("panel", pill_style)
-
-		var star_icon := status_pill.get_node_or_null("StatusBox/StarIcon") as Control
-		if star_icon != null:
-			star_icon.draw.connect(func(): Icons.draw_star(star_icon))
+		status_pill.visible = false
 
 	_setup_mode_toggle()
+	_setup_reset_run_button()
 	_setup_intel_button()
 	_setup_settings_button()
 	_setup_leaderboard_button()
 
 	_create_level_buttons()
 	_update_header_and_mode_ui()
+	GameState.update_bgm_for_mode()
 
 	# Auto-scroll directly to the highest active level on entry
 	call_deferred("_scroll_to_current_level")
@@ -123,7 +117,7 @@ func _apply_safe_area() -> void:
 			hdr.offset_top = target_top + 66.0
 		if has_node("MainArea"):
 			var main := $MainArea as Control
-			main.offset_top = target_top + 153.0
+			main.offset_top = target_top + 163.0
 		if has_node("DepthGauge"):
 			var gauge := $DepthGauge as Control
 			gauge.offset_top = target_top + 76.0
@@ -135,6 +129,8 @@ func _apply_safe_area() -> void:
 
 func _get_playable_levels() -> Array[String]:
 	if GameState.current_mode == GameState.GameMode.CHALLENGE:
+		if GameState.challenge_highest_unlocked < 21:
+			return GameState.CHALLENGE_LEVELS.slice(0, 20)
 		return GameState.CHALLENGE_LEVELS
 	return GameState.STORY_LEVELS
 
@@ -195,7 +191,15 @@ func _setup_mode_toggle() -> void:
 		return
 	# Challenge mode is completely hidden until all 21 story sectors are cleared!
 	mode_toggle.visible = GameState.is_story_completed()
-	mode_toggle.custom_minimum_size = Vector2(148, 56)
+	mode_toggle.custom_minimum_size = Vector2(0, 50)
+	mode_toggle.flat = true
+	mode_toggle.focus_mode = Control.FOCUS_NONE
+	mode_toggle.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	var empty_sb := StyleBoxEmpty.new()
+	mode_toggle.add_theme_stylebox_override("normal", empty_sb)
+	mode_toggle.add_theme_stylebox_override("hover", empty_sb)
+	mode_toggle.add_theme_stylebox_override("pressed", empty_sb)
+	mode_toggle.add_theme_stylebox_override("focus", empty_sb)
 	_style_mode_toggle(mode_toggle, GameState.current_mode == GameState.GameMode.CHALLENGE)
 	mode_toggle.pressed.connect(_on_mode_toggle_pressed)
 	_wire_button_Juice(mode_toggle)
@@ -204,17 +208,22 @@ func _setup_mode_toggle() -> void:
 func _style_mode_toggle(btn: Button, is_challenge: bool) -> void:
 	if btn == null:
 		return
-	var n_bg := Color(0.20, 0.04, 0.12, 0.92) if is_challenge else Color(0.04, 0.12, 0.22, 0.85)
-	var n_border := Color(0.95, 0.45, 0.75, 0.95) if is_challenge else Color(0.28, 0.72, 0.95, 0.8)
-	var h_bg := Color(0.28, 0.06, 0.18, 0.98) if is_challenge else Color(0.08, 0.22, 0.38, 0.95)
-	var h_border := Color(1.0, 0.65, 0.9, 1.0) if is_challenge else Color(0.5, 0.92, 1.0, 1.0)
-	var n_sb: StyleBoxFlat = LevelCardBuilder.make_button_style(n_bg, n_border, 2, 12)
-	var h_sb: StyleBoxFlat = LevelCardBuilder.make_button_style(h_bg, h_border, 2, 12)
-	btn.add_theme_stylebox_override("normal", n_sb)
-	btn.add_theme_stylebox_override("hover", h_sb)
-	btn.add_theme_stylebox_override("pressed", h_sb)
-	btn.add_theme_stylebox_override("focus", n_sb)
-	btn.add_theme_color_override("font_color", Color(1.0, 0.85, 0.95) if is_challenge else Color(0.85, 0.95, 1.0))
+	var empty_sb := StyleBoxEmpty.new()
+	btn.add_theme_stylebox_override("normal", empty_sb)
+	btn.add_theme_stylebox_override("hover", empty_sb)
+	btn.add_theme_stylebox_override("pressed", empty_sb)
+	btn.add_theme_stylebox_override("focus", empty_sb)
+	btn.add_theme_font_size_override("font_size", 16)
+	if is_challenge:
+		btn.text = "◈ CHALLENGE"
+		btn.add_theme_color_override("font_color", Color(1.0, 0.45, 0.80, 0.90))
+		btn.add_theme_color_override("font_hover_color", Color(1.0, 0.75, 0.92, 1.0))
+		btn.add_theme_color_override("font_pressed_color", Color(0.90, 0.25, 0.65, 1.0))
+	else:
+		btn.text = "◈ STORY"
+		btn.add_theme_color_override("font_color", Color(0.78, 0.90, 1.0, 0.85))
+		btn.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 1.0, 1.0))
+		btn.add_theme_color_override("font_pressed_color", Color(0.55, 0.88, 1.0, 1.0))
 
 
 func _on_mode_toggle_pressed() -> void:
@@ -296,6 +305,60 @@ func _setup_leaderboard_button() -> void:
 	_wire_button_Juice(leaderboard_button)
 
 
+func _setup_reset_run_button() -> void:
+	if reset_run_button != null and is_instance_valid(reset_run_button):
+		return
+	var top_bar := get_node_or_null("TopBar") as HBoxContainer
+	if top_bar == null:
+		return
+
+	reset_run_button = Button.new()
+	reset_run_button.name = "ResetRunButton"
+	reset_run_button.text = "RESET RUN"
+	reset_run_button.custom_minimum_size = Vector2(104, 32)
+	reset_run_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	reset_run_button.focus_mode = Control.FOCUS_NONE
+	reset_run_button.add_theme_font_size_override("font_size", 12)
+	ModalTemplate.style_danger_button(reset_run_button, false, true)
+
+	top_bar.add_child(reset_run_button)
+	if mode_toggle != null:
+		top_bar.move_child(reset_run_button, mode_toggle.get_index() + 1)
+
+	var is_chal: bool = (GameState.current_mode == GameState.GameMode.CHALLENGE)
+	var can_reset: bool = is_chal and (GameState.challenge_highest_unlocked > 1 or GameState.challenge_records.size() > 0)
+	reset_run_button.visible = can_reset
+	reset_run_button.pressed.connect(_on_reset_run_pressed)
+	_wire_button_Juice(reset_run_button)
+
+
+func _on_reset_run_pressed() -> void:
+	_play_ui_sound(_wav_click, -4.0, 1.0)
+	var modal_script: GDScript = load("res://ui/modals/ResetConfirmModal.gd") as GDScript
+	if modal_script != null:
+		modal_script.open(self, _on_confirm_reset_run)
+
+
+func _on_confirm_reset_run() -> void:
+	var vortex_script: GDScript = load("res://ui/level_select/AbyssVortexFx.gd") as GDScript
+	if vortex_script != null:
+		vortex_script.play(
+			self,
+			func():
+				GameState.reset_challenge_run()
+				_create_level_buttons()
+				_update_header_and_mode_ui()
+				scroll_container.scroll_vertical = 0
+				call_deferred("_scroll_to_current_level")
+		)
+	else:
+		GameState.reset_challenge_run()
+		_create_level_buttons()
+		_update_header_and_mode_ui()
+		scroll_container.scroll_vertical = 0
+		call_deferred("_scroll_to_current_level")
+
+
 func _on_leaderboard_pressed() -> void:
 	_play_ui_sound(_wav_click, -5.0, 1.0)
 	var modal_script: GDScript = load("res://ui/modals/LeaderboardModal.gd") as GDScript
@@ -316,8 +379,15 @@ func _on_settings_pressed() -> void:
 
 
 func _on_back_pressed() -> void:
+	if _is_mode_transitioning or _suppress_level_click:
+		return
+	_suppress_level_click = true
 	_play_ui_sound(_wav_click, -5.0, 0.9)
-	GameState.go_to_menu()
+	var tw := create_tween()
+	tw.tween_property(self, "modulate:a", 0.0, 0.18).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_callback(func():
+		GameState.go_to_menu()
+	)
 
 
 # --------------------------------------------------
@@ -334,57 +404,6 @@ func _create_level_buttons() -> void:
 	var total_levels: int = playable_levels.size()
 
 	if is_challenge:
-		# Top row in Challenge Mode: Ascend back to Story Mode + Status Badge
-		var ascend_btn := Button.new()
-		ascend_btn.custom_minimum_size = Vector2(290, 80)
-		ascend_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		ascend_btn.focus_mode = Control.FOCUS_NONE
-		var asc_sb: StyleBoxFlat = LevelCardBuilder.make_button_style(
-			Color(0.04, 0.14, 0.24, 0.92),
-			Color(0.35, 0.85, 1.0, 0.9),
-			2, 12,
-			Color(0.1, 0.5, 0.8, 0.35), 6
-		)
-		ascend_btn.add_theme_stylebox_override("normal", asc_sb)
-		ascend_btn.add_theme_stylebox_override("hover", asc_sb)
-		ascend_btn.add_theme_stylebox_override("pressed", asc_sb)
-
-		var asc_margin := MarginContainer.new()
-		asc_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-		asc_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		asc_margin.add_theme_constant_override("margin_left", 14)
-		asc_margin.add_theme_constant_override("margin_right", 12)
-		ascend_btn.add_child(asc_margin)
-
-		var asc_vbox := VBoxContainer.new()
-		asc_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		asc_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-		asc_margin.add_child(asc_vbox)
-
-		var asc_title := Label.new()
-		asc_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		asc_title.text = "▲ RETURN TO STORY MODE"
-		asc_title.add_theme_font_size_override("font_size", 15)
-		asc_title.add_theme_color_override("font_color", Color(0.85, 0.95, 1.0))
-		asc_vbox.add_child(asc_title)
-
-		var asc_sub := Label.new()
-		asc_sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		asc_sub.text = "ASCEND TO SURFACE CAVERNS"
-		asc_sub.add_theme_font_size_override("font_size", 11)
-		asc_sub.add_theme_color_override("font_color", Color(0.45, 0.75, 0.95, 0.85))
-		asc_vbox.add_child(asc_sub)
-
-		ascend_btn.pressed.connect(_ascend_to_story_mode)
-		_wire_button_Juice(ascend_btn)
-
-		var header_pad := Control.new()
-		header_pad.custom_minimum_size = Vector2(0, 80)
-		header_pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-		level_grid.add_child(ascend_btn)
-		level_grid.add_child(header_pad)
-
 		# Levels in Challenge Mode:
 		# Delving downwards from Level 1 (-4,500M) down to Level 21 (-9,999M King Sector SP)!
 		for level_number in range(1, total_levels + 1):
@@ -401,17 +420,23 @@ func _create_level_buttons() -> void:
 			)
 			_level_buttons[level_number] = button
 
+			if level_number == 21 and not GameState.challenge_sp_revealed:
+				button.modulate.a = 0.0
+				button.scale = Vector2(0.5, 0.5)
+				button.pivot_offset = button.custom_minimum_size * 0.5
+
 			var spacer := Control.new()
 			spacer.custom_minimum_size = Vector2(0, 78)
 			spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
+			# Challenge Mode staggered layout: Level 1 Right, Level 2 Left, Level 3 Right... ("右左右左")
 			if level_number % 2 == 1:
-				level_grid.add_child(button)
 				level_grid.add_child(spacer)
+				level_grid.add_child(button)
 			else:
-				level_grid.add_child(spacer)
 				level_grid.add_child(button)
+				level_grid.add_child(spacer)
 
 	else:
 		# Story Mode:
@@ -435,6 +460,7 @@ func _create_level_buttons() -> void:
 			spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
+			# Story Mode staggered layout: Level 1 Left, Level 2 Right, Level 3 Left... ("左右左右")
 			if level_number % 2 == 1:
 				level_grid.add_child(button)
 				level_grid.add_child(spacer)
@@ -445,60 +471,28 @@ func _create_level_buttons() -> void:
 		# At the deepest bottom of Story Mode:
 		var is_unlocked := GameState.is_story_completed()
 		if is_unlocked:
-			# Only reveal the Abyssal Rift once Story Mode has been cleared!
-			var rift_btn := Button.new()
-			rift_btn.custom_minimum_size = Vector2(290, 88)
-			rift_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			rift_btn.focus_mode = Control.FOCUS_NONE
-
-			var r_box: StyleBoxFlat = LevelCardBuilder.make_button_style(
-				Color(0.18, 0.04, 0.12, 0.96),
-				Color(0.95, 0.45, 0.85, 0.95),
-				2, 12,
-				Color(0.8, 0.15, 0.5, 0.45), 8
+			# Large subtle downward arrow indicating players can pull down to descend into Challenge Mode
+			var arrow_canvas := Control.new()
+			arrow_canvas.name = "AbyssDescentPrompt"
+			arrow_canvas.custom_minimum_size = Vector2(290, 110)
+			arrow_canvas.mouse_filter = Control.MOUSE_FILTER_PASS
+			arrow_canvas.draw.connect(func(): _draw_abyss_descent_prompt(arrow_canvas))
+			arrow_canvas.gui_input.connect(func(ev: InputEvent):
+				if (ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT) or (ev is InputEventScreenTouch and ev.pressed):
+					_descend_to_challenge_mode()
 			)
-			rift_btn.add_theme_stylebox_override("normal", r_box)
-			rift_btn.add_theme_stylebox_override("hover", r_box)
-			rift_btn.add_theme_stylebox_override("pressed", r_box)
 
-			var rift_margin := MarginContainer.new()
-			rift_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-			rift_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			rift_margin.add_theme_constant_override("margin_left", 14)
-			rift_margin.add_theme_constant_override("margin_right", 12)
-			rift_margin.add_theme_constant_override("margin_top", 10)
-			rift_margin.add_theme_constant_override("margin_bottom", 10)
-			rift_btn.add_child(rift_margin)
+			var arrow_spacer := Control.new()
+			arrow_spacer.custom_minimum_size = Vector2(290, 110)
+			arrow_spacer.mouse_filter = Control.MOUSE_FILTER_PASS
+			arrow_spacer.gui_input.connect(func(ev: InputEvent):
+				if (ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT) or (ev is InputEventScreenTouch and ev.pressed):
+					_descend_to_challenge_mode()
+			)
 
-			var rift_vbox := VBoxContainer.new()
-			rift_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			rift_vbox.add_theme_constant_override("separation", 4)
-			rift_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-			rift_margin.add_child(rift_vbox)
-
-			var rift_title := Label.new()
-			rift_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			rift_title.text = "▼ ABYSSAL RIFT"
-			rift_title.add_theme_font_size_override("font_size", 16)
-			rift_title.add_theme_color_override("font_color", Color(1.0, 0.85, 0.95))
-			rift_vbox.add_child(rift_title)
-
-			var rift_sub := Label.new()
-			rift_sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			rift_sub.text = "DESCEND TO CHALLENGE MODE"
-			rift_sub.add_theme_font_size_override("font_size", 12)
-			rift_sub.add_theme_color_override("font_color", Color(0.95, 0.65, 0.85, 0.9))
-			rift_vbox.add_child(rift_sub)
-
-			rift_btn.pressed.connect(_descend_to_challenge_mode)
-			_wire_button_Juice(rift_btn)
-
-			var spacer_bot := Control.new()
-			spacer_bot.custom_minimum_size = Vector2(290, 88)
-			spacer_bot.mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-			level_grid.add_child(rift_btn)
-			level_grid.add_child(spacer_bot)
+			level_grid.add_child(arrow_canvas)
+			level_grid.add_child(arrow_spacer)
+			_abyss_arrow_canvas = arrow_canvas
 
 
 func _update_header_and_mode_ui() -> void:
@@ -519,7 +513,6 @@ func _update_header_and_mode_ui() -> void:
 			sector_label.visible = false
 		if mode_toggle != null:
 			mode_toggle.visible = true
-			mode_toggle.text = "⚡ CHALLENGE"
 			_style_mode_toggle(mode_toggle, true)
 	else:
 		if tracker_label != null:
@@ -537,12 +530,14 @@ func _update_header_and_mode_ui() -> void:
 			sector_label.visible = false
 		if mode_toggle != null:
 			mode_toggle.visible = GameState.is_story_completed()
-			mode_toggle.text = "◈ STORY"
 			_style_mode_toggle(mode_toggle, false)
 
-	# Leaderboard is exclusive to Challenge Mode
+	# Leaderboard and Reset Run are exclusive to Challenge Mode
 	if leaderboard_button != null:
 		leaderboard_button.visible = is_challenge
+	if reset_run_button != null and is_instance_valid(reset_run_button):
+		var can_reset: bool = is_challenge and (GameState.challenge_highest_unlocked > 1 or GameState.challenge_records.size() > 0)
+		reset_run_button.visible = can_reset
 
 	# Update Top Status Bar: cleanly display current total star count without clutter
 	var playable_levels := _get_playable_levels()
@@ -564,24 +559,278 @@ func _on_rift_descend_triggered() -> void:
 		_descend_to_challenge_mode()
 
 
+func _draw_abyss_descent_prompt(canvas: Control) -> void:
+	if canvas == null or not is_instance_valid(canvas):
+		return
+	var grid_w := level_grid.size.x if (level_grid != null and level_grid.size.x > 100.0) else 600.0
+	var cx: float = grid_w * 0.5 - canvas.position.x
+	var bob: float = sin(_time * 3.2) * 5.0
+	var cy: float = 46.0 + bob
+
+	var a: float = 0.35 + 0.12 * sin(_time * 3.2)
+	if _overscroll_dist > 0.0:
+		a = clampf(a + (_overscroll_dist / 45.0) * 0.55, 0.0, 1.0)
+
+	var chevron_col := Color(0.85, 0.45, 0.95, a)
+	var tip := Vector2(cx, cy + 14.0)
+	var arm_l := Vector2(cx - 28.0, cy - 8.0)
+	var arm_r := Vector2(cx + 28.0, cy - 8.0)
+	canvas.draw_line(arm_l, tip, chevron_col, 2.5)
+	canvas.draw_line(arm_r, tip, chevron_col, 2.5)
+
+	# Faint secondary echo chevron
+	var tip2 := Vector2(cx, cy + 3.0)
+	var arm2_l := Vector2(cx - 18.0, cy - 14.0)
+	var arm2_r := Vector2(cx + 18.0, cy - 14.0)
+	var echo_col := Color(chevron_col.r, chevron_col.g, chevron_col.b, a * 0.48)
+	canvas.draw_line(arm2_l, tip2, echo_col, 1.6)
+	canvas.draw_line(arm2_r, tip2, echo_col, 1.6)
+
+	# Subtle guidance text
+	var text_col := Color(0.85, 0.65, 0.95, a * 0.78)
+	var font := ThemeDB.fallback_font
+	if font != null:
+		canvas.draw_string(font, Vector2(cx - 110.0, cy + 38.0), "PULL DOWN FOR CHALLENGE ABYSS", HORIZONTAL_ALIGNMENT_CENTER, 220.0, 11, text_col)
+
+
 func _descend_to_challenge_mode() -> void:
-	_play_ui_sound(_wav_click, -2.0, 0.7)
-	GameState.current_mode = GameState.GameMode.CHALLENGE
-	_create_level_buttons()
-	_update_header_and_mode_ui()
-	scroll_container.scroll_vertical = 0
-	call_deferred("_scroll_to_current_level")
+	_transition_mode(true)
 
 
 func _ascend_to_story_mode() -> void:
-	_play_ui_sound(_wav_click, -2.0, 1.25)
-	GameState.current_mode = GameState.GameMode.STORY
-	_create_level_buttons()
-	_update_header_and_mode_ui()
-	call_deferred("_scroll_to_current_level")
+	_transition_mode(false)
+
+
+func _transition_mode(to_challenge: bool) -> void:
+	if _is_mode_transitioning:
+		return
+	_is_mode_transitioning = true
+
+	var main_node := get_node_or_null("MainArea") as Control
+	var header_node := get_node_or_null("HeaderBox") as Control
+	var orig_main_y: float = main_node.position.y if main_node != null else 192.0
+	var orig_hdr_y: float = header_node.position.y if header_node != null else 95.0
+
+	# 1. Starting Atmospheric Audio
+	if to_challenge:
+		# Deep low rumble plunge into the abyss
+		_play_ui_sound(_wav_click, -1.0, 0.40)
+	else:
+		# Bright soaring ascension echo back to caverns
+		_play_ui_sound(_wav_click, -1.5, 1.25)
+
+	# 2. VFX Fullscreen Canvas
+	var vfx := Control.new()
+	vfx.name = "ModeTransitionOverlay"
+	vfx.set_anchors_preset(Control.PRESET_FULL_RECT)
+	vfx.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(vfx)
+
+	var vp_w: float = size.x if size.x > 100.0 else 720.0
+	var vp_h: float = size.y if size.y > 100.0 else 1280.0
+
+	# Speed streaks dataset
+	var streaks: Array[Dictionary] = []
+	for i in 32:
+		streaks.append({
+			"x": randf_range(16.0, vp_w - 16.0),
+			"y": randf_range(0.0, vp_h),
+			"len": randf_range(110.0, 260.0),
+			"speed": randf_range(2200.0, 3600.0),
+			"width": randf_range(1.6, 2.8),
+			"alpha": randf_range(0.4, 0.9)
+		})
+
+	var dark_alpha := 0.0
+	var streak_fade := 0.0
+	var ring_radius := 0.0
+	var ring_alpha := 0.0
+	var start_ms := Time.get_ticks_msec()
+
+	# Custom draw function for continuous, buttery-smooth 60+ FPS motion
+	vfx.draw.connect(func():
+		var elapsed := (Time.get_ticks_msec() - start_ms) * 0.001
+
+		# 1. Background dark veil
+		var bg_col: Color
+		if to_challenge:
+			bg_col = Color(0.02, 0.006, 0.022, dark_alpha)
+		else:
+			bg_col = Color(0.006, 0.018, 0.032, dark_alpha)
+		vfx.draw_rect(Rect2(0.0, 0.0, vp_w, vp_h), bg_col, true)
+
+		# 2. Atmospheric glow at boundary (bottom for plunge, top for ascent)
+		if dark_alpha > 0.05:
+			var glow_col: Color = Color(0.85, 0.15, 0.65, dark_alpha * 0.28) if to_challenge else Color(0.20, 0.65, 0.95, dark_alpha * 0.28)
+			if to_challenge:
+				vfx.draw_rect(Rect2(0.0, vp_h - 180.0, vp_w, 180.0), glow_col, true)
+			else:
+				vfx.draw_rect(Rect2(0.0, 0.0, vp_w, 180.0), glow_col, true)
+
+		# 3. Flowing speed streaks
+		if streak_fade > 0.01:
+			var base_col: Color = Color(1.0, 0.40, 0.88) if to_challenge else Color(0.38, 0.88, 1.0)
+			for s: Dictionary in streaks:
+				var cur_y: float
+				var p1: Vector2
+				var p2: Vector2
+				var l_len: float = float(s["len"])
+				var spd: float = float(s["speed"])
+				var w: float = float(s["width"])
+				var a: float = float(s["alpha"]) * streak_fade
+
+				if to_challenge:
+					# Plunging: streaks fly UPWARD
+					cur_y = fmod(float(s["y"]) - spd * elapsed, vp_h)
+					if cur_y < 0.0:
+						cur_y += vp_h
+					p1 = Vector2(float(s["x"]), cur_y)
+					p2 = Vector2(float(s["x"]), cur_y - l_len)
+				else:
+					# Ascending: streaks fly DOWNWARD
+					cur_y = fmod(float(s["y"]) + spd * elapsed, vp_h)
+					p1 = Vector2(float(s["x"]), cur_y)
+					p2 = Vector2(float(s["x"]), cur_y + l_len)
+
+				var col := Color(base_col.r, base_col.g, base_col.b, a)
+				vfx.draw_line(p1, p2, col, w)
+
+		# 4. Acoustic Arrival Sonar Ring (expands outwards from center)
+		if ring_alpha > 0.01 and ring_radius > 1.0:
+			var center := Vector2(vp_w * 0.5, vp_h * 0.5)
+			var ring_col: Color = Color(1.0, 0.40, 0.88, ring_alpha) if to_challenge else Color(0.38, 0.88, 1.0, ring_alpha)
+			vfx.draw_arc(center, ring_radius, 0.0, TAU, 36, ring_col, 2.5)
+			if ring_radius > 30.0:
+				var echo_col := Color(ring_col.r, ring_col.g, ring_col.b, ring_alpha * 0.45)
+				vfx.draw_arc(center, ring_radius * 0.65, 0.0, TAU, 28, echo_col, 1.5)
+	)
+
+	# Animation sequence
+	var tw := create_tween()
+
+	# --- PHASE 1: Departure & Dissolve (0.26s) ---
+	var drift_dist := 75.0
+	var out_dir := -1.0 if to_challenge else 1.0
+	if main_node != null:
+		tw.parallel().tween_property(main_node, "position:y", orig_main_y + out_dir * drift_dist, 0.26).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+		tw.parallel().tween_property(main_node, "modulate:a", 0.0, 0.24).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	if header_node != null:
+		tw.parallel().tween_property(header_node, "position:y", orig_hdr_y + out_dir * (drift_dist * 0.5), 0.26).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+		tw.parallel().tween_property(header_node, "modulate:a", 0.0, 0.24).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+
+	tw.parallel().tween_method(func(v: float):
+		dark_alpha = v
+		streak_fade = v
+		vfx.queue_redraw()
+	, 0.0, 1.0, 0.26).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+
+	# --- PHASE 2: Mid-Transition Singularity (Screen is 100% covered) ---
+	tw.tween_callback(func():
+		if to_challenge:
+			GameState.current_mode = GameState.GameMode.CHALLENGE
+			_create_level_buttons()
+			_update_header_and_mode_ui()
+			scroll_container.scroll_vertical = 0
+			call_deferred(&"_reset_scroll_to_top")
+			# Arrival impact audio (deep cavern sub-thud)
+			_play_ui_sound(_wav_click, 2.0, 0.48)
+			GameState.update_bgm_for_mode()
+		else:
+			GameState.current_mode = GameState.GameMode.STORY
+			_create_level_buttons()
+			_update_header_and_mode_ui()
+			call_deferred(&"_scroll_to_level_1")
+			# Surface breach chime (crisp cavern echo)
+			_play_ui_sound(_wav_click, 0.5, 1.45)
+			GameState.update_bgm_for_mode()
+
+		# Set up arrival entry positions (glide into place from opposite direction)
+		var in_dir := 1.0 if to_challenge else -1.0
+		if main_node != null:
+			main_node.position.y = orig_main_y + in_dir * 55.0
+			main_node.modulate.a = 0.0
+		if header_node != null:
+			header_node.position.y = orig_hdr_y + in_dir * 30.0
+			header_node.modulate.a = 0.0
+	)
+
+	# Brief micro-hold (0.03s) to allow Godot to settle scroll & layout before opening the veil
+	tw.tween_interval(0.03)
+
+	# --- PHASE 3: Arrival Emergence & Sonar Echo (0.34s) ---
+	if main_node != null:
+		tw.tween_property(main_node, "position:y", orig_main_y, 0.34).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		tw.parallel().tween_property(main_node, "modulate:a", 1.0, 0.30).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	else:
+		tw.tween_interval(0.0) # anchor step
+	if header_node != null:
+		tw.parallel().tween_property(header_node, "position:y", orig_hdr_y, 0.34).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		tw.parallel().tween_property(header_node, "modulate:a", 1.0, 0.30).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+	tw.parallel().tween_method(func(v: float):
+		dark_alpha = v
+		streak_fade = v * 0.5
+		vfx.queue_redraw()
+	, 1.0, 0.0, 0.34).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+	# Expanding acoustic arrival ripple
+	tw.parallel().tween_method(func(r: float):
+		ring_radius = r
+		vfx.queue_redraw()
+	, 0.0, 420.0, 0.34).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+
+	tw.parallel().tween_method(func(a: float):
+		ring_alpha = a
+		vfx.queue_redraw()
+	, 0.85, 0.0, 0.34).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+	# --- FINISH ---
+	tw.tween_callback(func():
+		if main_node != null:
+			main_node.position.y = orig_main_y
+			main_node.modulate.a = 1.0
+		if header_node != null:
+			header_node.position.y = orig_hdr_y
+			header_node.modulate.a = 1.0
+		_is_mode_transitioning = false
+		vfx.queue_free()
+	)
+
+
+func _reset_scroll_to_top() -> void:
+	if scroll_container != null and is_instance_valid(scroll_container):
+		scroll_container.scroll_vertical = 0
+	if is_inside_tree():
+		await get_tree().process_frame
+		if scroll_container != null and is_instance_valid(scroll_container):
+			scroll_container.scroll_vertical = 0
+
+
+func _scroll_to_level_1() -> void:
+	if not is_inside_tree():
+		return
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var vbar := scroll_container.get_v_scroll_bar()
+	var page := vbar.page if vbar.page > 0.0 else scroll_container.size.y
+	var max_scroll := maxf(0.0, vbar.max_value - page)
+	var btn: Button = _level_buttons.get(1)
+	if btn != null and is_instance_valid(btn) and btn.position.y > 0.0:
+		var target_y := btn.position.y - 120.0
+		scroll_container.scroll_vertical = int(clampf(target_y, 0.0, max_scroll))
+	else:
+		scroll_container.scroll_vertical = int(max_scroll)
 
 
 func _scroll_to_current_level() -> void:
+	await get_tree().process_frame
+	await get_tree().process_frame
+
+	var is_challenge := GameState.current_mode == GameState.GameMode.CHALLENGE
+	if is_challenge and GameState.challenge_highest_unlocked >= 21 and not GameState.challenge_sp_revealed:
+		_play_sp_unsealed_reveal_sequence()
+		return
+
 	var highest: int = GameState.highest_unlocked_level
 	var btn: Button = _level_buttons.get(highest)
 	if btn != null and is_instance_valid(btn):
@@ -592,6 +841,143 @@ func _scroll_to_current_level() -> void:
 		var final_y := clampf(target_y, 0.0, max_scroll)
 		var tw := create_tween()
 		tw.tween_property(scroll_container, "scroll_vertical", int(final_y), 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tw.tween_callback(func():
+			if btn != null and is_instance_valid(btn):
+				var pulse_tw := btn.create_tween()
+				pulse_tw.tween_property(btn, "scale", Vector2(1.035, 1.035), 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+				pulse_tw.tween_property(btn, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_SINE)
+		)
+
+
+func _play_sp_unsealed_reveal_sequence() -> void:
+	var sp_btn: Button = _level_buttons.get(21)
+	if sp_btn == null or not is_instance_valid(sp_btn):
+		return
+
+	_suppress_level_click = true
+
+	# Position camera near Level 20 initially
+	var btn_20: Button = _level_buttons.get(20)
+	var vbar := scroll_container.get_v_scroll_bar()
+	var page := vbar.page if vbar.page > 0.0 else scroll_container.size.y
+	var max_scroll := maxf(0.0, vbar.max_value - page)
+	if btn_20 != null and is_instance_valid(btn_20):
+		scroll_container.scroll_vertical = int(clampf(btn_20.position.y - 120.0, 0.0, max_scroll))
+
+	await get_tree().create_timer(0.45).timeout
+
+	# 1. Deep seismic descent camera scroll to SP
+	var target_y := clampf(sp_btn.position.y - 120.0, 0.0, max_scroll)
+	var scroll_tw := create_tween()
+	scroll_tw.tween_property(scroll_container, "scroll_vertical", int(target_y), 1.35).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+
+	# 2. Subterranean rumble screen shake & deep acoustic vibration
+	_play_ui_sound(_wav_click, 2.5, 0.32)
+	var shake_tw := create_tween()
+	for i in range(16):
+		var dx := randf_range(-4.5, 4.5)
+		var dy := randf_range(-3.5, 3.5)
+		shake_tw.tween_property(level_grid, "position", Vector2(dx, dy), 0.04)
+	shake_tw.tween_property(level_grid, "position", Vector2.ZERO, 0.08)
+
+	await scroll_tw.finished
+
+	# 3. SP King Sector Unsealed scale punch & shockwave
+	_play_ui_sound(_wav_launch if _wav_launch != null else _wav_click, 3.5, 0.72)
+	sp_btn.pivot_offset = sp_btn.size * 0.5
+	var reveal_tw := sp_btn.create_tween()
+	reveal_tw.set_parallel(true)
+	reveal_tw.tween_property(sp_btn, "modulate:a", 1.0, 0.22)
+	reveal_tw.tween_property(sp_btn, "scale", Vector2(1.22, 1.22), 0.28).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	reveal_tw.chain().tween_property(sp_btn, "scale", Vector2.ONE, 0.35).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+
+	level_grid.queue_redraw()
+	if depth_gauge != null and is_instance_valid(depth_gauge):
+		depth_gauge.queue_redraw()
+
+	# 4. Cinematic Unsealed Announcement Banner Overlay
+	_show_sp_unsealed_banner()
+
+	GameState.mark_challenge_sp_revealed()
+	_suppress_level_click = false
+
+
+func _show_sp_unsealed_banner() -> void:
+	var canvas := CanvasLayer.new()
+	canvas.layer = 200
+	get_tree().root.add_child(canvas)
+
+	var overlay := CenterContainer.new()
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	canvas.add_child(overlay)
+
+	var banner_box := PanelContainer.new()
+	banner_box.custom_minimum_size = Vector2(560, 140)
+	banner_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	banner_box.pivot_offset = Vector2(280, 70)
+	banner_box.scale = Vector2(0.8, 0.8)
+	banner_box.modulate.a = 0.0
+
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.12, 0.02, 0.04, 0.94)
+	sb.border_color = Color(1.0, 0.82, 0.35, 0.95)
+	sb.set_border_width_all(2)
+	sb.set_corner_radius_all(14)
+	sb.shadow_color = Color(0.9, 0.15, 0.30, 0.55)
+	sb.shadow_size = 20
+	banner_box.add_theme_stylebox_override("panel", sb)
+	overlay.add_child(banner_box)
+
+	var margin := MarginContainer.new()
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	margin.add_theme_constant_override("margin_left", 24)
+	margin.add_theme_constant_override("margin_right", 24)
+	margin.add_theme_constant_override("margin_top", 18)
+	margin.add_theme_constant_override("margin_bottom", 18)
+	banner_box.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	vbox.add_theme_constant_override("separation", 6)
+	margin.add_child(vbox)
+
+	var tag_lbl := Label.new()
+	tag_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tag_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tag_lbl.text = "◈  KING SECTOR UNSEALED  ◈"
+	tag_lbl.add_theme_font_size_override("font_size", 13)
+	tag_lbl.add_theme_color_override("font_color", Color(1.0, 0.82, 0.35))
+	vbox.add_child(tag_lbl)
+
+	var title_lbl := Label.new()
+	title_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_lbl.text = "THE FINAL ECHO"
+	title_lbl.add_theme_font_size_override("font_size", 24)
+	title_lbl.add_theme_color_override("font_color", Color(1.0, 0.96, 0.92))
+	title_lbl.add_theme_color_override("font_shadow_color", Color(0.9, 0.12, 0.25, 0.95))
+	title_lbl.add_theme_constant_override("shadow_offset_y", 2)
+	vbox.add_child(title_lbl)
+
+	var sub_lbl := Label.new()
+	sub_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	sub_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sub_lbl.text = "DEPTH: -9,999 M  •  ABYSSAL APEX"
+	sub_lbl.add_theme_font_size_override("font_size", 12)
+	sub_lbl.add_theme_color_override("font_color", Color(1.0, 0.55, 0.78, 0.88))
+	vbox.add_child(sub_lbl)
+
+	var b_tw := banner_box.create_tween()
+	b_tw.set_parallel(true)
+	b_tw.tween_property(banner_box, "modulate:a", 1.0, 0.28).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	b_tw.tween_property(banner_box, "scale", Vector2.ONE, 0.32).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	b_tw.chain().tween_interval(2.2)
+	b_tw.chain().tween_property(banner_box, "modulate:a", 0.0, 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	b_tw.tween_callback(func():
+		canvas.queue_free()
+	)
 
 
 func _draw_level_path() -> void:
@@ -626,21 +1012,42 @@ func _on_depth_gauge_gui_input(event: InputEvent) -> void:
 
 func _on_level_pressed(level_number: int) -> void:
 	if _suppress_level_click:
-		_suppress_level_click = false
 		return
+
+	if GameState.current_mode == GameState.GameMode.CHALLENGE:
+		if level_number < GameState.challenge_highest_unlocked:
+			return # Cleared levels in challenge mode cannot be re-entered
 
 	var playable_levels := _get_playable_levels()
 	var playable_index: int = level_number - 1
 	if playable_index < 0 or playable_index >= playable_levels.size():
 		return
 
+	_suppress_level_click = true
 	var level_path := playable_levels[playable_index]
 	var actual_level_index: int = GameState.get_current_levels().find(level_path)
-	_play_ui_sound(_wav_click, -4.0, 1.0)
-	if actual_level_index != -1:
-		GameState.start_game(actual_level_index)
+
+	# Tactile launch sequence on the selected level button
+	var btn: Button = _level_buttons.get(level_number)
+	if btn != null and is_instance_valid(btn):
+		btn.pivot_offset = btn.size * 0.5
+		_play_ui_sound(_wav_launch if _wav_launch != null else _wav_click, -2.0, 1.0)
+		var launch_tw := btn.create_tween()
+		launch_tw.tween_property(btn, "scale", Vector2(0.96, 0.96), 0.05).set_trans(Tween.TRANS_QUAD)
+		launch_tw.tween_property(btn, "scale", Vector2(1.04, 1.04), 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		launch_tw.tween_interval(0.04)
+		launch_tw.tween_callback(func():
+			if actual_level_index != -1:
+				GameState.start_game(actual_level_index)
+			else:
+				GameState.change_level(level_path)
+		)
 	else:
-		GameState.change_level(level_path)
+		_play_ui_sound(_wav_click, -4.0, 1.0)
+		if actual_level_index != -1:
+			GameState.start_game(actual_level_index)
+		else:
+			GameState.change_level(level_path)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -720,6 +1127,8 @@ func _process(delta: float) -> void:
 	if depth_gauge != null and is_instance_valid(depth_gauge):
 		if _depth_tag_alpha > 0.001 or _is_dragging_gauge:
 			depth_gauge.queue_redraw()
+	if _abyss_arrow_canvas != null and is_instance_valid(_abyss_arrow_canvas):
+		_abyss_arrow_canvas.queue_redraw()
 
 	# Redraw active level card (pulsing glow) and visible locked cards (scanning laser effect)
 	for lvl in _level_buttons:
@@ -839,6 +1248,7 @@ func _build_ui_audio() -> void:
 	_wav_click = _synth_tone(880.0, 0.045, 0.28, 0.003, 0.038)
 	_wav_hover = _synth_tone(1320.0, 0.030, 0.10, 0.002, 0.024)
 	_wav_error = _synth_tone(180.0, 0.120, 0.40, 0.005, 0.090)
+	_wav_launch = _synth_tone(520.0, 0.220, 0.45, 0.006, 0.160)
 
 
 func _synth_tone(

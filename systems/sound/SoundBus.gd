@@ -123,7 +123,7 @@ func _on_enemy_screamed(pos: Vector2, radius: float) -> void:
 				if is_instance_valid(_player) and _player.alive:
 					var cur_dist: float = _player.global_position.distance_to(pos)
 					if cur_dist <= radius:
-						# Walls block the scream's physical shockwave: taking cover shields the player
+						# Screamer shriek penetrates solid walls without acoustic attenuation
 						var space := _player.get_world_2d().direct_space_state
 						var query := PhysicsRayQueryParameters2D.create(pos, _player.global_position)
 						query.collision_mask = 1
@@ -131,10 +131,11 @@ func _on_enemy_screamed(pos: Vector2, radius: float) -> void:
 						var hit: Dictionary = space.intersect_ray(query)
 						var in_cover: bool = not hit.is_empty()
 
-						if not in_cover:
-							if _sfx != null:
-								_sfx.play_player_stun()
-							_player.immobilize(1.6)
+						if _sfx != null:
+							_sfx.play_player_stun()
+						# Penetrates walls: 1.0s stun even in cover, 1.6s full stun in the open
+						var stun_dur: float = 1.0 if in_cover else 1.6
+						_player.immobilize(stun_dur)
 			)
 
 	for enemy in _enemies():
@@ -151,6 +152,8 @@ func _on_enemy_alarmed(pos: Vector2, _target_pos: Vector2) -> void:
 
 	if is_instance_valid(_player) and _player.alive:
 		_player.camera_shake(0.65, 8.0)
+		if _player.has_method("apply_slow"):
+			_player.apply_slow(3.5, 0.50)
 
 	for enemy in _enemies():
 		enemy.force_alert_to(pos)

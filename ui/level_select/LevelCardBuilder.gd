@@ -33,27 +33,39 @@ static func make_button_style(
 static func draw_card_decorations(canvas: Control, is_active: bool, is_cleared: bool, time: float) -> void:
 	var w := canvas.size.x
 	var h := canvas.size.y
+	var is_chal: bool = (GameState.current_mode == GameState.GameMode.CHALLENGE)
 
 	# 1. Left neon accent bar (safely inset at x = 3.5 so it never bleeds or clips)
 	if is_active:
 		var bar_pulse := 0.85 + 0.15 * sin(time * 4.0)
-		canvas.draw_rect(Rect2(3.5, 12.0, 4.0, h - 24.0), Color(0.2, 0.65, 1.0, 0.35 * bar_pulse), true)
-		canvas.draw_rect(Rect2(3.5, 12.0, 2.8, h - 24.0), Color(0.4, 0.95, 1.0, 0.98 * bar_pulse), true)
+		if is_chal:
+			canvas.draw_rect(Rect2(3.5, 12.0, 4.0, h - 24.0), Color(0.85, 0.15, 0.65, 0.35 * bar_pulse), true)
+			canvas.draw_rect(Rect2(3.5, 12.0, 2.8, h - 24.0), Color(1.0, 0.45, 0.90, 0.98 * bar_pulse), true)
+		else:
+			canvas.draw_rect(Rect2(3.5, 12.0, 4.0, h - 24.0), Color(0.2, 0.65, 1.0, 0.35 * bar_pulse), true)
+			canvas.draw_rect(Rect2(3.5, 12.0, 2.8, h - 24.0), Color(0.4, 0.95, 1.0, 0.98 * bar_pulse), true)
 	elif is_cleared:
-		canvas.draw_rect(Rect2(3.5, 14.0, 2.6, h - 28.0), Color(0.32, 0.88, 0.62, 0.85), true)
+		if is_chal:
+			canvas.draw_rect(Rect2(3.5, 14.0, 2.6, h - 28.0), Color(0.48, 0.20, 0.42, 0.50), true)
+		else:
+			canvas.draw_rect(Rect2(3.5, 14.0, 2.6, h - 28.0), Color(0.32, 0.88, 0.62, 0.85), true)
 	else:
-		# Muted dark slate indicator notch
-		canvas.draw_rect(Rect2(3.5, 16.0, 2.0, h - 32.0), Color(0.24, 0.40, 0.58, 0.75), true)
+		# Muted dark indicator notch
+		if is_chal:
+			canvas.draw_rect(Rect2(3.5, 16.0, 2.0, h - 32.0), Color(0.42, 0.20, 0.38, 0.75), true)
+		else:
+			canvas.draw_rect(Rect2(3.5, 16.0, 2.0, h - 32.0), Color(0.24, 0.40, 0.58, 0.75), true)
 
 		# 1. Subtle diagonal interference grid (Fog of War barrier)
 		var step := 20.0
 		var num_lines := int(floor(w / step)) + 3
+		var grid_col := Color(0.38, 0.15, 0.32, 0.20) if is_chal else Color(0.16, 0.28, 0.42, 0.20)
 		for idx in range(-1, num_lines):
 			var x_start := float(idx) * step
 			var p_a := Vector2(x_start, 4.0)
 			var p_b := Vector2(x_start + 16.0, h - 4.0)
 			if p_a.x < w and p_b.x > 0:
-				canvas.draw_line(p_a, p_b, Color(0.16, 0.28, 0.42, 0.20), 1.0)
+				canvas.draw_line(p_a, p_b, grid_col, 1.0)
 
 
 
@@ -105,10 +117,15 @@ static func build_level_card(
 	level_path: String = ""
 ) -> Button:
 	var button := Button.new()
+	var is_chal: bool = (GameState.current_mode == GameState.GameMode.CHALLENGE)
 	var highest: int = GameState.highest_unlocked_level
-	var stars: int = GameState.get_level_stars(level_number)
 	var is_unlocked: bool = level_number <= highest
-	var is_cleared: bool = stars > 0 or level_number < highest
+	var is_cleared: bool = false
+	if is_chal:
+		is_cleared = (level_number < highest)
+	else:
+		var stars: int = GameState.get_level_stars(level_number)
+		is_cleared = stars > 0 or level_number < highest
 	var is_active: bool = is_unlocked and not is_cleared
 
 	button.custom_minimum_size = Vector2(290, 88)
@@ -194,60 +211,111 @@ static func build_level_card(
 		button.add_theme_stylebox_override("pressed", k_norm)
 		button.add_theme_stylebox_override("focus", k_norm)
 	elif is_active:
-		var norm := make_button_style(
-			Color(0.035, 0.11, 0.20, 0.95),
-			Color(0.35, 0.88, 1.0, 0.95),
-			2, 12,
-			Color(0.08, 0.52, 0.95, 0.35), 8
-		)
-		var hov := make_button_style(
-			Color(0.05, 0.16, 0.28, 0.98),
-			Color(0.55, 0.95, 1.0, 1.0),
-			2, 12,
-			Color(0.15, 0.65, 1.0, 0.55), 12
-		)
-		var prs := make_button_style(
-			Color(0.08, 0.22, 0.36, 1.0),
-			Color(0.75, 1.0, 1.0, 1.0),
-			2, 12,
-			Color(0.25, 0.85, 1.0, 0.65), 14
-		)
+		var norm: StyleBoxFlat
+		var hov: StyleBoxFlat
+		var prs: StyleBoxFlat
+		if is_chal:
+			norm = make_button_style(
+				Color(0.16, 0.03, 0.13, 0.96),
+				Color(1.0, 0.42, 0.88, 0.98),
+				2, 12,
+				Color(0.85, 0.15, 0.65, 0.45), 10
+			)
+			hov = make_button_style(
+				Color(0.25, 0.05, 0.20, 0.98),
+				Color(1.0, 0.68, 0.95, 1.0),
+				2, 12,
+				Color(0.95, 0.25, 0.75, 0.65), 14
+			)
+			prs = make_button_style(
+				Color(0.32, 0.07, 0.25, 1.0),
+				Color(1.0, 0.85, 0.98, 1.0),
+				2, 12,
+				Color(1.0, 0.35, 0.85, 0.80), 16
+			)
+		else:
+			norm = make_button_style(
+				Color(0.035, 0.11, 0.20, 0.95),
+				Color(0.35, 0.88, 1.0, 0.95),
+				2, 12,
+				Color(0.08, 0.52, 0.95, 0.35), 8
+			)
+			hov = make_button_style(
+				Color(0.05, 0.16, 0.28, 0.98),
+				Color(0.55, 0.95, 1.0, 1.0),
+				2, 12,
+				Color(0.15, 0.65, 1.0, 0.55), 12
+			)
+			prs = make_button_style(
+				Color(0.08, 0.22, 0.36, 1.0),
+				Color(0.75, 1.0, 1.0, 1.0),
+				2, 12,
+				Color(0.25, 0.85, 1.0, 0.65), 14
+			)
 		button.add_theme_stylebox_override("normal", norm)
 		button.add_theme_stylebox_override("hover", hov)
 		button.add_theme_stylebox_override("pressed", prs)
 		button.add_theme_stylebox_override("focus", norm)
 	elif is_cleared:
-		var norm := make_button_style(
-			Color(0.024, 0.065, 0.11, 0.92),
-			Color(0.18, 0.52, 0.58, 0.75),
-			1, 12
-		)
-		var hov := make_button_style(
-			Color(0.04, 0.12, 0.19, 0.96),
-			Color(0.32, 0.78, 0.82, 0.95),
-			2, 12
-		)
-		var prs := make_button_style(
-			Color(0.06, 0.16, 0.25, 1.0),
-			Color(0.45, 0.88, 0.95, 1.0),
-			2, 12
-		)
+		var norm: StyleBoxFlat
+		var hov: StyleBoxFlat
+		var prs: StyleBoxFlat
+		if is_chal:
+			# Dimmed and darkened card for passed challenge sectors (cannot be re-entered)
+			norm = make_button_style(
+				Color(0.040, 0.015, 0.038, 0.65),
+				Color(0.32, 0.14, 0.28, 0.40),
+				1, 12
+			)
+			hov = norm
+			prs = norm
+		else:
+			norm = make_button_style(
+				Color(0.024, 0.065, 0.11, 0.92),
+				Color(0.18, 0.52, 0.58, 0.75),
+				1, 12
+			)
+			hov = make_button_style(
+				Color(0.04, 0.12, 0.19, 0.96),
+				Color(0.32, 0.78, 0.82, 0.95),
+				2, 12
+			)
+			prs = make_button_style(
+				Color(0.06, 0.16, 0.25, 1.0),
+				Color(0.45, 0.88, 0.95, 1.0),
+				2, 12
+			)
 		button.add_theme_stylebox_override("normal", norm)
 		button.add_theme_stylebox_override("hover", hov)
 		button.add_theme_stylebox_override("pressed", prs)
+		button.add_theme_stylebox_override("disabled", norm)
 		button.add_theme_stylebox_override("focus", norm)
 	else:
 		# Locked level: deep solid dark abyss styling with high contrast borders
-		var locked_box := make_button_style(
-			Color(0.018, 0.042, 0.075, 0.96),
-			Color(0.18, 0.30, 0.44, 0.85),
-			1, 12
-		)
-		var locked_hov := make_button_style(
-			Color(0.028, 0.062, 0.105, 0.98),
-			Color(0.28, 0.46, 0.66, 0.95),
-			1, 12
-		)
+		var locked_box: StyleBoxFlat
+		var locked_hov: StyleBoxFlat
+		if is_chal:
+			locked_box = make_button_style(
+				Color(0.038, 0.012, 0.035, 0.96),
+				Color(0.38, 0.16, 0.35, 0.85),
+				1, 12
+			)
+			locked_hov = make_button_style(
+				Color(0.058, 0.02, 0.052, 0.98),
+				Color(0.55, 0.26, 0.50, 0.95),
+				1, 12
+			)
+		else:
+			locked_box = make_button_style(
+				Color(0.018, 0.042, 0.075, 0.96),
+				Color(0.18, 0.30, 0.44, 0.85),
+				1, 12
+			)
+			locked_hov = make_button_style(
+				Color(0.028, 0.062, 0.105, 0.98),
+				Color(0.28, 0.46, 0.66, 0.95),
+				1, 12
+			)
 		button.add_theme_stylebox_override("normal", locked_box)
 		button.add_theme_stylebox_override("hover", locked_hov)
 		button.add_theme_stylebox_override("pressed", locked_box)
@@ -286,33 +354,29 @@ static func build_level_card(
 	title_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_lbl.clip_text = true
 	title_lbl.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	title_lbl.text = ("👑 " + display_title) if is_king_sector else display_title
+	title_lbl.text = display_title
 
-	var t_len := display_title.length()
-	var fsize := 16
+	var fsize := 15
+	title_lbl.add_theme_font_size_override("font_size", fsize)
 	if is_king_sector:
-		fsize = 15 if t_len >= 18 else (16 if t_len >= 14 else 18)
-		title_lbl.add_theme_font_size_override("font_size", fsize)
 		title_lbl.add_theme_color_override("font_color", Color(1.0, 0.92, 0.45))
 		title_lbl.add_theme_color_override("font_shadow_color", Color(0.75, 0.12, 0.20, 0.95))
 		title_lbl.add_theme_constant_override("shadow_offset_y", 1)
 	elif is_active:
-		fsize = 15 if t_len >= 18 else (16 if t_len >= 14 else 18)
-		title_lbl.add_theme_font_size_override("font_size", fsize)
-		title_lbl.add_theme_color_override("font_color", Color(0.96, 0.98, 1.0))
-		title_lbl.add_theme_color_override("font_shadow_color", Color(0.05, 0.48, 0.95, 0.9))
+		if is_chal:
+			title_lbl.add_theme_color_override("font_color", Color(1.0, 0.94, 0.98))
+			title_lbl.add_theme_color_override("font_shadow_color", Color(0.85, 0.15, 0.65, 0.9))
+		else:
+			title_lbl.add_theme_color_override("font_color", Color(0.96, 0.98, 1.0))
+			title_lbl.add_theme_color_override("font_shadow_color", Color(0.05, 0.48, 0.95, 0.9))
 		title_lbl.add_theme_constant_override("shadow_offset_y", 1)
 	elif is_cleared:
-		fsize = 14 if t_len >= 18 else (15 if t_len >= 14 else 17)
-		title_lbl.add_theme_font_size_override("font_size", fsize)
-		title_lbl.add_theme_color_override("font_color", Color(0.85, 0.94, 1.0))
+		title_lbl.add_theme_color_override("font_color", Color(0.60, 0.42, 0.55, 0.75) if is_chal else Color(0.85, 0.94, 1.0))
 	else:
-		fsize = 14 if t_len >= 18 else (15 if t_len >= 14 else 16)
-		title_lbl.add_theme_font_size_override("font_size", fsize)
-		title_lbl.add_theme_color_override("font_color", Color(0.65, 0.78, 0.90, 0.92))
+		title_lbl.add_theme_color_override("font_color", Color(0.72, 0.58, 0.70, 0.90) if is_chal else Color(0.65, 0.78, 0.90, 0.92))
 	row1.add_child(title_lbl)
 
-	# Status chip: READY / BOSS for active sector, LOCKED for locked sectors
+	# Status chip: READY / BOSS for active sector, LOCKED for locked sectors, PASSED for cleared challenge sectors
 	if is_active:
 		var status_box := HBoxContainer.new()
 		status_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -329,7 +393,8 @@ static func build_level_card(
 		if is_king_sector:
 			icon_canvas.draw.connect(func(): Icons.draw_trophy(icon_canvas))
 		else:
-			icon_canvas.draw.connect(func(): Icons.draw_beacon(icon_canvas))
+			var beacon_col := Color(1.0, 0.45, 0.85) if is_chal else Color(0.35, 0.95, 1.0)
+			icon_canvas.draw.connect(func(): Icons.draw_beacon(icon_canvas, beacon_col))
 		status_box.add_child(icon_canvas)
 
 		var status_chip := Label.new()
@@ -338,7 +403,7 @@ static func build_level_card(
 		status_chip.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		status_chip.add_theme_font_size_override("font_size", 13)
 		status_chip.text = "BOSS" if is_king_sector else "READY"
-		status_chip.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3) if is_king_sector else Color(0.35, 0.95, 1.0))
+		status_chip.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3) if is_king_sector else (Color(1.0, 0.45, 0.85) if is_chal else Color(0.35, 0.95, 1.0)))
 		status_box.add_child(status_chip)
 	elif not is_unlocked:
 		var status_box := HBoxContainer.new()
@@ -353,7 +418,8 @@ static func build_level_card(
 		icon_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		icon_canvas.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		icon_canvas.custom_minimum_size = Vector2(13, 15)
-		icon_canvas.draw.connect(func(): Icons.draw_lock(icon_canvas))
+		var lock_col := Color(0.85, 0.50, 0.80, 0.90) if is_chal else Color(0.55, 0.70, 0.85, 0.92)
+		icon_canvas.draw.connect(func(): Icons.draw_lock(icon_canvas, lock_col))
 		status_box.add_child(icon_canvas)
 
 		var status_chip := Label.new()
@@ -362,7 +428,7 @@ static func build_level_card(
 		status_chip.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		status_chip.add_theme_font_size_override("font_size", 13)
 		status_chip.text = "KING" if is_king_sector else "LOCKED"
-		status_chip.add_theme_color_override("font_color", Color(0.95, 0.55, 0.65) if is_king_sector else Color(0.55, 0.68, 0.82, 0.90))
+		status_chip.add_theme_color_override("font_color", Color(0.95, 0.55, 0.65) if is_king_sector else (Color(0.75, 0.50, 0.70, 0.90) if is_chal else Color(0.55, 0.68, 0.82, 0.90)))
 		status_box.add_child(status_chip)
 
 	# --- Row 2: Depth Subtitle + Stars/Time ---
@@ -381,72 +447,118 @@ static func build_level_card(
 	sub_lbl.add_theme_font_size_override("font_size", 13)
 	sub_lbl.text = display_subtitle
 	if is_active:
-		sub_lbl.add_theme_color_override("font_color", Color(0.55, 0.90, 1.0, 0.98))
+		sub_lbl.add_theme_color_override("font_color", Color(1.0, 0.65, 0.90, 0.98) if is_chal else Color(0.55, 0.90, 1.0, 0.98))
 	elif is_cleared:
-		sub_lbl.add_theme_color_override("font_color", Color(0.45, 0.82, 0.92, 0.90))
+		sub_lbl.add_theme_color_override("font_color", Color(0.50, 0.32, 0.46, 0.65) if is_chal else Color(0.45, 0.82, 0.92, 0.90))
 	else:
-		sub_lbl.add_theme_color_override("font_color", Color(0.46, 0.58, 0.72, 0.88))
+		sub_lbl.add_theme_color_override("font_color", Color(0.62, 0.42, 0.58, 0.85) if is_chal else Color(0.46, 0.58, 0.72, 0.88))
 	row2.add_child(sub_lbl)
 
-	# Display earned stars and best time on cleared levels (Level 0 is tutorial: no stars)
-	var is_tutorial: bool = (GameState.current_mode == GameState.GameMode.STORY and (level_path.ends_with("level_0.tscn") or level_number == 1))
-	if is_tutorial:
-		if is_unlocked and is_cleared:
-			var comp_lbl := Label.new()
-			comp_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			comp_lbl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-			comp_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-			comp_lbl.text = "COMPLETED"
-			comp_lbl.add_theme_font_size_override("font_size", 12)
-			comp_lbl.add_theme_color_override("font_color", Color(0.4, 0.9, 0.7, 0.9))
-			row2.add_child(comp_lbl)
-	elif is_unlocked and stars > 0:
-		var best_time: float = GameState.get_level_best_time(level_number)
-		var is_ghost: bool = GameState.is_level_ghost_cleared(level_number)
+	# Display clear status / time (Challenge Mode: ONLY time, NO stars. Story Mode: Stars + Time)
+	if is_chal:
+		if is_cleared:
+			var best_time: float = GameState.get_level_best_time(level_number)
+			if best_time > 0.0 and best_time < 900.0:
+				var m := floori(best_time / 60.0)
+				var s := int(best_time) % 60
 
-		var star_box := HBoxContainer.new()
-		star_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		star_box.add_theme_constant_override("separation", 6)
-		star_box.alignment = BoxContainer.ALIGNMENT_END
-		star_box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+				var time_box := HBoxContainer.new()
+				time_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				time_box.add_theme_constant_override("separation", 5)
+				time_box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 
-		var s1 := "★" if stars >= 1 else "☆"
-		var s2 := "★" if is_ghost else ("★" if stars >= 2 else "☆")
-		var s3 := "★" if stars >= 3 else "☆"
+				var timer_icon := Control.new()
+				timer_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				timer_icon.custom_minimum_size = Vector2(13, 13)
+				timer_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+				var icon_col := Color(0.75, 0.48, 0.68, 0.85)
+				timer_icon.draw.connect(func():
+					Icons.draw_stopwatch(timer_icon, icon_col)
+				)
+				time_box.add_child(timer_icon)
 
-		var star_lbl := Label.new()
-		star_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		star_lbl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		star_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		star_lbl.text = "%s%s%s" % [s1, s2, s3]
-		star_lbl.add_theme_font_size_override("font_size", 14)
-		star_lbl.add_theme_color_override("font_color", Color(1.0, 0.82, 0.28))
-		star_box.add_child(star_lbl)
+				var time_lbl := Label.new()
+				time_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				time_lbl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+				time_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+				time_lbl.text = "%02d:%02d" % [m, s]
+				time_lbl.add_theme_font_size_override("font_size", 13)
+				time_lbl.add_theme_color_override("font_color", Color(0.68, 0.45, 0.62, 0.85))
+				time_box.add_child(time_lbl)
 
-		if best_time > 0.0 and best_time < 900.0:
-			var m := floori(best_time / 60.0)
-			var s := int(best_time) % 60
-			var time_lbl := Label.new()
-			time_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			time_lbl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-			time_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-			time_lbl.text = "%02d:%02d" % [m, s]
-			time_lbl.add_theme_font_size_override("font_size", 13)
-			time_lbl.add_theme_color_override("font_color", Color(0.68, 0.84, 0.95, 0.90))
-			star_box.add_child(time_lbl)
+				row2.add_child(time_box)
+			else:
+				var clear_lbl := Label.new()
+				clear_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				clear_lbl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+				clear_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+				clear_lbl.text = "CLEARED"
+				clear_lbl.add_theme_font_size_override("font_size", 12)
+				clear_lbl.add_theme_color_override("font_color", Color(0.65, 0.40, 0.58, 0.70))
+				row2.add_child(clear_lbl)
+	else:
+		var is_tutorial: bool = (level_path.ends_with("level_0.tscn") or level_number == 1)
+		var stars: int = GameState.get_level_stars(level_number)
+		if is_tutorial:
+			if is_unlocked and is_cleared:
+				var comp_lbl := Label.new()
+				comp_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				comp_lbl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+				comp_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+				comp_lbl.text = "COMPLETED"
+				comp_lbl.add_theme_font_size_override("font_size", 12)
+				comp_lbl.add_theme_color_override("font_color", Color(0.4, 0.9, 0.7, 0.9))
+				row2.add_child(comp_lbl)
+		elif is_unlocked and stars > 0:
+			var best_time: float = GameState.get_level_best_time(level_number)
+			var is_ghost: bool = GameState.is_level_ghost_cleared(level_number)
 
-		row2.add_child(star_box)
-	elif is_unlocked and is_cleared:
-		var clear_lbl := Label.new()
-		clear_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		clear_lbl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		clear_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		clear_lbl.text = "CLEARED"
-		clear_lbl.add_theme_font_size_override("font_size", 12)
-		clear_lbl.add_theme_color_override("font_color", Color(0.4, 0.9, 0.7, 0.9))
-		row2.add_child(clear_lbl)
+			var star_box := HBoxContainer.new()
+			star_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			star_box.add_theme_constant_override("separation", 6)
+			star_box.alignment = BoxContainer.ALIGNMENT_END
+			star_box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 
-	if is_unlocked:
+			var s1 := "★" if stars >= 1 else "☆"
+			var s2 := "★" if is_ghost else ("★" if stars >= 2 else "☆")
+			var s3 := "★" if stars >= 3 else "☆"
+
+			var star_lbl := Label.new()
+			star_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			star_lbl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			star_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			star_lbl.text = "%s%s%s" % [s1, s2, s3]
+			star_lbl.add_theme_font_size_override("font_size", 14)
+			star_lbl.add_theme_color_override("font_color", Color(1.0, 0.82, 0.28))
+			star_box.add_child(star_lbl)
+
+			if best_time > 0.0 and best_time < 900.0:
+				var m := floori(best_time / 60.0)
+				var s := int(best_time) % 60
+				var time_lbl := Label.new()
+				time_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				time_lbl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+				time_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+				time_lbl.text = "%02d:%02d" % [m, s]
+				time_lbl.add_theme_font_size_override("font_size", 13)
+				time_lbl.add_theme_color_override("font_color", Color(0.68, 0.84, 0.95, 0.90))
+				star_box.add_child(time_lbl)
+
+			row2.add_child(star_box)
+		elif is_unlocked and is_cleared:
+			var clear_lbl := Label.new()
+			clear_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			clear_lbl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			clear_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			clear_lbl.text = "CLEARED"
+			clear_lbl.add_theme_font_size_override("font_size", 12)
+			clear_lbl.add_theme_color_override("font_color", Color(0.4, 0.9, 0.7, 0.9))
+			row2.add_child(clear_lbl)
+
+	if is_chal and is_cleared:
+		button.disabled = true
+		button.mouse_default_cursor_shape = Control.CURSOR_FORBIDDEN
+	elif is_unlocked:
 		button.pressed.connect(func(): on_select.call(level_number))
 		if wire_juice.is_valid():
 			wire_juice.call(button)

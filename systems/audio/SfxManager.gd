@@ -9,9 +9,9 @@ signal beat(threat: float)
 const MIX_RATE := 44100
 
 # Heartbeat parameters
-@export var interval_calm := 1.30   # Seconds between beats when safe (~46 BPM)
+@export var interval_calm := 1.35   # Seconds between beats when sensing distant danger (~44 BPM)
 @export var interval_panic := 0.35  # Seconds between beats when hunted (~170 BPM)
-@export var vol_calm := -11.0       # Quiet subtle pulse when safe
+@export var vol_calm := -16.0       # Quiet subtle pulse when sensing distant danger
 @export var vol_panic := 3.2        # Pounding chest thump when hunted
 @export var pitch_calm := 0.88
 @export var pitch_panic := 1.22
@@ -63,6 +63,9 @@ var _wav_assist_on: AudioStreamWAV
 var _wav_assist_off: AudioStreamWAV
 var _wav_door_open: AudioStreamWAV
 var _wav_inv_pip: AudioStreamWAV
+var _wav_pact_reveal: AudioStreamWAV
+var _wav_pact_seal: AudioStreamWAV
+var _wav_pact_reroll: AudioStreamWAV
 
 var _charge_player: AudioStreamPlayer
 var _player_ref: Node2D
@@ -96,9 +99,14 @@ func set_player(player: Node2D) -> void:
 	_player_ref = player
 
 
-# Optional brief mic suppression only on extreme speaker bursts if needed
-func _suppress_mic(_duration: float) -> void:
-	pass
+# Acoustic echo cancellation & speaker feedback protection
+func _suppress_mic(duration: float) -> void:
+	if _player_ref == null or not is_instance_valid(_player_ref):
+		_player_ref = get_tree().get_first_node_in_group("player")
+	if _player_ref != null and is_instance_valid(_player_ref) and _player_ref.has_node("MicInput"):
+		var mic = _player_ref.get_node("MicInput") as MicInput
+		if mic != null and is_instance_valid(mic):
+			mic.suppress(duration)
 
 
 # --- Public Playback API -----------------------------------------------------
@@ -142,14 +150,14 @@ func play_sleeper_snore(pos: Vector2, occluded: bool = false) -> void:
 
 
 func play_echo_ping(loudness: float) -> void:
-	_suppress_mic(0.45)
+	_suppress_mic(1.15)
 	var vol_db: float = lerpf(-10.0, 2.0, clampf(loudness, 0.0, 1.0))
 	var pitch: float = lerpf(1.12, 0.88, clampf(loudness, 0.0, 1.0))
 	_play_non_spatial(_wav_echo_ping, vol_db, pitch)
 
 
 func play_charge_full() -> void:
-	_suppress_mic(0.2)
+	_suppress_mic(0.35)
 	_play_non_spatial(_wav_charge_full, -4.0, 1.0)
 
 
@@ -167,23 +175,23 @@ func update_charge_hum(charging: bool, charge_amount: float) -> void:
 
 
 func play_player_stun() -> void:
-	_suppress_mic(0.5)
+	_suppress_mic(1.5)
 	_play_non_spatial(_wav_player_stun, 0.0, 1.0)
 
 
 func play_player_death() -> void:
-	_suppress_mic(0.8)
+	_suppress_mic(3.0)
 	update_charge_hum(false, 0.0)
 	_play_non_spatial(_wav_player_death, 2.0, 1.0)
 
 
 func play_level_intro() -> void:
-	_suppress_mic(0.55)
+	_suppress_mic(2.0)
 	_play_non_spatial(_wav_level_intro, -3.0, 1.0)
 
 
 func play_level_exit() -> void:
-	_suppress_mic(0.4)
+	_suppress_mic(4.0)
 	_play_non_spatial(_wav_level_exit, -2.0, 1.0)
 
 
@@ -211,6 +219,20 @@ func play_pebble_clink(pos: Vector2) -> void:
 
 func play_deny_tick() -> void:
 	_play_non_spatial(_wav_deny_tick, -6.0, 1.0)
+
+
+func play_pact_reveal() -> void:
+	_suppress_mic(0.6)
+	_play_non_spatial(_wav_pact_reveal, 0.5, 1.0)
+
+
+func play_pact_seal() -> void:
+	_suppress_mic(0.6)
+	_play_non_spatial(_wav_pact_seal, 2.0, 1.0)
+
+
+func play_pact_reroll() -> void:
+	_play_non_spatial(_wav_pact_reroll, -1.0, randf_range(0.96, 1.04))
 
 
 # Visually Impaired (Blind) Echolocation & Navigation Audio API:
@@ -286,12 +308,12 @@ func play_screamer_crack(pos: Vector2, occluded: bool = false) -> void:
 
 
 func play_screamer_shriek(pos: Vector2) -> void:
-	_suppress_mic(0.9)
+	_suppress_mic(1.8)
 	_play_spatial(_wav_screamer_shriek, pos, 3.0, 1.0, 800.0)
 
 
 func play_listener_pip(pos: Vector2, count: int, occluded: bool = false) -> void:
-	_suppress_mic(0.3)
+	_suppress_mic(0.4)
 	# Pitch rises with each recorded shout (1..4) to build tension
 	var pitch: float = 0.85 + float(clampi(count, 1, 5)) * 0.14
 	var vol_db: float = -7.0 if occluded else 0.0
@@ -299,7 +321,7 @@ func play_listener_pip(pos: Vector2, count: int, occluded: bool = false) -> void
 
 
 func play_listener_alarm(pos: Vector2) -> void:
-	_suppress_mic(1.1)
+	_suppress_mic(2.2)
 	_play_spatial(_wav_listener_alarm, pos, 3.5, 1.0, 1400.0)
 
 
@@ -353,6 +375,10 @@ func _process_heartbeat(delta: float) -> void:
 	var rate := 4.2 if max_threat > _threat else 1.2
 	_threat = move_toward(_threat, max_threat, delta * rate)
 
+	if _threat < 0.06:
+		_hb_timer = 0.0
+		return
+
 	_hb_timer += delta
 	if _hb_timer >= lerpf(interval_calm, interval_panic, _threat):
 		_hb_timer = 0.0
@@ -394,7 +420,7 @@ func _process_ambient_subterranean(delta: float) -> void:
 		_ambient_drone_player.volume_db = move_toward(_ambient_drone_player.volume_db, target_vol, delta * 6.0)
 
 	# Organic distant spatial stalactite water droplets echoing in the darkness
-	if _player_ref != null and is_instance_valid(_player_ref) and bool(_player_ref.get("alive")):
+	if _player_ref != null and is_instance_valid(_player_ref) and _player_ref.get("alive") == true:
 		_droplet_timer -= delta
 		if _droplet_timer <= 0.0:
 			_droplet_timer = randf_range(5.0, 9.5)
@@ -545,6 +571,12 @@ func _build_all_streams() -> void:
 		_cache["door_open"] = _synth_door_open()
 	if not _cache.has("inv_pip"):
 		_cache["inv_pip"] = _synth_inv_pip()
+	if not _cache.has("pact_reveal"):
+		_cache["pact_reveal"] = _synth_pact_reveal()
+	if not _cache.has("pact_seal"):
+		_cache["pact_seal"] = _synth_pact_seal()
+	if not _cache.has("pact_reroll"):
+		_cache["pact_reroll"] = _synth_pact_reroll()
 
 	_wav_steps_walk.clear()
 	for i in 4:
@@ -590,6 +622,9 @@ func _build_all_streams() -> void:
 	_wav_assist_off = _cache.get("assist_off", null)
 	_wav_door_open = _cache.get("door_open", null)
 	_wav_inv_pip = _cache.get("inv_pip", null)
+	_wav_pact_reveal = _cache.get("pact_reveal", null)
+	_wav_pact_seal = _cache.get("pact_seal", null)
+	_wav_pact_reroll = _cache.get("pact_reroll", null)
 	_wav_star_chimes = [
 		_cache.get("star_chime_0", null),
 		_cache.get("star_chime_1", null),
@@ -1426,4 +1461,126 @@ static func get_menu_bgm_droplet() -> AudioStreamWAV:
 		out[i] = clampf(sample, -1.0, 1.0)
 	var wav: AudioStreamWAV = _make_wav(out)
 	_cache["menu_bgm_droplet"] = wav
+	return wav
+
+
+# Seamless 8-second deep abyss ambient pad loop for Challenge Mode.
+# Grounded in low D (36.7 Hz / 73.4 Hz) with sinister minor/tritone dissonance (Ab / F / Bb)
+# and slow abyssal pressure breathing.
+static func get_challenge_bgm_pad() -> AudioStreamWAV:
+	if _cache.has("challenge_bgm_pad"):
+		return _cache["challenge_bgm_pad"]
+	var dur := 8.0
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var lfo1: float = 0.50 + 0.50 * sin(TAU * 0.125 * t)
+		var lfo2: float = 0.50 + 0.50 * cos(TAU * 0.125 * t - 0.8)
+		var lfo_dark: float = pow(0.5 + 0.5 * sin(TAU * 0.25 * t + 1.4), 2.0)
+
+		# Deep subterranean tectonic sub-bass (D1 = 36.71 Hz, A1 = 55.0 Hz)
+		var sub: float = sin(TAU * 36.71 * t) * 0.38 * lfo1 + sin(TAU * 55.0 * t) * 0.24 * lfo2
+		# Sinister binaural drone with tritone/Phrygian tension (D2 = 73.42 Hz, F2 = 87.31 Hz, Ab2 = 103.83 Hz)
+		var pad_d: float = (sin(TAU * 73.42 * t) + sin(TAU * 73.545 * t)) * 0.16
+		var pad_f: float = (sin(TAU * 87.31 * t) + sin(TAU * 87.185 * t)) * 0.13 * lfo2
+		var pad_tritone: float = (sin(TAU * 103.83 * t) + sin(TAU * 103.955 * t)) * 0.10 * lfo_dark
+		# Chilling high-frequency cavern whisper (Bb3 = 233.08 Hz, Db4 = 277.18 Hz)
+		var whisper: float = (sin(TAU * 233.08 * t) * 0.045 + sin(TAU * 277.18 * t) * 0.035) * lfo1
+
+		out[i] = tanh((sub + pad_d + pad_f + pad_tritone + whisper) * 1.25) * 0.72
+	var wav: AudioStreamWAV = _make_wav(out, true)
+	_cache["challenge_bgm_pad"] = wav
+	return wav
+
+
+# Procedural turbine vortex surge sound for Challenge Mode reset (progressive slow-to-fast spin-up).
+static func get_abyss_vortex_sfx() -> AudioStreamWAV:
+	if _cache.has("abyss_vortex_sfx"):
+		return _cache["abyss_vortex_sfx"]
+	var dur := 1.45
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var sample := 0.0
+		if t < 0.85:
+			# Swirling turbine spin-up: starts very slow and gentle, then accelerates rapidly into a roar
+			var p_frac: float = t / 0.85
+			var spin_curve: float = pow(p_frac, 2.6)
+			var freq: float = lerpf(75.0, 560.0, spin_curve)
+			# Flutter rate speeds up from 6 Hz to 36 Hz
+			var flutter_rate: float = lerpf(6.0, 36.0, spin_curve)
+			var flutter: float = sin(TAU * flutter_rate * t) * (30.0 * p_frac)
+			var env: float = minf(t / 0.12, 1.0) * pow(p_frac, 1.2)
+			sample = sin(TAU * (freq + flutter) * t) * env * 0.52
+			# Wind and dark matter noise rush that swells at the apex
+			var noise: float = (randf() * 2.0 - 1.0) * 0.22 * pow(p_frac, 2.2)
+			sample += noise
+		else:
+			# Singularity burst & deep resonant sub-bass dissipation
+			var dt: float = t - 0.85
+			var boom_env: float = exp(-dt * 3.6)
+			var boom: float = sin(TAU * 42.0 * dt) * boom_env * 0.78
+			var harmonic: float = sin(TAU * 126.0 * dt) * exp(-dt * 5.5) * 0.26
+			sample = (boom + harmonic)
+		out[i] = clampf(sample * 0.88, -1.0, 1.0)
+	var wav: AudioStreamWAV = _make_wav(out)
+	_cache["abyss_vortex_sfx"] = wav
+	return wav
+
+
+# Abyssal Pact reveal: deep minor drone swell with mystical acoustic shimmer
+func _synth_pact_reveal() -> AudioStreamWAV:
+	var dur := 0.70
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var env: float = sin(minf(t / 0.20, 1.0) * PI * 0.5) * exp(-t * 2.6)
+		var bass: float = sin(TAU * 68.0 * t) * 0.55 + sin(TAU * 136.0 * t) * 0.35
+		var mystery: float = sin(TAU * 204.0 * t) * 0.25 + sin(TAU * 544.0 * t) * 0.15
+		out[i] = clampf((bass + mystery) * env * 0.85, -1.0, 1.0)
+	var wav := _make_wav(out)
+	_cache["pact_reveal"] = wav
+	return wav
+
+
+# Abyssal Pact seal: punchy sub-bass boom + crystalline lock chime
+func _synth_pact_seal() -> AudioStreamWAV:
+	var dur := 0.55
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var bass_env: float = exp(-t * 6.5)
+		var bass_f: float = lerpf(85.0, 42.0, t / dur)
+		var bass: float = sin(TAU * bass_f * t) * bass_env * 0.75
+		var chime_env: float = exp(-t * 12.0)
+		var chime: float = (sin(TAU * 980.0 * t) * 0.4 + sin(TAU * 1470.0 * t) * 0.25) * chime_env
+		out[i] = clampf((bass + chime) * 0.90, -1.0, 1.0)
+	var wav := _make_wav(out)
+	_cache["pact_seal"] = wav
+	return wav
+
+
+# Abyssal Pact reroll: agile ascending card flip sweep + acoustic tick
+func _synth_pact_reroll() -> AudioStreamWAV:
+	var dur := 0.24
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var env: float = sin((t / dur) * PI) * exp(-t * 4.0)
+		var f: float = lerpf(240.0, 680.0, pow(t / dur, 1.4))
+		var sweep: float = sin(TAU * f * t) * 0.65
+		var tick: float = randf_range(-1.0, 1.0) * exp(-t * 45.0) * 0.45
+		out[i] = clampf((sweep + tick) * env * 0.85, -1.0, 1.0)
+	var wav := _make_wav(out)
+	_cache["pact_reroll"] = wav
 	return wav

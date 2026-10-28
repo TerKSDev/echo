@@ -93,101 +93,78 @@ static func create_slider_row(
 	is_percent: bool,
 	on_val_changed: Callable
 ) -> Control:
-	var hbox := HBoxContainer.new()
-	hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hbox.add_theme_constant_override("separation", 16)
-
 	var vbox := VBoxContainer.new()
 	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	vbox.add_theme_constant_override("separation", 2)
+	vbox.add_theme_constant_override("separation", 6)
+
+	# Header: Title on Left, Value Indicator on Right
+	var hdr := HBoxContainer.new()
+	hdr.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 	var title_lbl := Label.new()
 	title_lbl.text = title_text
+	title_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_lbl.add_theme_color_override("font_color", Color(0.88, 0.96, 1.0, 1.0))
-	title_lbl.add_theme_font_size_override("font_size", 16)
-	vbox.add_child(title_lbl)
+	title_lbl.add_theme_font_size_override("font_size", 14)
+	hdr.add_child(title_lbl)
 
-	var desc_lbl := Label.new()
-	desc_lbl.text = desc_text
-	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	desc_lbl.add_theme_color_override("font_color", Color(0.55, 0.72, 0.88, 0.75))
-	desc_lbl.add_theme_font_size_override("font_size", 13)
-	vbox.add_child(desc_lbl)
+	var val_lbl := Label.new()
+	val_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	val_lbl.add_theme_font_size_override("font_size", 13)
+	val_lbl.add_theme_color_override("font_color", Color(0.40, 0.90, 1.0, 0.95))
+	if is_percent:
+		val_lbl.text = "%d%%" % int(round(cur_val * 100.0))
+	else:
+		val_lbl.text = "%.2f" % cur_val
+	hdr.add_child(val_lbl)
+	vbox.add_child(hdr)
 
-	hbox.add_child(vbox)
+	# Optional Description Subtitle
+	if not desc_text.is_empty():
+		var desc_lbl := Label.new()
+		desc_lbl.text = desc_text
+		desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		desc_lbl.add_theme_color_override("font_color", Color(0.52, 0.70, 0.86, 0.75))
+		desc_lbl.add_theme_font_size_override("font_size", 12)
+		vbox.add_child(desc_lbl)
 
-	var right_box := HBoxContainer.new()
-	right_box.custom_minimum_size = Vector2(210, 32)
-	right_box.add_theme_constant_override("separation", 10)
-	right_box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-
+	# Slider Row: Full-width glowing HSlider matching Pause Modal
 	var slider := HSlider.new()
 	slider.min_value = 0.0
 	slider.max_value = 1.0
 	slider.step = 0.05
 	slider.value = cur_val
-	slider.custom_minimum_size = Vector2(150, 20)
+	slider.custom_minimum_size = Vector2(0, 24)
 	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	slider.focus_mode = Control.FOCUS_NONE
-	right_box.add_child(slider)
-
-	var val_lbl := Label.new()
-	val_lbl.custom_minimum_size = Vector2(45, 0)
-	val_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	val_lbl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	val_lbl.add_theme_font_size_override("font_size", 14)
-	val_lbl.add_theme_color_override("font_color", Color(0.48, 0.84, 1.0, 0.95))
-	if is_percent:
-		val_lbl.text = "%d%%" % int(cur_val * 100.0)
-	else:
-		val_lbl.text = "%.2f" % cur_val
-	right_box.add_child(val_lbl)
+	ModalTemplate.style_slider(slider, ModalTemplate.ThemeKind.SONAR)
+	vbox.add_child(slider)
 
 	slider.value_changed.connect(func(v: float):
 		if is_percent:
-			val_lbl.text = "%d%%" % int(v * 100.0)
+			val_lbl.text = "%d%%" % int(round(v * 100.0))
 		else:
 			val_lbl.text = "%.2f" % v
 		if on_val_changed.is_valid():
 			on_val_changed.call(v)
 	)
 
-	hbox.add_child(right_box)
-	return hbox
+	return vbox
 
 
 static func refresh_toggle_btn(btn: Button, active: bool, on_text: String, off_text: String) -> void:
+	ModalTemplate.style_toggle_button(btn, active, on_text, off_text, ModalTemplate.ThemeKind.SONAR)
+
+
+static func style_action_button(btn: Button, border_col: Color, bg_col: Color, is_pill: bool = false) -> void:
+	if btn == null or not is_instance_valid(btn):
+		return
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	var rad := 14 if is_pill else 10
 	var sb := StyleBoxFlat.new()
-	sb.set_corner_radius_all(10)
-	sb.content_margin_left = 14.0
-	sb.content_margin_right = 14.0
-	sb.content_margin_top = 6.0
-	sb.content_margin_bottom = 6.0
-
-	if active:
-		sb.bg_color = Color(0.06, 0.22, 0.38, 0.85)
-		sb.border_color = Color(0.35, 0.85, 1.0, 0.85)
-		sb.set_border_width_all(1)
-		btn.text = on_text
-		btn.add_theme_color_override("font_color", Color(0.45, 0.92, 1.0))
-	else:
-		sb.bg_color = Color(0.03, 0.08, 0.14, 0.80)
-		sb.border_color = Color(0.22, 0.38, 0.52, 0.50)
-		sb.set_border_width_all(1)
-		btn.text = off_text
-		btn.add_theme_color_override("font_color", Color(0.45, 0.60, 0.75))
-
-	btn.add_theme_stylebox_override("normal", sb)
-	btn.add_theme_stylebox_override("hover", sb)
-	btn.add_theme_stylebox_override("pressed", sb)
-	btn.add_theme_stylebox_override("focus", sb)
-	btn.add_theme_font_size_override("font_size", 13)
-
-
-static func style_action_button(btn: Button, border_col: Color, bg_col: Color) -> void:
-	var sb := StyleBoxFlat.new()
-	sb.set_corner_radius_all(10)
+	sb.set_corner_radius_all(rad)
 	sb.content_margin_left = 14.0
 	sb.content_margin_right = 14.0
 	sb.content_margin_top = 6.0
@@ -195,16 +172,31 @@ static func style_action_button(btn: Button, border_col: Color, bg_col: Color) -
 	sb.bg_color = bg_col
 	sb.border_color = border_col
 	sb.set_border_width_all(1)
+
+	var hov := sb.duplicate() as StyleBoxFlat
+	hov.bg_color = bg_col.lightened(0.12)
+	hov.border_color = border_col.lightened(0.20)
+
+	var prs := sb.duplicate() as StyleBoxFlat
+	prs.bg_color = bg_col.darkened(0.15)
+
 	btn.add_theme_stylebox_override("normal", sb)
-	btn.add_theme_stylebox_override("hover", sb)
-	btn.add_theme_stylebox_override("pressed", sb)
-	btn.add_theme_stylebox_override("focus", sb)
-	btn.add_theme_font_size_override("font_size", 13)
+	btn.add_theme_stylebox_override("hover", hov)
+	btn.add_theme_stylebox_override("pressed", prs)
+	btn.add_theme_font_size_override("font_size", 12)
+	btn.add_theme_color_override("font_color", Color(0.85, 0.95, 1.0))
+	btn.add_theme_color_override("font_hover_color", Color.WHITE)
+	btn.add_theme_color_override("font_pressed_color", Color.WHITE)
 
 
-static func style_disabled_button(btn: Button) -> void:
+static func style_danger_button(btn: Button, is_primary: bool = false, is_pill: bool = false) -> void:
+	ModalTemplate.style_danger_button(btn, is_primary, is_pill)
+
+
+static func style_disabled_button(btn: Button, is_pill: bool = false) -> void:
 	var sb := StyleBoxFlat.new()
-	sb.set_corner_radius_all(10)
+	var rad := 14 if is_pill else 10
+	sb.set_corner_radius_all(rad)
 	sb.content_margin_left = 14.0
 	sb.content_margin_right = 14.0
 	sb.content_margin_top = 6.0
@@ -214,4 +206,4 @@ static func style_disabled_button(btn: Button) -> void:
 	sb.set_border_width_all(1)
 	btn.add_theme_stylebox_override("disabled", sb)
 	btn.add_theme_color_override("font_disabled_color", Color(0.35, 0.45, 0.55, 0.6))
-	btn.add_theme_font_size_override("font_size", 13)
+	btn.add_theme_font_size_override("font_size", 12)

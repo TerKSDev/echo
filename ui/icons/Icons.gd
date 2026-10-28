@@ -177,9 +177,8 @@ static func draw_book(canvas: Control) -> void:
 	canvas.draw_polyline(ridge, Color(col.r, col.g, col.b, 0.45), 1.5)
 
 
-static func draw_beacon(canvas: Control) -> void:
+static func draw_beacon(canvas: Control, col: Color = Color(0.35, 0.95, 1.0)) -> void:
 	var c := canvas.size * 0.5
-	var col := Color(0.35, 0.95, 1.0)
 	canvas.draw_circle(c, 3.2, col)
 	canvas.draw_arc(c, 5.8, 0.0, TAU, 16, Color(col.r, col.g, col.b, 0.6), 1.8)
 
@@ -194,8 +193,7 @@ static func draw_check(canvas: Control) -> void:
 	canvas.draw_line(p2, p3, col, 2.2)
 
 
-static func draw_lock(canvas: Control) -> void:
-	var col := Color(0.55, 0.70, 0.85, 0.92)
+static func draw_lock(canvas: Control, col: Color = Color(0.55, 0.70, 0.85, 0.92)) -> void:
 	var cx := canvas.size.x * 0.5
 	var cy := canvas.size.y * 0.5
 	# Shackle
@@ -215,12 +213,11 @@ static func draw_back_arrow(canvas: Control) -> void:
 		var btn := canvas as BaseButton
 		is_hovered = btn.is_hovered() or btn.button_pressed
 	var col := Color(0.92, 0.98, 1.0, 1.0) if is_hovered else Color(0.68, 0.86, 1.0, 0.90)
-	if is_hovered:
-		canvas.draw_circle(c, 16.0, Color(0.20, 0.65, 1.0, 0.16))
-	var tip := Vector2(c.x - 8.0, c.y)
-	var wing_top := Vector2(c.x - 1.0, c.y - 7.0)
-	var wing_bot := Vector2(c.x - 1.0, c.y + 7.0)
-	var stem_end := Vector2(c.x + 8.0, c.y)
+	var tip_x := 1.5
+	var tip := Vector2(tip_x, c.y)
+	var wing_top := Vector2(tip_x + 7.0, c.y - 7.0)
+	var wing_bot := Vector2(tip_x + 7.0, c.y + 7.0)
+	var stem_end := Vector2(tip_x + 16.0, c.y)
 	canvas.draw_line(wing_top, tip, col, 2.4, true)
 	canvas.draw_line(wing_bot, tip, col, 2.4, true)
 	canvas.draw_line(tip, stem_end, col, 2.4, true)
@@ -328,3 +325,104 @@ static func draw_diamond(canvas: Control, pulse: float = 1.0, col: Color = Color
 		c + Vector2(-core_w, 0.0)
 	])
 	canvas.draw_colored_polygon(core_pts, Color(1.0, 1.0, 1.0, 0.95 * pulse))
+
+
+static func draw_curse_sigil(canvas: Control, col: Color = Color(1.0, 0.32, 0.48)) -> void:
+	var c := canvas.size * 0.5
+	# Outer ominous halo
+	canvas.draw_circle(c, 9.5, Color(col.r, col.g, col.b, 0.18))
+
+	# Horned skull crest polygon
+	var skull_pts := PackedVector2Array([
+		Vector2(c.x - 8.0, c.y - 6.5), # Left horn tip
+		Vector2(c.x - 4.5, c.y - 3.5),
+		Vector2(c.x, c.y - 7.5),       # Center crown spike
+		Vector2(c.x + 4.5, c.y - 3.5),
+		Vector2(c.x + 8.0, c.y - 6.5), # Right horn tip
+		Vector2(c.x + 6.5, c.y + 1.0), # Cheek right
+		Vector2(c.x + 3.5, c.y + 7.5), # Jaw right
+		Vector2(c.x - 3.5, c.y + 7.5), # Jaw left
+		Vector2(c.x - 6.5, c.y + 1.0)  # Cheek left
+	])
+	canvas.draw_colored_polygon(skull_pts, Color(col.r * 0.25, col.g * 0.05, col.b * 0.15, 0.95))
+	var closed := skull_pts.duplicate()
+	closed.append(skull_pts[0])
+	canvas.draw_polyline(closed, col, 1.6)
+
+	# Angled demonic eye slits
+	canvas.draw_line(Vector2(c.x - 4.5, c.y - 0.5), Vector2(c.x - 1.5, c.y + 1.0), Color(1.0, 0.92, 0.95), 1.5)
+	canvas.draw_line(Vector2(c.x + 4.5, c.y - 0.5), Vector2(c.x + 1.5, c.y + 1.0), Color(1.0, 0.92, 0.95), 1.5)
+
+	# Nasal fissure tick
+	canvas.draw_line(Vector2(c.x, c.y + 2.5), Vector2(c.x, c.y + 5.0), Color(col.r, col.g, col.b, 0.8), 1.2)
+
+
+static func draw_boon_sigil(canvas: Control, col: Color = Color(0.35, 0.95, 1.0)) -> void:
+	var c := canvas.size * 0.5
+	# Outer bioluminescent halo
+	canvas.draw_circle(c, 9.5, Color(col.r, col.g, col.b, 0.18))
+
+	# 4 Cardinal beams
+	var l_card := 8.5
+	canvas.draw_line(c + Vector2(0, -l_card), c + Vector2(0, l_card), col, 1.8)
+	canvas.draw_line(c + Vector2(-l_card, 0), c + Vector2(l_card, 0), col, 1.8)
+
+	# 4 Diagonal accent rays
+	var l_diag := 4.2
+	canvas.draw_line(c + Vector2(-l_diag, -l_diag), c + Vector2(l_diag, l_diag), Color(col, 0.65), 1.2)
+	canvas.draw_line(c + Vector2(l_diag, -l_diag), c + Vector2(-l_diag, l_diag), Color(col, 0.65), 1.2)
+
+	# Central brilliant diamond
+	var dia_pts := PackedVector2Array([
+		c + Vector2(0, -3.5),
+		c + Vector2(3.5, 0),
+		c + Vector2(0, 3.5),
+		c + Vector2(-3.5, 0)
+	])
+	canvas.draw_colored_polygon(dia_pts, Color(0.04, 0.18, 0.28, 0.95))
+	var closed := dia_pts.duplicate()
+	closed.append(dia_pts[0])
+	canvas.draw_polyline(closed, col, 1.4)
+	canvas.draw_circle(c, 1.4, Color.WHITE)
+
+
+static func draw_reroll_sigil(canvas: Control, col: Color = Color(1.0, 0.85, 0.45)) -> void:
+	var c := canvas.size * 0.5
+	var r := 5.5
+	# Two half circle arcs
+	canvas.draw_arc(c, r, -PI * 0.85, -PI * 0.05, 12, col, 1.6)
+	canvas.draw_arc(c, r, PI * 0.15, PI * 0.95, 12, col, 1.6)
+
+	# Top arrow tip
+	var p_top := c + Vector2(cos(-PI * 0.05), sin(-PI * 0.05)) * r
+	canvas.draw_line(p_top + Vector2(-2.5, -2.5), p_top, col, 1.6)
+	canvas.draw_line(p_top + Vector2(-2.8, 1.2), p_top, col, 1.6)
+
+	# Bottom arrow tip
+	var p_bot := c + Vector2(cos(PI * 0.95), sin(PI * 0.95)) * r
+	canvas.draw_line(p_bot + Vector2(2.5, 2.5), p_bot, col, 1.6)
+	canvas.draw_line(p_bot + Vector2(2.8, -1.2), p_bot, col, 1.6)
+
+
+static func draw_stopwatch(canvas: Control, col: Color = Color(0.75, 0.85, 0.95, 0.9)) -> void:
+	var c := canvas.size * 0.5
+	var r := 4.8
+	# Outer watch body circle
+	canvas.draw_arc(c + Vector2(0.0, 1.0), r, 0.0, TAU, 16, col, 1.4)
+	# Top winder stem & crown button
+	canvas.draw_line(c + Vector2(0.0, -r + 1.0), c + Vector2(0.0, -r - 1.2), col, 1.4)
+	canvas.draw_line(c + Vector2(-1.8, -r - 1.2), c + Vector2(1.8, -r - 1.2), col, 1.4)
+	# Angled right lap button
+	var lap_ang := -PI * 0.25
+	var p_lap := c + Vector2(0.0, 1.0) + Vector2(cos(lap_ang), sin(lap_ang)) * r
+	canvas.draw_line(p_lap, p_lap + Vector2(1.2, -1.2), col, 1.2)
+	# Clock center dot
+	canvas.draw_circle(c + Vector2(0.0, 1.0), 1.0, col)
+	# Hands: second hand pointing up, minute hand pointing up-right
+	canvas.draw_line(c + Vector2(0.0, 1.0), c + Vector2(0.0, -1.8), col, 1.2)
+	canvas.draw_line(c + Vector2(0.0, 1.0), c + Vector2(2.0, -0.4), col, 1.2)
+
+
+static func draw_stopwatch_icon(canvas: Control) -> void:
+	draw_stopwatch(canvas)
+

@@ -52,10 +52,13 @@ static func draw_depth_gauge(
 	# Reference Milestones
 	var milestones: Array[Dictionary] = []
 	if is_challenge:
+		var has_sp := GameState.challenge_highest_unlocked >= 21
+		var bottom_lbl := "-9,999M" if has_sp else "-9,250M"
+		var mid_lbl := "-7,250M" if has_sp else "-6,875M"
 		milestones = [
 			{"label": "-4,500M", "ratio": 0.0},
-			{"label": "-7,250M", "ratio": 0.5},
-			{"label": "-9,999M", "ratio": 1.0},
+			{"label": mid_lbl, "ratio": 0.5},
+			{"label": bottom_lbl, "ratio": 1.0},
 		]
 	else:
 		milestones = [
@@ -102,7 +105,8 @@ static func draw_depth_gauge(
 		var cur_y := lerpf(20.0, h - 20.0, scroll_ratio)
 		var cur_meters: int = 0
 		if is_challenge:
-			cur_meters = int(round(lerpf(-4500.0, -9999.0, scroll_ratio)))
+			var max_depth := -9999.0 if GameState.challenge_highest_unlocked >= 21 else -9250.0
+			cur_meters = int(round(lerpf(-4500.0, max_depth, scroll_ratio)))
 		else:
 			cur_meters = int(round(lerpf(0.0, -4200.0, scroll_ratio)))
 		var depth_str := format_depth_meters(cur_meters)

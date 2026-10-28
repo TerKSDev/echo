@@ -37,8 +37,13 @@ var _wav_tick: AudioStreamWAV
 var _wav_advance: AudioStreamWAV
 
 
+func is_active() -> bool:
+	return _is_active
+
+
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	z_index = 110
 	_build_audio()
 	_setup_header_label()
 	ripple_layer.draw.connect(_draw_ripples)
@@ -134,13 +139,26 @@ func _draw_diamond_prompt() -> void:
 	diamond_prompt.draw_set_transform(Vector2.ZERO)
 
 
+func _suppress_game_mic(duration: float) -> void:
+	var tree := get_tree()
+	if tree == null:
+		return
+	var players = tree.get_nodes_in_group("player")
+	for p in players:
+		if is_instance_valid(p) and p.has_node("MicInput"):
+			var mic = p.get_node("MicInput")
+			if mic != null and mic.has_method("suppress"):
+				mic.suppress(duration)
+
+
 ## Start a sequential narrative sequence of dialogue lines
-func play_sequence(lines: Array, on_finished: Callable = Callable(), dark_backdrop: bool = true, header_text: String = "", theme_mode: String = "") -> void:
+func play_sequence(lines: Array, on_finished: Callable = Callable(), dark_backdrop: bool = true, header_text: String = "", theme_mode: String = "", black_hold: float = 0.0) -> void:
 	if lines.is_empty():
 		if on_finished.is_valid():
 			on_finished.call()
 		return
 
+	_suppress_game_mic(9999.0)
 	_queue.clear()
 	for item in lines:
 		_queue.append(str(item))
@@ -181,9 +199,16 @@ func play_sequence(lines: Array, on_finished: Callable = Callable(), dark_backdr
 		backdrop.visible = true
 		backdrop.color = Color(0.03, 0.01, 0.04, 1.0) if _theme_mode == "singularity" else Color(0.0, 0.0, 0.0, 1.0)
 		backdrop.modulate.a = 0.0
+		if content_box != null:
+			content_box.modulate.a = 0.0
 		var b_tw := create_tween()
-		b_tw.tween_property(backdrop, "modulate:a", 1.0, 0.28).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-		b_tw.tween_callback(_show_next_in_queue)
+		var fade_in_dur: float = 0.45 if black_hold > 0.0 else 0.28
+		b_tw.tween_property(backdrop, "modulate:a", 1.0, fade_in_dur).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		if black_hold > 0.0:
+			b_tw.tween_interval(black_hold)
+		b_tw.tween_callback(func():
+			_show_next_in_queue()
+		)
 	else:
 		if backdrop != null:
 			backdrop.visible = false
@@ -313,6 +338,7 @@ func _advance_line() -> void:
 func _finish_sequence() -> void:
 	_is_active = false
 	touch_area.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_suppress_game_mic(0.4)
 
 	var tw := create_tween()
 	tw.tween_property(content_box, "modulate:a", 0.0, 0.22).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
@@ -331,6 +357,7 @@ func _finish_sequence() -> void:
 func hide_overlay(fade_dur: float = 0.22) -> void:
 	_is_active = false
 	touch_area.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_suppress_game_mic(0.4)
 	if _type_tween != null and _type_tween.is_valid():
 		_type_tween.kill()
 

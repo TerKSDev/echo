@@ -11,7 +11,7 @@ const WARMUP_TIME := 0.15
 const CALIBRATE_TIME := 1.0
 const MAX_MARGIN_DB := 24.0
 const ATTACK_WINDOW := 0.09
-const COOLDOWN := 0.35
+const COOLDOWN := 0.85
 
 enum State {
 	CALIBRATING,
@@ -108,12 +108,42 @@ func is_calibrating() -> bool:
 	return _state == State.CALIBRATING
 
 
+func suppress(duration: float) -> void:
+	suppress_timer = maxf(suppress_timer, duration)
+	if _capture != null:
+		_capture.clear_buffer()
+	if _state == State.ATTACK:
+		_state = State.IDLE
+		_timer = 0.0
+
+
 func get_trigger_db() -> float:
 	return GameState.get_mic_trigger_db()
 
 
 func get_current_db() -> float:
 	return level_db
+
+
+func is_input_allowed() -> bool:
+	if get_tree().paused or suppress_timer > 0.0:
+		return false
+	var p := get_parent()
+	if p == null or not is_instance_valid(p):
+		return false
+	if ("alive" in p and not p.alive) or ("can_sound" in p and not p.can_sound):
+		return false
+	var main := p.get_parent()
+	if main != null and is_instance_valid(main):
+		if "_changing" in main and main._changing:
+			return false
+		if main.has_node("Hud"):
+			var hud = main.get_node("Hud")
+			if hud != null and hud.has_node("StoryOverlay"):
+				var so = hud.get_node("StoryOverlay")
+				if so != null and (so.visible or (so.has_method("is_active") and so.is_active()) or so.get("_is_active") == true):
+					return false
+	return true
 
 
 func _process(delta: float) -> void:
@@ -162,16 +192,16 @@ func _process(delta: float) -> void:
 				calibration_finished.emit(noise_floor_db)
 
 		State.IDLE:
-			# Do not emit gameplay voice echoes while the game is paused in Settings
-			if get_tree().paused:
+			# Do not emit gameplay voice echoes while paused, suppressed, or when sound is locked
+			if not is_input_allowed():
 				return
-			if suppress_timer <= 0.0 and level_db > trigger_db:
+			if level_db > trigger_db:
 				_state = State.ATTACK
 				_timer = 0.0
 				_peak_db = level_db
 
 		State.ATTACK:
-			if get_tree().paused:
+			if not is_input_allowed():
 				_state = State.IDLE
 				return
 			_peak_db = maxf(_peak_db, level_db)
@@ -181,6 +211,7 @@ func _process(delta: float) -> void:
 				var k: float = clampf(inverse_lerp(lowest, highest, _peak_db), 0.0, 1.0)
 
 				voice_detected.emit(k)
+				suppress(1.10) # Self-acoustic ducking: blocks echo ping and cavern reverb feedback loop!
 				_state = State.COOLDOWN
 				_timer = 0.0
 

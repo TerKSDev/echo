@@ -90,6 +90,10 @@ class TutorialBeacon extends Node2D:
 
 
 func _ready() -> void:
+	if GameState.current_mode == GameState.GameMode.CHALLENGE and GameState.current_level == 0:
+		if not ChallengeModifiers.is_milestone_claimed(1):
+			ChallengeModifiers.reset_challenge_run()
+
 	_load_level(GameState.current_level_path())
 
 	sfx.set_player(player)
@@ -121,9 +125,13 @@ func _connect_enemies_telemetry() -> void:
 				enemy.alarmed.connect(func(_p, _t): _on_enemy_alert(enemy))
 
 
-func _on_enemy_alert(_enemy: Enemy) -> void:
+func _on_enemy_alert(enemy: Enemy) -> void:
 	if not _changing:
+		if enemy != null and is_instance_valid(enemy) and enemy.is_investigating_decoy:
+			return
 		_enemies_alerted += 1
+		if is_instance_valid(player) and player.has_method("trigger_terror_shiver"):
+			player.trigger_terror_shiver(3.0)
 
 
 func _play_entry_sequence() -> void:
@@ -615,9 +623,17 @@ func _level_0_cinematic_exit() -> void:
 	_clear_tutorial_beacon()
 	if hud != null:
 		hud.hide_tutorial_callout()
+		hud.set_gameplay_buttons_visible(false)
 	if is_instance_valid(player):
 		player.can_move = false
+		player.can_sound = false
+		player.can_sneak = false
+		player.can_pebble = false
 		player.velocity = Vector2.ZERO
+		if player.has_node("MicInput"):
+			var mic = player.get_node("MicInput")
+			if mic != null and mic.has_method("suppress"):
+				mic.suppress(9999.0)
 
 	if sfx != null:
 		sfx.play_level_exit()
@@ -632,7 +648,7 @@ func _level_0_cinematic_exit() -> void:
 			"Hoping this path leads out of the abyss..."
 		], func():
 			GameState.go_to_level_select()
-		)
+		, true, "", "", 0.95)
 
 
 func _level_0_physics_process(_delta: float) -> void:
@@ -807,13 +823,13 @@ func _spawn_enemies() -> void:
 func _physics_process(delta: float) -> void:
 	if _changing or _level_root == null or _level_root.walls == null or player == null or not is_instance_valid(player):
 		return
-	if "alive" in player and not bool(player.get("alive")):
+	if "alive" in player and not player.alive:
 		return
 
 	_level_time += delta
 
 	# Periodic spatial exit beacon pulse only when approaching the exit zone (< 380px)
-	if has_exit and not _changing and is_instance_valid(player) and bool(player.get("alive")):
+	if has_exit and not _changing and is_instance_valid(player) and player.alive:
 		var exit_pos := cell_to_world(exit_cell)
 		var dist: float = player.global_position.distance_to(exit_pos)
 		var max_beacon_dist: float = 380.0 if GameState.blind_assist_mode else 280.0
@@ -847,49 +863,141 @@ func _physics_process(delta: float) -> void:
 		if _is_tutorial_level:
 			_level_0_cinematic_exit()
 			return
-		_changing = true
-		var cur_sector: int = GameState.current_level
-		var level_num: int = cur_sector + 1
+		_play_level_clear_sequence()
+
+
+func _play_level_clear_sequence() -> void:
+	_changing = true
+	var cur_sector: int = GameState.current_level
+	var level_num: int = cur_sector + 1
+
+	# 1. Freeze player controls immediately and hide gameplay buttons
+	if hud != null:
+		hud.set_gameplay_buttons_visible(false)
+	if is_instance_valid(player):
+		player.can_move = false
+		player.can_sound = false
+		player.can_sneak = false
+		player.can_pebble = false
+		player.velocity = Vector2.ZERO
+		if player.has_node("MicInput"):
+			var mic = player.get_node("MicInput")
+			if mic != null and mic.has_method("suppress"):
+				mic.suppress(9999.0)
+
+	# 2. Play ascension / level exit chime
+	if sfx != null:
+		sfx.play_level_exit()
+
+	# 3. Sonar resonance rings bursting from exit portal
+	var exit_pos := cell_to_world(exit_cell)
+	if echo_layer != null:
+		echo_layer.emit_echo(exit_pos, 280.0, [], false)
+
+	# 4. Player ascension animation: glides to center of exit, pulses gently and dissolves into light
+	if is_instance_valid(player):
+		var tw := create_tween()
+		tw.set_parallel(true)
+		tw.tween_property(player, "global_position", exit_pos, 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tw.tween_property(player, "scale", Vector2(1.22, 1.22), 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tw.tween_property(player, "modulate:a", 0.0, 0.55).set_delay(0.10).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+
+	# 5. After player dissolves (0.45s), record clear and proceed with transition
+	get_tree().create_timer(0.45).timeout.connect(func():
 		var debrief_data := GameState.record_level_clear(
 			level_num,
 			_level_time,
 			_sonar_pings,
 			_enemies_alerted
 		)
-		hud.show_debrief(
-			debrief_data,
-			func(): # On Next
-				if GameState.has_next_level():
-					var milestone: Array = GameState.get_act_milestone_lines(cur_sector)
-					if milestone.size() > 0 and hud != null and hud.story_overlay != null:
-						GameState.mark_act_milestone_seen(cur_sector)
-						var act_hdr: String = GameState.get_act_milestone_header(cur_sector)
-						hud.story_overlay.play_sequence(milestone, func():
-							hud.play_level_exit_transition(func():
-								GameState.next_level()
-							)
-						, true, act_hdr, "milestone")
-					else:
-						hud.play_level_exit_transition(func():
-							GameState.next_level()
-						)
-				else:
-					var ending_lines: Array = GameState.get_campaign_ending_lines()
-					if ending_lines.size() > 0 and hud != null and hud.story_overlay != null:
-						GameState.mark_campaign_ending_seen()
-						var is_chal: bool = (GameState.current_mode == GameState.GameMode.CHALLENGE)
-						var end_hdr: String = "◈   K I N G   S E C T O R   •   D E P T H   - 9 , 9 9 9   M   ◈" if is_chal else "◈   S U R F A C E   B R E A C H   •   D E P T H   0   M   ◈"
-						var end_theme: String = "singularity" if is_chal else "daylight"
-						hud.story_overlay.play_sequence(ending_lines, func():
-							hud.show_victory_screen()
-						, true, end_hdr, end_theme)
-					else:
-						hud.show_victory_screen(),
-			func(): # On Retry
-				GameState.restart_level(),
-			func(): # On Level Select
+
+		if GameState.current_mode == GameState.GameMode.CHALLENGE:
+			# Roguelite flow: non-blocking clear banner (shows sector & time automatically), no retry or level-select buttons
+			if hud != null:
+				var on_chal_clear := func():
+					_on_challenge_clear_next(cur_sector)
+				hud.show_challenge_clear_banner(
+					GameState.get_level_name(cur_sector),
+					_level_time,
+					on_chal_clear
+				)
+			else:
+				_on_challenge_clear_next(cur_sector)
+		else:
+			# Story Mode flow:
+			# 1. Screen fades completely to black (holds on black briefly for ~0.95s)
+			# 2. Displays pure typewriter story narration (all black, only text, like game intro)
+			# 3. When narrative sequence finishes, fades back to level cavern and displays the 3-star DebriefModal
+			_play_story_clear_sequence(cur_sector, debrief_data)
+	)
+
+
+func _play_story_clear_sequence(cur_sector: int, debrief_data: Dictionary) -> void:
+	var is_final_level: bool = not GameState.has_next_level()
+	var story_lines: Array = []
+	if is_final_level:
+		story_lines = GameState.get_campaign_ending_lines()
+		GameState.mark_campaign_ending_seen()
+	else:
+		story_lines = GameState.get_sector_story_lines(cur_sector)
+		GameState.mark_act_milestone_seen(cur_sector)
+
+	if story_lines.size() > 0 and hud != null and hud.story_overlay != null:
+		var theme_mode := "daylight" if is_final_level else ""
+		var on_story_finished := func():
+			_show_story_debrief_modal(debrief_data, is_final_level)
+		hud.story_overlay.play_sequence(story_lines, on_story_finished, true, "", theme_mode, 0.95)
+	else:
+		_show_story_debrief_modal(debrief_data, is_final_level)
+
+
+func _show_story_debrief_modal(debrief_data: Dictionary, is_final_level: bool) -> void:
+	if hud == null:
+		return
+	var on_next := func():
+		if is_final_level:
+			hud.show_victory_screen()
+		else:
+			hud.play_level_exit_transition(func():
+				GameState.next_level()
+			)
+	var on_retry := func():
+		GameState.restart_level()
+	var on_select := func():
+		GameState.go_to_level_select()
+
+	hud.show_debrief(debrief_data, on_next, on_retry, on_select)
+
+
+func _on_challenge_clear_next(cur_sector: int) -> void:
+	var level_num: int = cur_sector + 1
+	if ChallengeModifiers.is_milestone_sector(level_num) and not ChallengeModifiers.is_milestone_claimed(level_num):
+		var on_pact_done := func():
+			_proceed_challenge_after_pact(cur_sector)
+		AbyssalPactModal.open_pact(hud if hud != null else self, level_num, on_pact_done)
+		return
+	_proceed_challenge_after_pact(cur_sector)
+
+
+func _proceed_challenge_after_pact(cur_sector: int) -> void:
+	if not GameState.has_next_level():
+		var ending_lines: Array = GameState.get_campaign_ending_lines()
+		if ending_lines.size() > 0 and hud != null and hud.story_overlay != null:
+			GameState.mark_campaign_ending_seen()
+			var end_hdr: String = "◈   K I N G   S E C T O R   •   D E P T H   - 9 , 9 9 9   M   ◈"
+			var end_theme: String = "singularity"
+			var on_chal_victory := func():
+				hud.show_victory_screen()
+			hud.story_overlay.play_sequence(ending_lines, on_chal_victory, true, end_hdr, end_theme, 0.8)
+		else:
+			hud.show_victory_screen()
+	else:
+		if hud != null:
+			var on_exit_done := func():
 				GameState.go_to_level_select()
-		)
+			hud.play_level_exit_transition(on_exit_done)
+		else:
+			GameState.go_to_level_select()
 
 func is_exit_locked() -> bool:
 	for c in switch_cells:
@@ -902,6 +1010,9 @@ func is_exit_locked() -> bool:
 func _press_switch(cell: Vector2i) -> void:
 	pressed[cell] = true
 	_echo_features_dirty = true
+	if GameState.current_mode == GameState.GameMode.CHALLENGE and ChallengeModifiers.has_boon("boon_deep_pockets") and is_instance_valid(player):
+		player.pebbles = mini(player.pebbles + 1, 4)
+		player.pebble_count_changed.emit(player.pebbles)
 	var id: String = str(switch_cells[cell]).to_upper()
 	for body in door_nodes.get(id, []):
 		if is_instance_valid(body) and not body.has_meta("open"):

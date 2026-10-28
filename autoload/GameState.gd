@@ -147,6 +147,7 @@ var story_completed := false
 var has_seen_intro := false
 var story_tutorial_completed := false
 var force_level_0_story := false
+var challenge_sp_revealed := false
 var seen_act_milestones: Dictionary = {}
 var seen_campaign_endings: Dictionary = {}
 
@@ -269,6 +270,74 @@ const ACT_MILESTONES: Dictionary = {
 	]
 }
 
+# Evocative sector transition narrative beats for Story Mode ascent
+const SECTOR_TRANSITIONS: Dictionary = {
+	1: [
+		"The resonance of the Shallow Ring fades into the deep.",
+		"“In the deepest dark, silence is not emptiness—it is your canvas.”"
+	],
+	2: [
+		"The heavy snores of the sleeping giants sink back into the silt.",
+		"“Sound travels far down straight halls, but calmness travels further.”"
+	],
+	3: [
+		"The ancient stone gates grind shut. You step into the quiet hollows above.",
+		"“Move gently. The abyss reflects only what you project.”"
+	],
+	4: [
+		"Past the crimson predators, the narrow corridor opens upward.",
+		"“A quiet diversion overcomes sheer brute force.”"
+	],
+	5: [
+		"You pay the silent toll of the deep. Ahead lies the threshold of Hush Hall.",
+		"“Patience unmasks every wall; panic only builds more.”"
+	],
+	7: [
+		"The shrill echoes of the crystal gallery fracture into silence.",
+		"“Walk with care. Subterranean pressure turns rough stone into steadfast resolve.”"
+	],
+	8: [
+		"Drenched in black water, you climb past the subterranean tide: -2,440 Meters.",
+		"“Still your waters. When current drags your feet, freeze and let the terror pass.”"
+	],
+	9: [
+		"The deceptive alarms fade into the abyss. The path upward is clear.",
+		"“The loudest alarm can clear the quietest path. Wisdom turns danger into an ally.”"
+	],
+	10: [
+		"Both ancient vaults unlocked, the cold stone stairs wind upward: -2,000 Meters.",
+		"“In the crystalline cold, clarity shines through the dark. Unlock both sides of fear.”"
+	],
+	11: [
+		"You slip past the towering dormant shadows into the grand cathedral above.",
+		"“Step past dormant shadows. When the time comes, let courage outrun terror.”"
+	],
+	13: [
+		"Through the four dark forks, patient echoes revealed the true passage.",
+		"“Four paths in the gloom. Do not shout blindly; patience illuminates the true branch.”"
+	],
+	14: [
+		"Behind you, the tomb run collapses into stillness: -1,120 Meters.",
+		"“A scattered pebble buys precious heartbeats. In ancient tombs, ingenuity outpaces the beast.”"
+	],
+	15: [
+		"Wading through the drowned gallery, you pull yourself onto the dry ledges above.",
+		"“Balance upon the dry beam above, wade through the deep below. Adaptability is survival.”"
+	],
+	16: [
+		"Three great locks dissolved into the dark. Less than a kilometer of rock remains.",
+		"“Three ancient gates fall one by one. Every seal broken brings you closer to the sky.”"
+	],
+	17: [
+		"You slip past the listening eye undetected. The winding spiral beckons: -460 Meters.",
+		"“The eye of the cavern listens to your every breath. Subdue your panic into absolute silence.”"
+	],
+	19: [
+		"Across the vast expanse of the Black Lake, cold surface air stirs the water.",
+		"“Dark waters stretch under ancient domes. Cross the cold lake; the shore of daylight is near.”"
+	],
+}
+
 func has_seen_act_milestone(lvl: int) -> bool:
 	return seen_act_milestones.has(lvl)
 
@@ -303,9 +372,22 @@ func mark_campaign_ending_seen(mode_key: String = "") -> void:
 
 func get_act_milestone_lines(lvl: int) -> Array:
 	if current_mode == GameMode.STORY and ACT_MILESTONES.has(lvl):
-		if has_seen_act_milestone(lvl):
-			return []
 		return ACT_MILESTONES[lvl]
+	return []
+
+
+func get_sector_story_lines(lvl: int) -> Array:
+	if current_mode != GameMode.STORY:
+		return []
+	if ACT_MILESTONES.has(lvl):
+		return ACT_MILESTONES[lvl]
+	if SECTOR_TRANSITIONS.has(lvl):
+		return SECTOR_TRANSITIONS[lvl]
+	if SECTOR_LOGS.has(lvl):
+		return [
+			"You step onto the cold stone stairs winding upward into the dark.",
+			"“%s”" % str(SECTOR_LOGS[lvl])
+		]
 	return []
 
 
@@ -318,12 +400,11 @@ func get_act_milestone_header(lvl: int) -> String:
 		18:
 			return "◈   A C T   I I I   C L E A R E D   •   D E P T H   - 4 6 0   M   ◈"
 		_:
-			return "◈   A B Y S S   S T R A T U M   A S C E N D E D   ◈"
+			var d_str: String = get_level_depth_str(lvl)
+			return "◈   S E C T O R   %02d   •   D E P T H   %s   •   A S C E N T   ◈" % [lvl, d_str]
 
 
 func get_campaign_ending_lines() -> Array:
-	if has_seen_campaign_ending():
-		return []
 	if current_mode == GameMode.CHALLENGE:
 		return [
 			"You stand at -9,999 Meters: the absolute core of the abyss.",
@@ -347,31 +428,32 @@ func get_sector_log(lvl: int) -> String:
 
 # Level Par Benchmarks: { level_number: { "par_time": float, "par_pings": int } }
 const LEVEL_PARS: Dictionary = {
-	0: { "par_time": 20.0, "par_pings": 6 },    # Tutorial
-	1: { "par_time": 22.0, "par_pings": 6 },    # Shallow Ring
-	2: { "par_time": 30.0, "par_pings": 8 },    # Sleeping Giant
-	3: { "par_time": 32.0, "par_pings": 8 },    # The Living Door
-	4: { "par_time": 36.0, "par_pings": 8 },    # Dead Quiet
-	5: { "par_time": 42.0, "par_pings": 10 },   # The Tollkeeper
-	6: { "par_time": 45.0, "par_pings": 12 },   # Hush Hall
-	7: { "par_time": 48.0, "par_pings": 10 },   # Shriek Gallery
-	8: { "par_time": 56.0, "par_pings": 12 },   # The Flooded Stairs
-	9: { "par_time": 52.0, "par_pings": 14 },   # The Wrong Alarm
-	10: { "par_time": 62.0, "par_pings": 14 },  # Twin Vaults
-	11: { "par_time": 42.0, "par_pings": 8 },   # What Sleeps Above
-	12: { "par_time": 65.0, "par_pings": 16 },  # Cathedral of Pillars
-	13: { "par_time": 55.0, "par_pings": 12 },  # The Blind Forks
-	14: { "par_time": 48.0, "par_pings": 10 },  # Tomb Run
-	15: { "par_time": 68.0, "par_pings": 16 },  # The Drowned Gallery
-	16: { "par_time": 75.0, "par_pings": 18 },  # Three Locks
-	17: { "par_time": 82.0, "par_pings": 20 },  # The Listening Eye
-	18: { "par_time": 72.0, "par_pings": 16 },  # The Spiral
-	19: { "par_time": 78.0, "par_pings": 18 },  # The Black Lake
-	20: { "par_time": 65.0, "par_pings": 14 },  # Surface Breach
-	21: { "par_time": 105.0, "par_pings": 24 }, # King Sector: The Final Echo
+	0: { "par_time": 25.0, "par_pings": 8 },    # Tutorial
+	1: { "par_time": 30.0, "par_pings": 8 },    # Shallow Ring (2.3% Water)
+	2: { "par_time": 40.0, "par_pings": 10 },   # Sleeping Giant (20.4% Water)
+	3: { "par_time": 40.0, "par_pings": 10 },   # The Living Door (Compact)
+	4: { "par_time": 45.0, "par_pings": 10 },   # Dead Quiet (4.5% Water)
+	5: { "par_time": 55.0, "par_pings": 12 },   # The Tollkeeper
+	6: { "par_time": 60.0, "par_pings": 14 },   # Hush Hall
+	7: { "par_time": 60.0, "par_pings": 12 },   # Shriek Gallery (Screamers)
+	8: { "par_time": 80.0, "par_pings": 16 },   # The Flooded Stairs (97.8% Water)
+	9: { "par_time": 65.0, "par_pings": 16 },   # The Wrong Alarm
+	10: { "par_time": 80.0, "par_pings": 16 },  # Twin Vaults (Dual Keys)
+	11: { "par_time": 60.0, "par_pings": 10 },  # What Sleeps Above
+	12: { "par_time": 90.0, "par_pings": 20 },  # Cathedral of Pillars (1,416 Walkable Cells)
+	13: { "par_time": 70.0, "par_pings": 14 },  # The Blind Forks
+	14: { "par_time": 65.0, "par_pings": 12 },  # Tomb Run (10.4% Water)
+	15: { "par_time": 95.0, "par_pings": 20 },  # The Drowned Gallery (72.2% Water)
+	16: { "par_time": 100.0, "par_pings": 20 }, # Three Locks (Tri-Gate Run)
+	17: { "par_time": 105.0, "par_pings": 22 }, # The Listening Eye
+	18: { "par_time": 95.0, "par_pings": 18 },  # The Spiral
+	19: { "par_time": 120.0, "par_pings": 22 }, # The Black Lake (1,724 Cells + 26.5% Water)
+	20: { "par_time": 90.0, "par_pings": 18 },  # Surface Breach (Vertical Ascent)
+	21: { "par_time": 140.0, "par_pings": 28 }, # King Sector: The Final Echo (1,365 Cells)
 }
 
 var level_records: Dictionary = {}
+var challenge_records: Dictionary = {}
 var collected_notes: Dictionary = {}
 
 # Collectible Expedition Archives & Subterranean Lore Notes
@@ -672,6 +754,8 @@ var mic_push_to_talk := false
 # Gameplay & Controls Settings
 var sneak_hold_mode := false      # false = Toggle Sneak, true = Hold to Sneak
 var fast_pulse_mode := false      # Double-tap / fast ping support
+var virtual_joystick_enabled := false # false = Drag & Tap, true = Virtual Joystick
+var controls_layout := "right"     # "right" = Actions Right (Left Stick), "left" = Actions Left (Right Stick)
 var sound_indicator_enabled := true # Off-screen directional sound pulse visualizer
 var blind_assist_mode := true     # Visually impaired acoustic navigation (exit beacon, wall echoes, obstacle cane radar)
 
@@ -692,7 +776,10 @@ var previous_scene_path: String = LEVEL_SELECT_SCENE
 
 # Global Procedural Subterranean Menu & UI BGM System
 const BGM_SCALE: Array[float] = [0.75, 1.0, 1.125, 1.2, 1.333, 1.5, 1.6, 1.8, 2.0]
+const CHALLENGE_BGM_SCALE: Array[float] = [0.667, 0.707, 0.794, 0.891, 1.0, 1.059, 1.189, 1.335, 1.414, 1.587]
 var _bgm_pad_player: AudioStreamPlayer = null
+var _wav_story_pad: AudioStreamWAV = null
+var _wav_challenge_pad: AudioStreamWAV = null
 var _wav_bgm_note: AudioStreamWAV = null
 var _wav_bgm_droplet: AudioStreamWAV = null
 var _bgm_note_timer := 1.2
@@ -775,8 +862,11 @@ func apply_audio_settings() -> void:
 
 # Effective dB threshold required to trigger a voice echo
 func get_mic_trigger_db() -> float:
-	var margin: float = lerpf(24.0, 7.0, clampf(mic_sensitivity, 0.0, 1.0))
-	return clampf(mic_noise_floor_db + margin, -44.0, -14.0)
+	var sens := clampf(mic_sensitivity, 0.0, 1.0)
+	var margin: float = lerpf(42.0, 10.0, sens)
+	var target_db: float = mic_noise_floor_db + margin
+	var min_allowed_db: float = lerpf(-7.0, -32.0, sens)
+	return clampf(maxf(target_db, min_allowed_db), -34.0, -6.0)
 
 
 func apply_display_settings() -> void:
@@ -816,6 +906,8 @@ func save_settings() -> void:
 
 	cfg.set_value("controls", "sneak_hold_mode", sneak_hold_mode)
 	cfg.set_value("controls", "fast_pulse_mode", fast_pulse_mode)
+	cfg.set_value("controls", "virtual_joystick_enabled", virtual_joystick_enabled)
+	cfg.set_value("controls", "controls_layout", controls_layout)
 	cfg.set_value("controls", "sound_indicator_enabled", sound_indicator_enabled)
 	cfg.set_value("controls", "blind_assist_mode", blind_assist_mode)
 
@@ -837,26 +929,28 @@ func load_settings() -> void:
 		apply_display_settings()
 		return
 	master_volume = clampf(float(cfg.get_value("audio", "master_volume", 1.0)), 0.0, 1.0)
-	master_muted = bool(cfg.get_value("audio", "master_muted", false))
+	master_muted = (cfg.get_value("audio", "master_muted", false) == true)
 	bgm_volume = clampf(float(cfg.get_value("audio", "bgm_volume", 0.8)), 0.0, 1.0)
 	sfx_volume = clampf(float(cfg.get_value("audio", "sfx_volume", 1.0)), 0.0, 1.0)
 
-	mic_enabled = bool(cfg.get_value("mic", "enabled", true))
+	mic_enabled = (cfg.get_value("mic", "enabled", true) == true)
 	mic_sensitivity = clampf(float(cfg.get_value("mic", "sensitivity", 0.5)), 0.0, 1.0)
 	mic_noise_floor_db = clampf(float(cfg.get_value("mic", "noise_floor_db", -48.0)), -54.0, -34.0)
-	mic_calibrated = bool(cfg.get_value("mic", "calibrated", false))
-	mic_push_to_talk = bool(cfg.get_value("mic", "push_to_talk", false))
+	mic_calibrated = (cfg.get_value("mic", "calibrated", false) == true)
+	mic_push_to_talk = (cfg.get_value("mic", "push_to_talk", false) == true)
 
-	sneak_hold_mode = bool(cfg.get_value("controls", "sneak_hold_mode", false))
-	fast_pulse_mode = bool(cfg.get_value("controls", "fast_pulse_mode", false))
-	sound_indicator_enabled = bool(cfg.get_value("controls", "sound_indicator_enabled", true))
-	blind_assist_mode = bool(cfg.get_value("controls", "blind_assist_mode", true))
+	sneak_hold_mode = (cfg.get_value("controls", "sneak_hold_mode", false) == true)
+	fast_pulse_mode = (cfg.get_value("controls", "fast_pulse_mode", false) == true)
+	virtual_joystick_enabled = (cfg.get_value("controls", "virtual_joystick_enabled", false) == true)
+	controls_layout = str(cfg.get_value("controls", "controls_layout", "right"))
+	sound_indicator_enabled = (cfg.get_value("controls", "sound_indicator_enabled", true) == true)
+	blind_assist_mode = (cfg.get_value("controls", "blind_assist_mode", true) == true)
 
-	fullscreen_enabled = bool(cfg.get_value("display", "fullscreen_enabled", false))
+	fullscreen_enabled = (cfg.get_value("display", "fullscreen_enabled", false) == true)
 	screen_shake_intensity = clampf(float(cfg.get_value("display", "screen_shake_intensity", 1.0)), 0.0, 1.0)
 	sonar_glow_boost = clampf(float(cfg.get_value("display", "sonar_glow_boost", 1.0)), 0.6, 1.4)
-	vignette_enabled = bool(cfg.get_value("display", "vignette_enabled", true))
-	vsync_enabled = bool(cfg.get_value("display", "vsync_enabled", true))
+	vignette_enabled = (cfg.get_value("display", "vignette_enabled", true) == true)
+	vsync_enabled = (cfg.get_value("display", "vsync_enabled", true) == true)
 	max_fps = int(cfg.get_value("display", "max_fps", 60))
 
 	sonar_palette = str(cfg.get_value("advanced", "sonar_palette", "cyan"))
@@ -1046,6 +1140,8 @@ func reset_to_defaults() -> void:
 	mic_push_to_talk = false
 	sneak_hold_mode = false
 	fast_pulse_mode = false
+	virtual_joystick_enabled = false
+	controls_layout = "right"
 	sound_indicator_enabled = true
 	blind_assist_mode = true
 	fullscreen_enabled = false
@@ -1061,28 +1157,74 @@ func reset_to_defaults() -> void:
 
 
 func reset_progress() -> void:
-	story_highest_unlocked = 1
-	challenge_highest_unlocked = 1
+	# Resets Story Mode's 20 star-bearing sectors (Levels 2 to 21) back to Sector 01.
+	# Level 1 (Tutorial) does NOT need to be replayed.
+	# Challenge Mode access, records, and modifiers are preserved.
+	story_highest_unlocked = 2
 	story_completed = false
-	has_seen_intro = false
-	story_tutorial_completed = false
-	force_level_0_story = false
-	current_level = 0
-	level_records.clear()
-	collected_notes.clear()
+	story_tutorial_completed = true
+	has_seen_intro = true
+	current_level = 1
 	seen_act_milestones.clear()
-	seen_campaign_endings.clear()
+	seen_campaign_endings.erase("story")
+	for i in range(2, STORY_LEVELS.size() + 2):
+		level_records.erase(i)
+	if not level_records.has(1):
+		level_records[1] = {
+			"survivor": true,
+			"ghost": false,
+			"swift": false,
+			"best_time": 999.0,
+			"best_pings": 999,
+			"stars": 0,
+		}
 	var cfg := ConfigFile.new()
-	cfg.set_value("progress", "highest_unlocked_level", 1)
-	cfg.set_value("progress", "story_highest_unlocked", 1)
-	cfg.set_value("progress", "challenge_highest_unlocked", 1)
-	cfg.set_value("progress", "story_completed", false)
-	cfg.set_value("progress", "has_seen_intro", false)
-	cfg.set_value("progress", "story_tutorial_completed", false)
-	cfg.set_value("lore", "collected_notes", [])
-	cfg.set_value("narrative", "seen_act_milestones", [])
-	cfg.set_value("narrative", "seen_campaign_endings", [])
-	cfg.save(PROGRESS_PATH)
+	if cfg.load(PROGRESS_PATH) == OK:
+		cfg.set_value("progress", "story_highest_unlocked", 2)
+		cfg.set_value("progress", "highest_unlocked_level", 2)
+		cfg.set_value("progress", "story_completed", false)
+		cfg.set_value("progress", "story_tutorial_completed", true)
+		cfg.set_value("progress", "has_seen_intro", true)
+		cfg.set_value("narrative", "seen_act_milestones", [])
+		var endings: Array = []
+		if seen_campaign_endings.has("challenge"):
+			endings.append("challenge")
+		cfg.set_value("narrative", "seen_campaign_endings", endings)
+		for i in range(2, STORY_LEVELS.size() + 2):
+			var sec := "level_%02d" % i
+			if cfg.has_section(sec):
+				cfg.erase_section(sec)
+		cfg.save(PROGRESS_PATH)
+
+
+func reset_challenge_run() -> void:
+	challenge_highest_unlocked = 1
+	challenge_sp_revealed = false
+	challenge_records.clear()
+	if Engine.has_singleton("ChallengeModifiers") or get_node_or_null("/root/ChallengeModifiers") != null:
+		ChallengeModifiers.reset_challenge_run()
+	var cfg := ConfigFile.new()
+	if cfg.load(PROGRESS_PATH) == OK:
+		cfg.set_value("progress", "challenge_highest_unlocked", 1)
+		cfg.set_value("progress", "challenge_sp_revealed", false)
+		for i in range(1, CHALLENGE_LEVELS.size() + 2):
+			var sec := "challenge_%02d" % i
+			if cfg.has_section(sec):
+				cfg.erase_section(sec)
+		cfg.save(PROGRESS_PATH)
+
+
+func mark_challenge_sp_revealed() -> void:
+	challenge_sp_revealed = true
+	var cfg := ConfigFile.new()
+	if cfg.load(PROGRESS_PATH) == OK:
+		cfg.set_value("progress", "challenge_sp_revealed", true)
+		cfg.save(PROGRESS_PATH)
+
+
+func restart_challenge_from_first_sector() -> void:
+	reset_challenge_run()
+	start_game(0)
 
 
 func mark_intro_seen() -> void:
@@ -1140,21 +1282,31 @@ func load_progress() -> void:
 		1,
 		CHALLENGE_LEVELS.size() + 1
 	)
-	story_completed = bool(cfg.get_value("progress", "story_completed", story_highest_unlocked > STORY_LEVELS.size()))
-	has_seen_intro = bool(cfg.get_value("progress", "has_seen_intro", false))
-	story_tutorial_completed = bool(cfg.get_value("progress", "story_tutorial_completed", story_highest_unlocked > 1))
+	story_completed = (cfg.get_value("progress", "story_completed", story_highest_unlocked > STORY_LEVELS.size()) == true)
+	has_seen_intro = (cfg.get_value("progress", "has_seen_intro", false) == true)
+	story_tutorial_completed = (cfg.get_value("progress", "story_tutorial_completed", story_highest_unlocked > 1) == true)
+	challenge_sp_revealed = (cfg.get_value("progress", "challenge_sp_revealed", false) == true)
 
 	var max_entries := maxi(STORY_LEVELS.size(), CHALLENGE_LEVELS.size()) + 2
 	for i in range(1, max_entries + 1):
 		var sec := "level_%02d" % i
 		if cfg.has_section(sec):
 			level_records[i] = {
-				"survivor": bool(cfg.get_value(sec, "survivor", true)),
-				"ghost": bool(cfg.get_value(sec, "ghost", false)),
-				"swift": bool(cfg.get_value(sec, "swift", false)),
+				"survivor": (cfg.get_value(sec, "survivor", true) == true),
+				"ghost": (cfg.get_value(sec, "ghost", false) == true),
+				"swift": (cfg.get_value(sec, "swift", false) == true),
 				"best_time": float(cfg.get_value(sec, "best_time", 999.0)),
 				"best_pings": int(cfg.get_value(sec, "best_pings", 999)),
 				"stars": int(cfg.get_value(sec, "stars", 1)),
+			}
+
+	challenge_records.clear()
+	for i in range(1, CHALLENGE_LEVELS.size() + 2):
+		var sec := "challenge_%02d" % i
+		if cfg.has_section(sec):
+			challenge_records[i] = {
+				"best_time": float(cfg.get_value(sec, "best_time", 999.0)),
+				"best_pings": int(cfg.get_value(sec, "best_pings", 999))
 			}
 
 
@@ -1168,21 +1320,36 @@ func get_level_par(lvl: int) -> Dictionary:
 
 
 func get_level_stars(lvl: int) -> int:
+	if current_mode == GameMode.CHALLENGE:
+		return 0 # Challenge mode does not use stars
 	if level_records.has(lvl):
 		return int(level_records[lvl].get("stars", 0))
 	return 0
 
 
 func get_level_best_time(lvl: int) -> float:
+	if current_mode == GameMode.CHALLENGE:
+		if challenge_records.has(lvl):
+			return float(challenge_records[lvl].get("best_time", 0.0))
+		return 0.0
 	if level_records.has(lvl):
 		return float(level_records[lvl].get("best_time", 0.0))
 	return 0.0
 
 
 func is_level_ghost_cleared(lvl: int) -> bool:
+	if current_mode == GameMode.CHALLENGE:
+		return false
 	if level_records.has(lvl):
-		return bool(level_records[lvl].get("ghost", false))
+		return (level_records[lvl].get("ghost", false) == true)
 	return false
+
+
+func get_total_challenge_time() -> float:
+	var total := 0.0
+	for lvl in challenge_records:
+		total += float(challenge_records[lvl].get("best_time", 0.0))
+	return total
 
 
 func record_level_clear(level_number: int, clear_time: float, pings: int, alerts: int) -> Dictionary:
@@ -1197,6 +1364,43 @@ func record_level_clear(level_number: int, clear_time: float, pings: int, alerts
 	var is_ghost := (alerts == 0)
 	var is_swift := (clear_time <= par_time)
 
+	if current_mode == GameMode.CHALLENGE:
+		var prior_rec: Dictionary = challenge_records.get(level_number, {
+			"best_time": 999.0,
+			"best_pings": 999
+		})
+		var prior_best_time: float = float(prior_rec.get("best_time", 999.0))
+		var new_best_time: float = minf(prior_best_time, clear_time)
+		var new_best_pings: int = mini(int(prior_rec.get("best_pings", 999)), pings)
+		challenge_records[level_number] = {
+			"best_time": new_best_time,
+			"best_pings": new_best_pings
+		}
+
+		var cfg := ConfigFile.new()
+		cfg.load(PROGRESS_PATH)
+		cfg.set_value("progress", "challenge_highest_unlocked", challenge_highest_unlocked)
+		var sec := "challenge_%02d" % level_number
+		cfg.set_value(sec, "best_time", new_best_time)
+		cfg.set_value(sec, "best_pings", new_best_pings)
+		cfg.save(PROGRESS_PATH)
+
+		return {
+			"level_number": level_number,
+			"clear_time": clear_time,
+			"pings": pings,
+			"alerts": alerts,
+			"par_time": par_time,
+			"par_pings": par_pings,
+			"is_survivor": is_survivor,
+			"is_ghost": is_ghost,
+			"is_swift": is_swift,
+			"run_stars": 0,
+			"total_stars": 0,
+			"is_new_best_time": (clear_time < prior_best_time),
+			"is_challenge": true
+		}
+
 	var rec: Dictionary = level_records.get(level_number, {
 		"survivor": false,
 		"ghost": false,
@@ -1206,8 +1410,8 @@ func record_level_clear(level_number: int, clear_time: float, pings: int, alerts
 		"stars": 0
 	})
 
-	var prior_ghost: bool = bool(rec.get("ghost", false))
-	var prior_swift: bool = bool(rec.get("swift", false))
+	var prior_ghost: bool = (rec.get("ghost", false) == true)
+	var prior_swift: bool = (rec.get("swift", false) == true)
 	var prior_best_time: float = float(rec.get("best_time", 999.0))
 	var prior_best_pings: int = int(rec.get("best_pings", 999))
 
@@ -1252,7 +1456,8 @@ func record_level_clear(level_number: int, clear_time: float, pings: int, alerts
 		"is_swift": is_swift,
 		"run_stars": run_stars,
 		"total_stars": total_stars,
-		"is_new_best_time": (clear_time < prior_best_time)
+		"is_new_best_time": (clear_time < prior_best_time),
+		"is_challenge": false
 	}
 
 
@@ -1308,45 +1513,75 @@ func stop_menu_bgm(fade_dur: float = 0.4) -> void:
 
 
 func _setup_menu_bgm() -> void:
+	_wav_story_pad = SfxManager.get_menu_bgm_pad()
+	_wav_challenge_pad = SfxManager.get_challenge_bgm_pad()
 	_wav_bgm_note = SfxManager.get_menu_bgm_note()
 	_wav_bgm_droplet = SfxManager.get_menu_bgm_droplet()
 
 	_bgm_pad_player = AudioStreamPlayer.new()
 	_bgm_pad_player.name = "GlobalMenuBGM"
-	_bgm_pad_player.stream = SfxManager.get_menu_bgm_pad()
+	_bgm_pad_player.stream = _wav_challenge_pad if current_mode == GameMode.CHALLENGE else _wav_story_pad
 	_bgm_pad_player.bus = &"BGM"
 	_bgm_pad_player.volume_db = -26.0
 	add_child(_bgm_pad_player)
+
+
+func update_bgm_for_mode() -> void:
+	if _bgm_pad_player == null:
+		_setup_menu_bgm()
+	var is_chal: bool = (current_mode == GameMode.CHALLENGE)
+	var target_stream: AudioStreamWAV = _wav_challenge_pad if is_chal else _wav_story_pad
+	if _bgm_pad_player.stream != target_stream:
+		var tw := create_tween()
+		tw.tween_property(_bgm_pad_player, "volume_db", -36.0, 0.30).set_trans(Tween.TRANS_SINE)
+		tw.tween_callback(func():
+			if _bgm_pad_player != null:
+				_bgm_pad_player.stream = target_stream
+				_bgm_pad_player.play()
+		)
+		tw.tween_property(_bgm_pad_player, "volume_db", -6.5 if is_chal else -7.5, 0.45).set_trans(Tween.TRANS_SINE)
 
 
 func _process(delta: float) -> void:
 	if not _bgm_active or _bgm_pad_player == null or not _bgm_pad_player.playing:
 		return
 
-	_bgm_pad_player.volume_db = lerpf(_bgm_pad_player.volume_db, -7.5, clampf(delta * 4.0, 0.0, 1.0))
+	var is_chal: bool = (current_mode == GameMode.CHALLENGE)
+	var active_scale: Array[float] = CHALLENGE_BGM_SCALE if is_chal else BGM_SCALE
+	var target_vol: float = -6.5 if is_chal else -7.5
+	_bgm_pad_player.volume_db = lerpf(_bgm_pad_player.volume_db, target_vol, clampf(delta * 4.0, 0.0, 1.0))
 
-	# Generative crystalline echo notes (A minor / Dorian motif)
+	# Generative crystalline / abyssal echo notes
 	_bgm_note_timer -= delta
 	if _bgm_note_timer <= 0.0:
-		_bgm_note_timer = randf_range(2.8, 4.8)
-		var motif_indices: Array[int] = [1, 4, 3, 1, 5, 3, 2, 0, 1, 6, 4, 3]
+		_bgm_note_timer = randf_range(2.4, 4.2) if is_chal else randf_range(2.8, 4.8)
+		var motif_indices: Array[int]
+		if is_chal:
+			# Ominous, brooding descent motif with tension and release
+			motif_indices = [0, 4, 1, 5, 2, 8, 4, 0, 5, 1, 6, 2]
+		else:
+			motif_indices = [1, 4, 3, 1, 5, 3, 2, 0, 1, 6, 4, 3]
+
 		var idx: int = motif_indices[_bgm_note_step % motif_indices.size()]
 		_bgm_note_step += 1
-		var pitch: float = BGM_SCALE[idx]
-		_play_bgm_sfx(_wav_bgm_note, randf_range(-11.5, -8.5), pitch)
+		var pitch: float = active_scale[idx % active_scale.size()]
+		var note_pitch: float = pitch * (0.84 if is_chal else 1.0)
+		_play_bgm_sfx(_wav_bgm_note, randf_range(-11.5, -8.0), note_pitch)
 
-		if randf() < 0.45:
-			var ans_pitch: float = BGM_SCALE[(idx + 2) % BGM_SCALE.size()]
-			get_tree().create_timer(0.44).timeout.connect(func():
+		if randf() < (0.55 if is_chal else 0.45):
+			var ans_step: int = (idx + (1 if is_chal else 2)) % active_scale.size()
+			var ans_pitch: float = active_scale[ans_step] * (0.84 if is_chal else 1.0)
+			get_tree().create_timer(0.40 if is_chal else 0.44).timeout.connect(func():
 				if _bgm_active:
-					_play_bgm_sfx(_wav_bgm_note, -13.5, ans_pitch)
+					_play_bgm_sfx(_wav_bgm_note, -13.0 if is_chal else -13.5, ans_pitch)
 			)
 
-	# Subterranean cavern water droplets
+	# Subterranean cavern water droplets (deeper, heavier drops in the abyss)
 	_bgm_drop_timer -= delta
 	if _bgm_drop_timer <= 0.0:
-		_bgm_drop_timer = randf_range(4.2, 7.8)
-		_play_bgm_sfx(_wav_bgm_droplet, randf_range(-13.0, -9.5), randf_range(0.84, 1.26))
+		_bgm_drop_timer = randf_range(3.8, 6.8) if is_chal else randf_range(4.2, 7.8)
+		var drop_pitch: float = randf_range(0.68, 0.98) if is_chal else randf_range(0.84, 1.26)
+		_play_bgm_sfx(_wav_bgm_droplet, randf_range(-12.5, -9.0), drop_pitch)
 
 
 func _play_bgm_sfx(stream: AudioStreamWAV, vol_db: float, pitch: float) -> void:

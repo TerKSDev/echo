@@ -225,25 +225,28 @@ func _update_tab_button_styles() -> void:
 		btn.text = titles[i]
 		var is_active := (i == _current_tab)
 		var style := StyleBoxFlat.new()
-		style.set_corner_radius_all(6)
-		style.content_margin_left = 6.0
-		style.content_margin_right = 6.0
+		style.set_corner_radius_all(10)
+		style.content_margin_left = 10.0
+		style.content_margin_right = 10.0
 		style.content_margin_top = 4.0
 		style.content_margin_bottom = 4.0
 		if is_active:
 			if i == 1:
-				style.bg_color = Color(0.24, 0.18, 0.06, 0.95)
-				style.border_color = Color(1.0, 0.82, 0.35, 0.9)
+				style.bg_color = Color(0.24, 0.16, 0.05, 0.95)
+				style.border_color = Color(1.0, 0.82, 0.35, 0.95)
+				style.shadow_color = Color(0.65, 0.45, 0.10, 0.35)
 			else:
-				style.bg_color = Color(0.12, 0.28, 0.48, 0.95)
-				style.border_color = Color(0.38, 0.75, 1.0, 0.9)
-			style.set_border_width_all(1)
-			btn.add_theme_color_override("font_color", Color.WHITE)
+				style.bg_color = Color(0.06, 0.22, 0.38, 0.95)
+				style.border_color = Color(0.35, 0.88, 1.0, 1.0)
+				style.shadow_color = Color(0.15, 0.55, 0.95, 0.35)
+			style.set_border_width_all(2)
+			style.shadow_size = 4
+			btn.add_theme_color_override("font_color", Color(0.40, 1.0, 1.0, 1.0) if i != 1 else Color(1.0, 0.95, 0.85, 1.0))
 		else:
-			style.bg_color = Color(0.04, 0.09, 0.16, 0.6)
-			style.border_color = Color(0.15, 0.25, 0.38, 0.4)
+			style.bg_color = Color(0.025, 0.07, 0.13, 0.80)
+			style.border_color = Color(0.18, 0.38, 0.60, 0.50)
 			style.set_border_width_all(1)
-			btn.add_theme_color_override("font_color", Color(0.55, 0.70, 0.85, 0.7))
+			btn.add_theme_color_override("font_color", Color(0.55, 0.72, 0.85, 0.75))
 		btn.add_theme_stylebox_override("normal", style)
 		btn.add_theme_stylebox_override("hover", style)
 		btn.add_theme_stylebox_override("pressed", style)
@@ -377,7 +380,7 @@ func _populate_lore_notes() -> void:
 
 func _add_lore_note_card(note_data: Dictionary) -> void:
 	var nid: String = str(note_data.get("id", ""))
-	var is_collected: bool = bool(note_data.get("collected", false))
+	var is_collected: bool = (note_data.get("collected", false) == true)
 	var lvl_num: int = int(note_data.get("level", 1))
 	var depth_str: String = str(note_data.get("depth", ""))
 	var author_str: String = str(note_data.get("author", "Unknown Survivor"))

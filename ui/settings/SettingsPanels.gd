@@ -18,6 +18,7 @@ static func update_fps_btn_text(btn: Button) -> void:
 			btn.text = "TARGET: UNCAPPED"
 		_:
 			btn.text = "TARGET: %d FPS" % GameState.max_fps
+	SettingsUIFactory.style_action_button(btn, Color(0.35, 0.85, 1.0, 0.85), Color(0.04, 0.14, 0.25, 0.85), true)
 
 
 static func update_palette_btn(btn: Button, chip: ColorRect) -> void:
@@ -33,6 +34,7 @@ static func update_palette_btn(btn: Button, chip: ColorRect) -> void:
 			btn.text = "WHITE"
 		_:
 			btn.text = GameState.sonar_palette.to_upper()
+	SettingsUIFactory.style_action_button(btn, Color(0.35, 0.85, 1.0, 0.85), Color(0.04, 0.14, 0.25, 0.85), true)
 
 
 static func build_general_panel(scene: Control) -> VBoxContainer:
@@ -120,9 +122,9 @@ static func build_general_panel(scene: Control) -> VBoxContainer:
 	var calib_btn := Button.new()
 	calib_btn.custom_minimum_size = Vector2(136, 32)
 	calib_btn.focus_mode = Control.FOCUS_NONE
-	calib_btn.add_theme_font_size_override("font_size", 13)
+	calib_btn.add_theme_font_size_override("font_size", 12)
 	calib_btn.text = "CALIBRATE ROOM"
-	SettingsUIFactory.style_action_button(calib_btn, Color(0.28, 0.65, 0.95, 0.8), Color(0.04, 0.12, 0.22, 0.85))
+	SettingsUIFactory.style_action_button(calib_btn, Color(0.35, 0.85, 1.0, 0.85), Color(0.04, 0.14, 0.25, 0.85), true)
 	calib_btn.pressed.connect(func():
 		scene.call("play_click")
 		var mic: Node = scene.get("_menu_mic")
@@ -152,6 +154,52 @@ static func build_controls_panel(scene: Control) -> VBoxContainer:
 	root.add_theme_constant_override("separation", 22)
 
 	root.add_child(SettingsUIFactory.create_section_header("MOVEMENT & STEALTH"))
+
+	# Movement Scheme: Joystick vs Drag & Tap
+	var scheme_btn := Button.new()
+	scheme_btn.custom_minimum_size = Vector2(160, 32)
+	scheme_btn.focus_mode = Control.FOCUS_NONE
+	SettingsUIFactory.refresh_toggle_btn(scheme_btn, GameState.virtual_joystick_enabled, "JOYSTICK", "DRAG & TAP")
+	scheme_btn.pressed.connect(func():
+		scene.call("play_click")
+		GameState.virtual_joystick_enabled = not GameState.virtual_joystick_enabled
+		GameState.save_settings()
+		SettingsUIFactory.refresh_toggle_btn(scheme_btn, GameState.virtual_joystick_enabled, "JOYSTICK", "DRAG & TAP")
+		var hud = scene.get_tree().get_first_node_in_group("hud")
+		if hud == null:
+			hud = scene.get_node_or_null("../../Hud")
+		if hud != null and hud.has_method("update_controls_layout"):
+			hud.update_controls_layout()
+	)
+	scene.call("wire_juice", scheme_btn)
+	root.add_child(SettingsUIFactory.create_setting_row(
+		"MOVEMENT SCHEME",
+		"Choose between dual-thumb Virtual Joystick or direct Drag & Tap touch steering.",
+		scheme_btn
+	))
+
+	# Action Buttons Side / Handedness
+	var layout_btn := Button.new()
+	layout_btn.custom_minimum_size = Vector2(160, 32)
+	layout_btn.focus_mode = Control.FOCUS_NONE
+	SettingsUIFactory.refresh_toggle_btn(layout_btn, GameState.controls_layout == "right", "ACTIONS RIGHT", "ACTIONS LEFT")
+	layout_btn.pressed.connect(func():
+		scene.call("play_click")
+		GameState.controls_layout = "left" if GameState.controls_layout == "right" else "right"
+		GameState.save_settings()
+		SettingsUIFactory.refresh_toggle_btn(layout_btn, GameState.controls_layout == "right", "ACTIONS RIGHT", "ACTIONS LEFT")
+		var hud = scene.get_tree().get_first_node_in_group("hud")
+		if hud == null:
+			hud = scene.get_node_or_null("../../Hud")
+		if hud != null and hud.has_method("update_controls_layout"):
+			hud.update_controls_layout()
+	)
+	scene.call("wire_juice", layout_btn)
+	root.add_child(SettingsUIFactory.create_setting_row(
+		"ACTION BUTTONS SIDE",
+		"Position action buttons on the Right (left-thumb move) or Left (right-thumb move).",
+		layout_btn
+	))
 
 	# Sneak Mode: Hold vs Toggle
 	var sneak_btn := Button.new()
@@ -386,10 +434,10 @@ static func build_advanced_panel(scene: Control) -> VBoxContainer:
 
 	# Replay Prologue / Opening Story
 	var prologue_btn := Button.new()
-	prologue_btn.custom_minimum_size = Vector2(170, 36)
+	prologue_btn.custom_minimum_size = Vector2(160, 32)
 	prologue_btn.focus_mode = Control.FOCUS_NONE
 	prologue_btn.text = "REPLAY PROLOGUE"
-	SettingsUIFactory.style_action_button(prologue_btn, Color(0.35, 0.75, 1.0, 0.9), Color(0.04, 0.14, 0.24, 0.85))
+	SettingsUIFactory.style_action_button(prologue_btn, Color(0.35, 0.85, 1.0, 0.85), Color(0.04, 0.14, 0.25, 0.85), true)
 	prologue_btn.pressed.connect(func():
 		scene.call("play_click")
 		GameState.transition_to_scene("res://ui/screens/intro_cutscene.tscn")
@@ -409,21 +457,20 @@ static func build_advanced_panel(scene: Control) -> VBoxContainer:
 
 	var has_cleared_adv := GameState.highest_unlocked_level > 1
 	var reset_btn := Button.new()
-	reset_btn.custom_minimum_size = Vector2(170, 36)
+	reset_btn.custom_minimum_size = Vector2(160, 32)
 	reset_btn.focus_mode = Control.FOCUS_NONE
-	reset_btn.add_theme_font_size_override("font_size", 13)
+	reset_btn.add_theme_font_size_override("font_size", 12)
 	if has_cleared_adv:
 		reset_btn.text = "RETURN TO ABYSS"
-		SettingsUIFactory.style_action_button(reset_btn, Color(0.92, 0.28, 0.35, 0.95), Color(0.20, 0.04, 0.06, 0.90))
-		reset_btn.add_theme_color_override("font_color", Color(1.0, 0.75, 0.78, 1.0))
+		SettingsUIFactory.style_danger_button(reset_btn, false, true)
 		reset_btn.pressed.connect(func(): scene.call("open_confirm_modal"))
 		scene.call("wire_juice", reset_btn)
 	else:
 		reset_btn.text = "LOCKED (%s)" % GameState.get_level_name(1)
 		reset_btn.disabled = true
-		SettingsUIFactory.style_disabled_button(reset_btn)
+		SettingsUIFactory.style_disabled_button(reset_btn, true)
 
-	var adv_desc := "Reset all unlocked sectors back to %s. Irreversible. (Requires at least Sector 02 cleared)." % GameState.get_level_name(1)
+	var adv_desc := "Reset Story Mode's 20 sectors back to Sector 01. Challenge Mode and Tutorial progress are preserved."
 
 	root.add_child(SettingsUIFactory.create_setting_row(
 		"RETURN TO ABYSS",

@@ -17,28 +17,25 @@ func _draw() -> void:
 	var base := EnemyPresets.color_of(enemy.enemy_type)
 	var t := Time.get_ticks_msec() / 1000.0
 
-	# 1. Footstep ripples (mobile enemies)
+	# 1. Footstep ripples & sleeping breath ripples
 	if not enemy.is_wall_occluded or enemy.visible_alpha >= 0.02 or state == Enemy.State.INVESTIGATE:
 		var occ_mult: float = 0.55 if enemy.is_wall_occluded else 1.0
 		for r in enemy.step_ripples:
 			var prog: float = float(r["age"])
 			var rad: float = prog * float(r["max_r"])
-			var is_water: bool = bool(r.get("is_water", false))
-			var col_r := Color(0.28, 0.75, 1.0, (1.0 - prog) * 0.55 * occ_mult) if is_water else Color(base, (1.0 - prog) * 0.4 * occ_mult)
-			draw_arc(to_local(Vector2(r["pos"])), rad, 0.0, TAU, 20, col_r, 1.6 if is_water else 1.2)
-			if is_water and prog < 0.55:
-				draw_arc(to_local(Vector2(r["pos"])), rad * 0.55, 0.0, TAU, 16, Color(0.5, 0.9, 1.0, (1.0 - prog) * 0.35 * occ_mult), 1.0)
+			var is_water: bool = (r.get("is_water", false) == true)
+			var is_breath: bool = (r.get("is_breath", false) == true)
+			if is_breath:
+				var b_alpha := (1.0 - prog) * (1.0 - prog) * 0.38 * occ_mult
+				var col_breath := Color(0.65, 0.32, 0.95, b_alpha)
+				draw_arc(to_local(Vector2(r["pos"])), rad, 0.0, TAU, 24, col_breath, 1.2)
+			else:
+				var col_r := Color(0.28, 0.75, 1.0, (1.0 - prog) * 0.55 * occ_mult) if is_water else Color(base, (1.0 - prog) * 0.4 * occ_mult)
+				draw_arc(to_local(Vector2(r["pos"])), rad, 0.0, TAU, 20, col_r, 1.6 if is_water else 1.2)
+				if is_water and prog < 0.55:
+					draw_arc(to_local(Vector2(r["pos"])), rad * 0.55, 0.0, TAU, 16, Color(0.5, 0.9, 1.0, (1.0 - prog) * 0.35 * occ_mult), 1.0)
 
-	# 2. Proximity aura and pulse
-	var proximity := enemy.proximity
-	if proximity > 0.0:
-		var beat := 0.5 + 0.5 * sin(t * (4.0 + 10.0 * proximity))
-		draw_arc(Vector2.ZERO, 20.0 + 8.0 * beat * proximity, 0.0, TAU, 32, Color(base, 0.15 + 0.45 * proximity), 2.0)
-		if state == Enemy.State.SLEEP:
-			var breathe := 0.5 + 0.5 * sin(t * 1.8)
-			draw_circle(Vector2.ZERO, 14.0 + 3.0 * breathe, Color(base, 0.12 * proximity))
-
-	# 3. Chaser phantom trail
+	# 2. Chaser phantom trail
 	if enemy.enemy_type == Enemy.EnemyType.CHASER and enemy.trail_points.size() > 0:
 		for i in range(enemy.trail_points.size()):
 			var p := to_local(enemy.trail_points[i])
@@ -67,12 +64,22 @@ func _draw() -> void:
 
 	# Body is hidden until revealed by an echo (or while alert/screaming/alarming)
 	if enemy.visible_alpha < 0.02 and not always_shown:
+		if enemy.eye_linger_timer > 0.0 and not enemy.is_wall_occluded:
+			_draw_lingering_eyes(t, enemy.eye_linger_timer / 0.45)
 		return
 
 	var alpha := maxf(enemy.visible_alpha, 0.35 if always_shown else 0.0)
 	var col := Color(base, alpha)
 
-	# 5. Body per type
+	# 5. Body per type (with startled twitch/spasm if sound wave struck from darkness)
+	var has_spasm: bool = enemy.spasm_timer > 0.0
+	if has_spasm:
+		draw_set_transform(enemy.spasm_offset, 0.0, Vector2.ONE)
+		var s_prog: float = enemy.spasm_timer / 0.16
+		var shock_r := 12.0 + (1.0 - s_prog) * 10.0
+		var shock_col := Color(base.r, base.g * 0.8, base.b * 0.8, s_prog * 0.65 * alpha)
+		draw_arc(Vector2.ZERO, shock_r, 0.0, TAU, 18, shock_col, 1.5)
+
 	match enemy.enemy_type:
 		Enemy.EnemyType.SLEEPER:
 			_draw_sleeper(t, col, alpha)
@@ -84,6 +91,9 @@ func _draw() -> void:
 			_draw_screamer(t, col, alpha)
 		Enemy.EnemyType.LISTENER:
 			_draw_listener(col, alpha)
+
+	if has_spasm:
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 	# 6. Active search scanning cone when monster is prowling in SEARCH state
 	if state == Enemy.State.SEARCH:
@@ -185,16 +195,16 @@ func _draw_screamer(t: float, col: Color, alpha: float) -> void:
 		draw_circle(Vector2.ZERO, 3.5, Color(0.2, 0.05, 0.15, alpha))
 
 
-# Listener: sonar dish with 5 pips (one per sound counted)
+# Listener: sonar dish with 3 pips (one per sound counted)
 func _draw_listener(col: Color, alpha: float) -> void:
 	draw_arc(Vector2.ZERO, 15.0, -PI * 0.8, PI * 0.8, 24, col, 2.5)
 	draw_circle(Vector2.ZERO, 8.0, Color(col, 0.4 * alpha))
-	for i in 5:
-		var ang := -PI * 0.72 + i * (PI * 1.44 / 4.0)
+	for i in 3:
+		var ang := -PI * 0.65 + i * (PI * 1.30 / 2.0)
 		var pip_pos := Vector2.from_angle(ang) * 22.0
 		if enemy.listener_count > i:
-			draw_circle(pip_pos, 4.0, Color(0.2, 1.0, 0.7, alpha))
-			draw_circle(pip_pos, 1.8, Color(1.0, 1.0, 1.0, alpha))
+			draw_circle(pip_pos, 4.5, Color(0.2, 1.0, 0.7, alpha))
+			draw_circle(pip_pos, 2.0, Color(1.0, 1.0, 1.0, alpha))
 		else:
 			draw_circle(pip_pos, 3.0, Color(col, 0.3 * alpha))
 
@@ -235,3 +245,34 @@ func _draw_alert_roar(t: float, col: Color, alpha: float) -> void:
 	var pupil_dir := to_target.orthogonal() * 7.0
 	draw_line(jitter - pupil_dir, jitter + pupil_dir, Color(0.1, 0.0, 0.0, eye_alpha), 3.0)
 	draw_circle(jitter, 2.0, Color(1.0, 0.2, 0.2, eye_alpha))
+
+
+# Lingering sinister eyes after body dissolves into the dark
+func _draw_lingering_eyes(_t: float, factor: float) -> void:
+	var a: float = clampf(factor, 0.0, 1.0)
+	match enemy.enemy_type:
+		Enemy.EnemyType.SLEEPER:
+			if enemy.state == Enemy.State.SLEEP:
+				var slit_half: float = 7.0 * factor
+				draw_line(Vector2(-slit_half, 0.0), Vector2(slit_half, 0.0), Color(0.75, 0.2, 0.9, a * 0.8), 2.0)
+				draw_circle(Vector2.ZERO, 1.8 * factor, Color(0.95, 0.4, 0.95, a))
+			else:
+				var gaze: Vector2 = enemy.facing_dir * 3.0
+				draw_circle(gaze, 3.5 * factor, Color(0.85, 0.25, 0.95, a * 0.9))
+				draw_circle(gaze, 1.6 * factor, Color(1.0, 0.9, 1.0, a))
+		Enemy.EnemyType.PATROLLER:
+			var gaze: Vector2 = enemy.facing_dir * 2.8
+			draw_circle(gaze, 4.0 * factor, Color(1.0, 0.7, 0.2, a * 0.85))
+			draw_circle(gaze, 1.8 * factor, Color(1.0, 0.95, 0.8, a))
+		Enemy.EnemyType.CHASER:
+			var gaze: Vector2 = enemy.facing_dir * 2.2
+			var slit_dir: Vector2 = enemy.facing_dir.orthogonal() * (6.5 * factor)
+			draw_circle(gaze, 6.0 * factor, Color(0.9, 0.05, 0.05, a * 0.28))
+			draw_line(gaze - slit_dir, gaze + slit_dir, Color(1.0, 0.15, 0.15, a * 0.95), 2.4)
+			draw_circle(gaze, 1.6 * factor, Color(1.0, 0.85, 0.85, a))
+		Enemy.EnemyType.SCREAMER:
+			draw_circle(Vector2.ZERO, 4.5 * factor, Color(1.0, 0.15, 0.45, a * 0.9))
+			draw_circle(Vector2.ZERO, 1.8 * factor, Color(1.0, 0.9, 0.95, a))
+		Enemy.EnemyType.LISTENER:
+			draw_circle(Vector2.ZERO, 4.0 * factor, Color(0.2, 1.0, 0.7, a * 0.85))
+			draw_circle(Vector2.ZERO, 1.5 * factor, Color(0.9, 1.0, 0.95, a))

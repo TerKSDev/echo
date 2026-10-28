@@ -35,20 +35,18 @@ func _draw() -> void:
 	# 3. Outer Rim
 	draw_arc(center, radius, 0.0, TAU, 36, Color(0.26, 0.54, 0.82, 0.65), 1.6)
 
-	# 4. Pause Bars Icons (Two sleek vertical rounded capsules)
+	# 4. Pause Bars Icons (Two sleek vertical bars)
 	var bar_w := 3.2
 	var bar_h := 14.0
 	var bar_gap := 4.5
 	var col := Color(0.85, 0.94, 1.0, 0.9)
 
-	# Left bar
 	draw_line(
 		Vector2(center.x - bar_gap, center.y - bar_h * 0.5),
 		Vector2(center.x - bar_gap, center.y + bar_h * 0.5),
 		col,
 		bar_w
 	)
-	# Right bar
 	draw_line(
 		Vector2(center.x + bar_gap, center.y - bar_h * 0.5),
 		Vector2(center.x + bar_gap, center.y + bar_h * 0.5),

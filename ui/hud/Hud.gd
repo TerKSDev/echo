@@ -6,8 +6,7 @@ const DebriefModal = preload("res://ui/modals/DebriefModal.gd")
 @onready var story_overlay: Control = get_node_or_null("StoryOverlay")
 
 var _base_inner_radius := 0.42
-var _badge_container: HBoxContainer = null
-var _badge_icon_lbl: Label = null
+var _badge_container: VBoxContainer = null
 var _badge_name_lbl: Label = null
 var _badge_depth_lbl: Label = null
 
@@ -48,22 +47,28 @@ func _ready() -> void:
 		$PauseBtn.pressed.connect($SettingsModal.open)
 
 	_setup_sound_indicator_canvas()
+	_setup_virtual_joystick()
+	update_controls_layout()
 
 func _on_voice_detected(_loudness: float) -> void:
-	if has_node("MicIndicator"):
+	if player == null or not is_instance_valid(player) or not player.can_sound or not player.alive:
+		return
+	if story_overlay != null and (story_overlay.visible or (story_overlay.has_method("is_active") and story_overlay.is_active()) or story_overlay.get("_is_active") == true):
+		return
+	if has_node("MicIndicator") and $MicIndicator.visible:
 		$MicIndicator.pulse_flash()
 
 # Vignette tightens on every heartbeat; stronger when more threatened
 func pulse_vignette(threat: float) -> void:
-	if threat < 0.2:
+	if threat < 0.15:
 		return
 	var mat := _vignette_material()
 	if mat == null:
 		return
-	var pulse_r := clampf(_base_inner_radius - 0.12 * threat, 0.18, _base_inner_radius)
+	var pulse_r := clampf(_base_inner_radius - 0.14 * threat, 0.16, _base_inner_radius)
 	var tw := create_tween()
 	tw.tween_property(mat, "shader_parameter/inner_radius", pulse_r, 0.08)
-	tw.tween_property(mat, "shader_parameter/inner_radius", _base_inner_radius, 0.28)
+	tw.tween_property(mat, "shader_parameter/inner_radius", _base_inner_radius, 0.30)
 
 # Crimson flash when the player dies
 func flash_death() -> void:
@@ -107,6 +112,11 @@ func set_gameplay_buttons_visible(buttons_visible: bool) -> void:
 		_badge_container.visible = buttons_visible
 	if not buttons_visible:
 		hide_tutorial_callout()
+		if _joystick_active:
+			_deactivate_joystick()
+		_joystick_fade = 0.0
+		if _joystick_canvas != null and is_instance_valid(_joystick_canvas):
+			_joystick_canvas.queue_redraw()
 
 
 var _tutorial_callout: PanelContainer = null
@@ -447,7 +457,20 @@ func play_level_exit_transition(on_complete: Callable) -> void:
 	var sfx_mgr := get_node_or_null("../SfxManager") as SfxManager
 	if sfx_mgr != null:
 		sfx_mgr.play_level_exit()
-	on_complete.call()
+
+	var curtain := ColorRect.new()
+	curtain.set_anchors_preset(Control.PRESET_FULL_RECT)
+	curtain.color = Color(0.0, 0.015, 0.035, 0.0)
+	curtain.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(curtain)
+
+	var tw := create_tween()
+	tw.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	tw.tween_property(curtain, "color:a", 1.0, 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_callback(func():
+		on_complete.call()
+		curtain.queue_free()
+	)
 
 
 var _debrief_modal: Control = null
@@ -478,6 +501,102 @@ func show_debrief(data: Dictionary, on_next: Callable, on_retry: Callable, on_se
 
 	var sfx_mgr := get_node_or_null("../SfxManager") as SfxManager
 	dm.show_debrief(data, sfx_mgr)
+
+
+# Non-blocking automatic clear banner for Challenge Mode (Roguelite flow: no buttons, zero clicks required)
+func show_challenge_clear_banner(sector_name: String, clear_time: float, on_finished: Callable) -> void:
+	if has_node("SettingsModal") and $SettingsModal.visible:
+		$SettingsModal.visible = false
+	set_gameplay_buttons_visible(false)
+
+	var banner_canvas := CanvasLayer.new()
+	banner_canvas.layer = 120
+	banner_canvas.name = "ChallengeClearBannerLayer"
+	add_child(banner_canvas)
+
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	banner_canvas.add_child(center)
+
+	var card := PanelContainer.new()
+	card.custom_minimum_size = Vector2(460, 0)
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var card_sb := StyleBoxFlat.new()
+	card_sb.bg_color = Color(0.038, 0.012, 0.045, 0.94)
+	card_sb.border_color = Color(1.0, 0.42, 0.88, 0.95)
+	card_sb.set_border_width_all(2)
+	card_sb.set_corner_radius_all(14)
+	card_sb.content_margin_left = 32.0
+	card_sb.content_margin_right = 32.0
+	card_sb.content_margin_top = 22.0
+	card_sb.content_margin_bottom = 22.0
+	card_sb.shadow_size = 22
+	card_sb.shadow_color = Color(0.85, 0.15, 0.65, 0.45)
+	card.add_theme_stylebox_override("panel", card_sb)
+	center.add_child(card)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 10)
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	card.add_child(vbox)
+
+	var tag := Label.new()
+	tag.text = "((   A B Y S S   E X T R A C T I O N   S U C C E S S F U L   ))"
+	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tag.add_theme_color_override("font_color", Color(1.0, 0.55, 0.88, 0.95))
+	tag.add_theme_font_size_override("font_size", 11)
+	vbox.add_child(tag)
+
+	var title_lbl := Label.new()
+	title_lbl.text = "%s CLEARED" % sector_name
+	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_lbl.add_theme_color_override("font_color", Color(1.0, 0.95, 0.98, 1.0))
+	title_lbl.add_theme_color_override("font_shadow_color", Color(0.85, 0.15, 0.65, 0.9))
+	title_lbl.add_theme_constant_override("shadow_offset_y", 2)
+	title_lbl.add_theme_font_size_override("font_size", 22)
+	vbox.add_child(title_lbl)
+
+	var line_holder := CenterContainer.new()
+	line_holder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.add_child(line_holder)
+
+	var scan_line := ColorRect.new()
+	scan_line.custom_minimum_size = Vector2(24.0, 2.0)
+	scan_line.color = Color(1.0, 0.45, 0.85, 0.95)
+	line_holder.add_child(scan_line)
+
+	var m := floori(clear_time / 60.0)
+	var s := int(clear_time) % 60
+	var ms := int((clear_time - floorf(clear_time)) * 10.0)
+	var time_lbl := Label.new()
+	time_lbl.text = "TIME: %02d:%02d.%01d   •   SECTOR SECURED" % [m, s, ms]
+	time_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	time_lbl.add_theme_color_override("font_color", Color(0.95, 0.78, 0.92, 0.95))
+	time_lbl.add_theme_font_size_override("font_size", 13)
+	vbox.add_child(time_lbl)
+
+	card.modulate.a = 0.0
+	card.scale = Vector2(0.92, 0.92)
+	card.pivot_offset = Vector2(230.0, 55.0)
+
+	var in_tw := create_tween().set_parallel(true)
+	in_tw.tween_property(card, "modulate:a", 1.0, 0.28).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	in_tw.tween_property(card, "scale", Vector2.ONE, 0.28).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	in_tw.tween_property(scan_line, "custom_minimum_size:x", 320.0, 0.40).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+
+	var out_tw := create_tween()
+	out_tw.tween_interval(1.5)
+	# Smooth cross-dissolve: as banner dissolves, simultaneously trigger next stage so screen never drops to raw void
+	out_tw.tween_property(card, "modulate:a", 0.0, 0.24).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	out_tw.parallel().tween_callback(func():
+		if on_finished.is_valid():
+			on_finished.call()
+	)
+	out_tw.tween_interval(0.26)
+	out_tw.tween_callback(func():
+		banner_canvas.queue_free()
+	)
 
 
 # Grand campaign victory celebration when conquering the finale
@@ -583,34 +702,25 @@ func show_victory_screen() -> void:
 
 
 func _build_sector_badge() -> void:
-	_badge_container = HBoxContainer.new()
-	_badge_container.position = Vector2(36.0, 42.0)
+	_badge_container = VBoxContainer.new()
+	_badge_container.position = Vector2(38.0, 42.0)
 	_badge_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_badge_container.add_theme_constant_override("separation", 6)
+	_badge_container.add_theme_constant_override("separation", 2)
 	add_child(_badge_container)
-
-	_badge_icon_lbl = Label.new()
-	_badge_icon_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_badge_icon_lbl.add_theme_color_override("font_color", Color(0.42, 0.88, 1.0, 0.9))
-	_badge_icon_lbl.add_theme_font_size_override("font_size", 12)
-	_badge_container.add_child(_badge_icon_lbl)
-
-	var text_vbox := VBoxContainer.new()
-	text_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	text_vbox.add_theme_constant_override("separation", 2)
-	_badge_container.add_child(text_vbox)
 
 	_badge_name_lbl = Label.new()
 	_badge_name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_badge_name_lbl.add_theme_color_override("font_color", Color(0.85, 0.94, 1.0, 0.85))
-	_badge_name_lbl.add_theme_font_size_override("font_size", 12)
-	text_vbox.add_child(_badge_name_lbl)
+	_badge_name_lbl.add_theme_color_override("font_color", Color(0.90, 0.96, 1.0, 0.90))
+	_badge_name_lbl.add_theme_color_override("font_shadow_color", Color(0.05, 0.45, 0.90, 0.45))
+	_badge_name_lbl.add_theme_constant_override("shadow_offset_y", 1)
+	_badge_name_lbl.add_theme_font_size_override("font_size", 15)
+	_badge_container.add_child(_badge_name_lbl)
 
 	_badge_depth_lbl = Label.new()
 	_badge_depth_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_badge_depth_lbl.add_theme_color_override("font_color", Color(0.45, 0.75, 0.95, 0.60))
-	_badge_depth_lbl.add_theme_font_size_override("font_size", 10)
-	text_vbox.add_child(_badge_depth_lbl)
+	_badge_depth_lbl.add_theme_color_override("font_color", Color(0.45, 0.78, 0.96, 0.65))
+	_badge_depth_lbl.add_theme_font_size_override("font_size", 11)
+	_badge_container.add_child(_badge_depth_lbl)
 
 
 # Atmospheric fade-from-black + sonar title banner on level entry
@@ -638,17 +748,13 @@ func play_level_intro(title_text: String, subtitle_text: String = "Listen closel
 			raw_depth = str(GameState.STORY_SECTORS[s_idx]["depth"])
 			kicker_str = "((   S E C T O R   %02d   •   D E P T H   %s   •   A S C E N T   ))" % [cur_lvl, raw_depth]
 
-	if _badge_icon_lbl != null:
-		_badge_icon_lbl.text = "👑" if (is_challenge and cur_lvl >= 20) else "◈"
-		if is_challenge and cur_lvl >= 20:
-			_badge_icon_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.35, 0.95))
-		else:
-			_badge_icon_lbl.add_theme_color_override("font_color", Color(0.42, 0.88, 1.0, 0.9))
-
 	if _badge_name_lbl != null:
+		var fsize := 13 if title_text.length() >= 18 else (14 if title_text.length() >= 14 else 15)
+		_badge_name_lbl.add_theme_font_size_override("font_size", fsize)
 		_badge_name_lbl.text = title_text
 	if _badge_depth_lbl != null:
-		_badge_depth_lbl.text = raw_depth
+		var depth_fmt := ("~" + raw_depth.replace("-", "").strip_edges()) if raw_depth.ends_with("M") else raw_depth
+		_badge_depth_lbl.text = depth_fmt
 
 	# 1. Fullscreen abyss curtain fading out smoothly
 	var curtain := ColorRect.new()
@@ -775,6 +881,14 @@ func _process(delta: float) -> void:
 		)
 		if _indicator_canvas != null and is_instance_valid(_indicator_canvas):
 			_indicator_canvas.queue_redraw()
+	if _joystick_active:
+		_joystick_fade = move_toward(_joystick_fade, 1.0, delta * 8.0)
+		if _joystick_canvas != null and is_instance_valid(_joystick_canvas):
+			_joystick_canvas.queue_redraw()
+	elif _joystick_fade > 0.0:
+		_joystick_fade = move_toward(_joystick_fade, 0.0, delta * 5.0)
+		if _joystick_canvas != null and is_instance_valid(_joystick_canvas):
+			_joystick_canvas.queue_redraw()
 
 
 func _draw_sound_indicators() -> void:
@@ -802,3 +916,249 @@ func _draw_sound_indicators() -> void:
 		var p1 := marker_pos + dir.rotated(2.2) * 8.0
 		var p2 := marker_pos + dir.rotated(-2.2) * 8.0
 		_indicator_canvas.draw_colored_polygon(PackedVector2Array([tip, p1, p2]), Color(col.r, col.g, col.b, alpha * 0.95))
+
+
+# --- Virtual Joystick System (Ergonomic Mobile Controls) ---
+var _joystick_canvas: Control = null
+var _joystick_active := false
+var _joystick_touch_id := -1
+var _joystick_center := Vector2.ZERO
+var _joystick_current := Vector2.ZERO
+var _joystick_fade := 0.0
+const JOYSTICK_MAX_RADIUS := 64.0
+const JOYSTICK_DEADZONE := 8.0
+
+
+func _setup_virtual_joystick() -> void:
+	_joystick_canvas = Control.new()
+	_joystick_canvas.name = "JoystickCanvas"
+	_joystick_canvas.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_joystick_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_joystick_canvas.draw.connect(_draw_virtual_joystick)
+	add_child(_joystick_canvas)
+	if has_node("Vignette"):
+		move_child(_joystick_canvas, $Vignette.get_index() + 1)
+
+
+func update_controls_layout() -> void:
+	if not has_node("SneakBtn") or not has_node("SoundBtn"):
+		return
+
+	var is_left_handed: bool = (GameState.controls_layout == "left")
+
+	if GameState.virtual_joystick_enabled:
+		if is_left_handed:
+			# Left-handed layout: Action buttons on Left, Right thumb drives joystick
+			$SoundBtn.anchor_left = 0.0
+			$SoundBtn.anchor_right = 0.0
+			$SoundBtn.offset_left = 40.0
+			$SoundBtn.offset_top = -186.0
+			$SoundBtn.offset_right = 150.0
+			$SoundBtn.offset_bottom = -50.0
+
+			$SneakBtn.anchor_left = 0.0
+			$SneakBtn.anchor_right = 0.0
+			$SneakBtn.offset_left = 158.0
+			$SneakBtn.offset_top = -186.0
+			$SneakBtn.offset_right = 268.0
+			$SneakBtn.offset_bottom = -50.0
+
+			if has_node("PebbleBtn"):
+				$PebbleBtn.anchor_left = 0.0
+				$PebbleBtn.anchor_right = 0.0
+				$PebbleBtn.offset_left = 51.0
+				$PebbleBtn.offset_top = -310.0
+				$PebbleBtn.offset_right = 139.0
+				$PebbleBtn.offset_bottom = -206.0
+		else:
+			# Standard layout: Action buttons on Right, Left thumb drives joystick
+			$SoundBtn.anchor_left = 1.0
+			$SoundBtn.anchor_right = 1.0
+			$SoundBtn.offset_left = -150.0
+			$SoundBtn.offset_top = -186.0
+			$SoundBtn.offset_right = -40.0
+			$SoundBtn.offset_bottom = -50.0
+
+			$SneakBtn.anchor_left = 1.0
+			$SneakBtn.anchor_right = 1.0
+			$SneakBtn.offset_left = -268.0
+			$SneakBtn.offset_top = -186.0
+			$SneakBtn.offset_right = -158.0
+			$SneakBtn.offset_bottom = -50.0
+
+			if has_node("PebbleBtn"):
+				$PebbleBtn.anchor_left = 1.0
+				$PebbleBtn.anchor_right = 1.0
+				$PebbleBtn.offset_left = -139.0
+				$PebbleBtn.offset_top = -310.0
+				$PebbleBtn.offset_right = -51.0
+				$PebbleBtn.offset_bottom = -206.0
+	else:
+		# Classical Drag & Tap layout:
+		if is_left_handed:
+			$SoundBtn.anchor_left = 0.0
+			$SoundBtn.anchor_right = 0.0
+			$SoundBtn.offset_left = 40.0
+			$SoundBtn.offset_top = -186.0
+			$SoundBtn.offset_right = 150.0
+			$SoundBtn.offset_bottom = -50.0
+
+			$SneakBtn.anchor_left = 1.0
+			$SneakBtn.anchor_right = 1.0
+			$SneakBtn.offset_left = -150.0
+			$SneakBtn.offset_top = -186.0
+			$SneakBtn.offset_right = -40.0
+			$SneakBtn.offset_bottom = -50.0
+
+			if has_node("PebbleBtn"):
+				$PebbleBtn.anchor_left = 0.0
+				$PebbleBtn.anchor_right = 0.0
+				$PebbleBtn.offset_left = 51.0
+				$PebbleBtn.offset_top = -310.0
+				$PebbleBtn.offset_right = 139.0
+				$PebbleBtn.offset_bottom = -206.0
+		else:
+			$SoundBtn.anchor_left = 1.0
+			$SoundBtn.anchor_right = 1.0
+			$SoundBtn.offset_left = -150.0
+			$SoundBtn.offset_top = -186.0
+			$SoundBtn.offset_right = -40.0
+			$SoundBtn.offset_bottom = -50.0
+
+			$SneakBtn.anchor_left = 0.0
+			$SneakBtn.anchor_right = 0.0
+			$SneakBtn.offset_left = 40.0
+			$SneakBtn.offset_top = -186.0
+			$SneakBtn.offset_right = 150.0
+			$SneakBtn.offset_bottom = -50.0
+
+			if has_node("PebbleBtn"):
+				$PebbleBtn.anchor_left = 1.0
+				$PebbleBtn.anchor_right = 1.0
+				$PebbleBtn.offset_left = -139.0
+				$PebbleBtn.offset_top = -310.0
+				$PebbleBtn.offset_right = -51.0
+				$PebbleBtn.offset_bottom = -206.0
+
+	if not GameState.virtual_joystick_enabled and _joystick_active:
+		_deactivate_joystick()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not GameState.virtual_joystick_enabled:
+		return
+	if player == null or not is_instance_valid(player) or not player.alive or player.get("can_move") == false:
+		if _joystick_active:
+			_deactivate_joystick()
+		return
+	if has_node("SoundBtn") and not $SoundBtn.visible:
+		if _joystick_active:
+			_deactivate_joystick()
+		return
+	if player.get("is_aiming_pebble") == true:
+		if _joystick_active:
+			_deactivate_joystick()
+		return
+
+	# Multi-touch Screen Input: both Left Hand and Right Hand freely supported anywhere on open screen!
+	if event is InputEventScreenTouch:
+		if event.pressed:
+			if event.position.y > 70.0:
+				_joystick_active = true
+				_joystick_touch_id = event.index
+				_joystick_center = event.position
+				_joystick_current = event.position
+				_joystick_fade = 1.0
+				if _joystick_canvas != null:
+					_joystick_canvas.queue_redraw()
+				get_viewport().set_input_as_handled()
+		elif not event.pressed and event.index == _joystick_touch_id:
+			_deactivate_joystick()
+			get_viewport().set_input_as_handled()
+
+	elif event is InputEventScreenDrag:
+		if _joystick_active and event.index == _joystick_touch_id:
+			_update_joystick_drag(event.position)
+			get_viewport().set_input_as_handled()
+
+	# Desktop / Mouse simulation
+	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			if event.position.y > 70.0:
+				_joystick_active = true
+				_joystick_touch_id = -999
+				_joystick_center = event.position
+				_joystick_current = event.position
+				_joystick_fade = 1.0
+				if _joystick_canvas != null:
+					_joystick_canvas.queue_redraw()
+		elif not event.pressed and _joystick_touch_id == -999:
+			_deactivate_joystick()
+
+	elif event is InputEventMouseMotion:
+		if _joystick_active and _joystick_touch_id == -999:
+			_update_joystick_drag(event.position)
+
+
+func _update_joystick_drag(pointer_pos: Vector2) -> void:
+	var offset: Vector2 = pointer_pos - _joystick_center
+	var dist: float = offset.length()
+	if dist > JOYSTICK_MAX_RADIUS:
+		_joystick_current = _joystick_center + offset.normalized() * JOYSTICK_MAX_RADIUS
+	else:
+		_joystick_current = pointer_pos
+
+	if dist > JOYSTICK_DEADZONE:
+		var dir := offset.normalized()
+		if player != null and is_instance_valid(player) and player.has_method("set_joystick_direction"):
+			player.set_joystick_direction(dir)
+	else:
+		if player != null and is_instance_valid(player) and player.has_method("set_joystick_direction"):
+			player.set_joystick_direction(Vector2.ZERO)
+
+	if _joystick_canvas != null and is_instance_valid(_joystick_canvas):
+		_joystick_canvas.queue_redraw()
+
+
+func _deactivate_joystick() -> void:
+	_joystick_active = false
+	_joystick_touch_id = -1
+	_joystick_current = _joystick_center
+	if player != null and is_instance_valid(player) and player.has_method("set_joystick_direction"):
+		player.set_joystick_direction(Vector2.ZERO)
+	if _joystick_canvas != null and is_instance_valid(_joystick_canvas):
+		_joystick_canvas.queue_redraw()
+
+
+func _draw_virtual_joystick() -> void:
+	if not GameState.virtual_joystick_enabled or _joystick_canvas == null or _joystick_fade <= 0.01:
+		return
+	var a: float = _joystick_fade
+	var base_r: float = JOYSTICK_MAX_RADIUS
+	var stick_r := 25.0
+
+	# 1. Base outer disc (subtle dark sonar glass)
+	_joystick_canvas.draw_circle(_joystick_center, base_r, Color(0.01, 0.04, 0.08, 0.38 * a))
+
+	# 2. Base ring rim (glowing cyan / sonar palette accent)
+	var ring_col := Color(0.20, 0.75, 1.0, 0.50 * a)
+	_joystick_canvas.draw_arc(_joystick_center, base_r, 0.0, TAU, 36, ring_col, 2.0)
+
+	# 3. Four subtle cardinal tick marks (N, S, E, W)
+	for i in 4:
+		var rad: float = i * PI * 0.5
+		var t_dir := Vector2(cos(rad), sin(rad))
+		var p_in := _joystick_center + t_dir * (base_r - 8.0)
+		var p_out := _joystick_center + t_dir * (base_r - 2.0)
+		_joystick_canvas.draw_line(p_in, p_out, Color(0.35, 0.85, 1.0, 0.35 * a), 1.8)
+
+	# 4. Elastic connecting tether line between base center and stick knob
+	var offset := _joystick_current - _joystick_center
+	if offset.length() > 4.0:
+		_joystick_canvas.draw_line(_joystick_center, _joystick_current, Color(0.25, 0.80, 1.0, 0.30 * a), 2.5)
+
+	# 5. Thumb Stick Knob
+	_joystick_canvas.draw_circle(_joystick_current, stick_r + 2.0, Color(0.0, 0.0, 0.0, 0.25 * a))
+	_joystick_canvas.draw_circle(_joystick_current, stick_r, Color(0.08, 0.38, 0.58, 0.70 * a))
+	_joystick_canvas.draw_arc(_joystick_current, stick_r, 0.0, TAU, 28, Color(0.40, 0.90, 1.0, 0.80 * a), 2.2)
+	_joystick_canvas.draw_circle(_joystick_current, 7.0, Color(0.85, 0.96, 1.0, 0.90 * a))

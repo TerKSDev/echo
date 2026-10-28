@@ -34,14 +34,38 @@ static func show_modal(
 	vbox.add_theme_constant_override("separation", 16)
 	panel.add_child(vbox)
 
+	var close_func := func():
+		var tw := modal.create_tween().set_parallel(true)
+		tw.tween_property(modal, "modulate:a", 0.0, 0.15).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		tw.tween_property(panel, "scale", Vector2(0.92, 0.92), 0.15).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		tw.chain().tween_callback(func():
+			modal.queue_free()
+			if on_cancelled.is_valid():
+				on_cancelled.call()
+		)
+
+	# Header: Title + Close Button
+	var header := HBoxContainer.new()
+	vbox.add_child(header)
+
 	var title := Label.new()
-	title.text = "RETURN TO ABYSS?"
-	title.add_theme_font_size_override("font_size", 24)
+	title.text = "RETURN TO ABYSS"
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.add_theme_font_size_override("font_size", 20)
 	title.add_theme_color_override("font_color", Color(1.0, 0.35, 0.40, 1.0))
-	vbox.add_child(title)
+	header.add_child(title)
+
+	var close_btn := ModalTemplate.make_close_button(close_func, ModalTemplate.ThemeKind.CRIMSON)
+	header.add_child(close_btn)
+
+	# Divider line
+	var div := ColorRect.new()
+	div.custom_minimum_size = Vector2(0, 1)
+	div.color = Color(0.85, 0.25, 0.35, 0.35)
+	vbox.add_child(div)
 
 	var desc := Label.new()
-	desc.text = "WARNING: This action is completely IRREVERSIBLE.\n\nAll unlocked sector progression, speedrun records, and collected stars will be permanently erased. You will be placed back at Sector 01 (Abyss Origin)."
+	desc.text = "WARNING: This action is completely IRREVERSIBLE.\n\nStory Mode's 20 star-bearing sectors (Sectors 01–20) will be reset back to Sector 01. Challenge Mode access, high scores, and the tutorial remain unlocked."
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	desc.add_theme_font_size_override("font_size", 13)
 	desc.add_theme_color_override("font_color", Color(0.95, 0.82, 0.85, 0.95))
@@ -55,12 +79,8 @@ static func show_modal(
 	cancel_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	cancel_btn.custom_minimum_size = Vector2(0, 42)
 	cancel_btn.add_theme_font_size_override("font_size", 13)
-	SettingsUIFactory.style_action_button(cancel_btn, Color(0.3, 0.5, 0.7, 0.7), Color(0.05, 0.12, 0.2, 0.9))
-	cancel_btn.pressed.connect(func():
-		modal.queue_free()
-		if on_cancelled.is_valid():
-			on_cancelled.call()
-	)
+	ModalTemplate.style_button(cancel_btn, false, ModalTemplate.ThemeKind.CRIMSON)
+	cancel_btn.pressed.connect(close_func)
 	if wire_juice_cb.is_valid():
 		wire_juice_cb.call(cancel_btn)
 	btn_row.add_child(cancel_btn)
@@ -70,13 +90,12 @@ static func show_modal(
 	confirm_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	confirm_btn.custom_minimum_size = Vector2(0, 42)
 	confirm_btn.add_theme_font_size_override("font_size", 13)
-	SettingsUIFactory.style_action_button(confirm_btn, Color(0.95, 0.3, 0.35, 1.0), Color(0.28, 0.05, 0.08, 0.95))
-	confirm_btn.add_theme_color_override("font_color", Color(1.0, 0.75, 0.8, 1.0))
+	ModalTemplate.style_danger_button(confirm_btn, true, false)
 	confirm_btn.pressed.connect(func():
 		if play_sound_cb.is_valid():
 			play_sound_cb.call()
 		GameState.reset_progress()
-		modal.queue_free()
+		close_func.call()
 		if on_confirmed.is_valid():
 			on_confirmed.call()
 	)
@@ -85,5 +104,20 @@ static func show_modal(
 	btn_row.add_child(confirm_btn)
 
 	vbox.add_child(btn_row)
+
+	# ESC key support
+	modal.gui_input.connect(func(ev: InputEvent):
+		if ev is InputEventKey and ev.pressed and ev.keycode == KEY_ESCAPE:
+			close_func.call()
+	)
+
+	# Enter animation
+	modal.modulate.a = 0.0
+	panel.scale = Vector2(0.92, 0.92)
+	panel.pivot_offset = Vector2(ModalTemplate.CARD_WIDTH * 0.5, 150.0)
+	var tw := modal.create_tween().set_parallel(true)
+	tw.tween_property(modal, "modulate:a", 1.0, 0.18).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(panel, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
 	parent.add_child(modal)
 	return modal

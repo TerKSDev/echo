@@ -109,7 +109,7 @@ func _draw() -> void:
 	var is_stunned := false
 	if _player != null and is_instance_valid(_player):
 		pebbles_left = int(_player.get("pebbles"))
-		is_aiming = bool(_player.get("is_aiming_pebble"))
+		is_aiming = (_player.get("is_aiming_pebble") == true)
 		if "_stun_timer" in _player and float(_player._stun_timer) > 0.0:
 			is_stunned = true
 

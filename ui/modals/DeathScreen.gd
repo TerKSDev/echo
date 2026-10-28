@@ -50,6 +50,13 @@ func _ready() -> void:
 	panel.custom_minimum_size.x = ModalTemplate.CARD_WIDTH
 	panel.add_theme_stylebox_override("panel", ModalTemplate.make_card_style(ModalTemplate.ThemeKind.CRIMSON))
 	_sync_viewport_size()
+
+	retry_btn.custom_minimum_size = Vector2(0, 44)
+	ModalTemplate.style_danger_button(retry_btn, true, false)
+
+	menu_btn.custom_minimum_size = Vector2(0, 40)
+	ModalTemplate.style_button(menu_btn, false, ModalTemplate.ThemeKind.CRIMSON)
+
 	wave_canvas.draw.connect(_draw_flatline_wave)
 	retry_btn.pressed.connect(_on_retry_pressed)
 	menu_btn.pressed.connect(_on_menu_pressed)
@@ -112,7 +119,17 @@ func open(killer_type: int = -1) -> void:
 	_sync_viewport_size()
 	get_tree().paused = true
 
-	if killer_type >= 0 and killer_type < KILLER_INFO.size():
+	var is_chal: bool = (GameState.current_mode == GameState.GameMode.CHALLENGE)
+	if is_chal:
+		killer_dot.color = Color(1.0, 0.20, 0.35)
+		killer_label.text = "EXPEDITION FAILED"
+		killer_label.add_theme_color_override("font_color", Color(1.0, 0.45, 0.60))
+		tip_label.text = "The abyss swallowed your echoes. All active pacts have dissipated, and your expedition has reset to Sector 01."
+		if retry_btn != null:
+			retry_btn.text = "NEW RUN" if GameState.is_touch_or_mobile() else "NEW RUN   [SPACE / R]"
+		if menu_btn != null:
+			menu_btn.text = "ABYSS MAP" if GameState.is_touch_or_mobile() else "ABYSS MAP   [ESC]"
+	elif killer_type >= 0 and killer_type < KILLER_INFO.size():
 		var info: Dictionary = KILLER_INFO[killer_type]
 		var col: Color = info["color"]
 		killer_dot.color = col
@@ -122,14 +139,19 @@ func open(killer_type: int = -1) -> void:
 		if GameState.is_touch_or_mobile():
 			tip_text = tip_text.replace(" ([SHIFT])", "")
 		tip_label.text = tip_text
+		if retry_btn != null:
+			retry_btn.text = "TRY AGAIN" if GameState.is_touch_or_mobile() else "TRY AGAIN   [SPACE / R]"
+		if menu_btn != null:
+			menu_btn.text = "LEVEL SELECT" if GameState.is_touch_or_mobile() else "LEVEL SELECT   [ESC]"
 	else:
 		killer_dot.color = Color(1.0, 0.28, 0.32)
 		killer_label.text = "DEVOURED BY THE ABYSS"
 		killer_label.add_theme_color_override("font_color", Color(1.0, 0.55, 0.58))
 		tip_label.text = "Every sound illuminates the cave, yet draws the attention of what lurks in the dark."
-
-	if retry_btn != null:
-		retry_btn.text = "TRY AGAIN" if GameState.is_touch_or_mobile() else "TRY AGAIN   [SPACE / R]"
+		if retry_btn != null:
+			retry_btn.text = "TRY AGAIN" if GameState.is_touch_or_mobile() else "TRY AGAIN   [SPACE / R]"
+		if menu_btn != null:
+			menu_btn.text = "LEVEL SELECT" if GameState.is_touch_or_mobile() else "LEVEL SELECT   [ESC]"
 
 	var tw := create_tween().set_parallel(true)
 	tw.tween_property(self, "modulate:a", 1.0, 0.32).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
@@ -165,8 +187,41 @@ func _draw_flatline_wave() -> void:
 
 
 func _on_retry_pressed() -> void:
-	GameState.restart_level()
+	if not _is_open:
+		return
+	_is_open = false
+	if retry_btn != null:
+		retry_btn.disabled = true
+	if menu_btn != null:
+		menu_btn.disabled = true
+
+	var tw := create_tween()
+	tw.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	tw.parallel().tween_property(panel, "scale", Vector2(0.92, 0.92), 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.parallel().tween_property(self, "modulate:a", 0.0, 0.18).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_callback(func():
+		if GameState.current_mode == GameState.GameMode.CHALLENGE:
+			GameState.restart_challenge_from_first_sector()
+		else:
+			GameState.restart_level()
+	)
 
 
 func _on_menu_pressed() -> void:
-	GameState.go_to_level_select()
+	if not _is_open:
+		return
+	_is_open = false
+	if retry_btn != null:
+		retry_btn.disabled = true
+	if menu_btn != null:
+		menu_btn.disabled = true
+
+	var tw := create_tween()
+	tw.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	tw.parallel().tween_property(panel, "scale", Vector2(0.92, 0.92), 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.parallel().tween_property(self, "modulate:a", 0.0, 0.18).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_callback(func():
+		if GameState.current_mode == GameState.GameMode.CHALLENGE:
+			GameState.reset_challenge_run()
+		GameState.go_to_level_select()
+	)

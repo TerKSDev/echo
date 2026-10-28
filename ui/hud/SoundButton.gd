@@ -47,8 +47,13 @@ func _draw() -> void:
 	draw_circle(center, radius, Color(0.04, 0.12, 0.22, 0.78))
 	draw_circle(center, radius * 0.78, Color(0.08, 0.22, 0.36, 0.35))
 
-	# 3. Base Border Ring
-	draw_arc(center, radius, 0.0, TAU, 48, Color(0.26, 0.54, 0.82, 0.65), 1.8)
+	# 3. Base Border Ring & Cardinal Sonar Ticks
+	var base_rim := Color(0.26, 0.54, 0.82, 0.65)
+	draw_arc(center, radius, 0.0, TAU, 48, base_rim, 1.8)
+	for i in range(4):
+		var ang := i * PI * 0.5
+		var dir := Vector2.from_angle(ang)
+		draw_line(center + dir * (radius - 5.5), center + dir * (radius - 1.5), Color(base_rim, 0.38), 1.4)
 
 	# 4. Dynamic Charge Ring & Stun State (tracked from player)
 	var charging := false

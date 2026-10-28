@@ -184,16 +184,10 @@ func _build_ui() -> void:
 
 	_login_btn = Button.new()
 	_login_btn.text = "SIGN IN WITH HUAWEI ID"
-	_login_btn.custom_minimum_size = Vector2(170, 28)
+	_login_btn.custom_minimum_size = Vector2(170, 30)
 	_login_btn.focus_mode = Control.FOCUS_NONE
-	var red_btn_style := StyleBoxFlat.new()
-	red_btn_style.bg_color = Color(0.85, 0.15, 0.20, 1.0)
-	red_btn_style.set_corner_radius_all(6)
-	_login_btn.add_theme_stylebox_override("normal", red_btn_style)
-	_login_btn.add_theme_stylebox_override("hover", red_btn_style)
-	_login_btn.add_theme_stylebox_override("pressed", red_btn_style)
-	_login_btn.add_theme_color_override("font_color", Color.WHITE)
 	_login_btn.add_theme_font_size_override("font_size", 11)
+	ModalTemplate.style_danger_button(_login_btn, true, true)
 	_login_btn.pressed.connect(func():
 		HMSService.login_huawei(func(_name): _refresh_view())
 	)
@@ -201,7 +195,7 @@ func _build_ui() -> void:
 
 	_logout_btn = Button.new()
 	_logout_btn.text = "SIGN OUT"
-	_logout_btn.custom_minimum_size = Vector2(75, 28)
+	_logout_btn.custom_minimum_size = Vector2(75, 30)
 	_logout_btn.focus_mode = Control.FOCUS_NONE
 	_logout_btn.flat = true
 	_logout_btn.add_theme_font_size_override("font_size", 11)
@@ -220,8 +214,9 @@ func _build_ui() -> void:
 
 	_prev_sector_btn = Button.new()
 	_prev_sector_btn.text = "◀"
-	_prev_sector_btn.custom_minimum_size = Vector2(36, 28)
+	_prev_sector_btn.custom_minimum_size = Vector2(36, 30)
 	_prev_sector_btn.focus_mode = Control.FOCUS_NONE
+	ModalTemplate.style_button(_prev_sector_btn, false, ModalTemplate.ThemeKind.CRIMSON)
 	_prev_sector_btn.pressed.connect(func():
 		var max_sec := GameState.LEVELS.size()
 		_current_sector = max_sec if _current_sector <= 1 else _current_sector - 1
@@ -239,8 +234,9 @@ func _build_ui() -> void:
 
 	_next_sector_btn = Button.new()
 	_next_sector_btn.text = "▶"
-	_next_sector_btn.custom_minimum_size = Vector2(36, 28)
+	_next_sector_btn.custom_minimum_size = Vector2(36, 30)
 	_next_sector_btn.focus_mode = Control.FOCUS_NONE
+	ModalTemplate.style_button(_next_sector_btn, false, ModalTemplate.ThemeKind.CRIMSON)
 	_next_sector_btn.pressed.connect(func():
 		var max_sec := GameState.LEVELS.size()
 		_current_sector = 1 if _current_sector >= max_sec else _current_sector + 1
@@ -300,7 +296,7 @@ func _refresh_view() -> void:
 
 	# Update Account status row
 	if HMSService.is_logged_in:
-		_account_lbl.text = "🔴 HUAWEI ID: %s   (Rankings Synced)" % HMSService.display_name
+		_account_lbl.text = "◈ HUAWEI ID: %s   (Rankings Synced)" % HMSService.display_name
 		_account_lbl.add_theme_color_override("font_color", Color(0.35, 0.95, 0.75, 1.0))
 		_login_btn.visible = false
 		_logout_btn.visible = true
@@ -354,13 +350,13 @@ func _build_leaderboard_row(rank: int, data: Dictionary) -> PanelContainer:
 	rank_lbl.add_theme_font_size_override("font_size", 12)
 	match rank:
 		1:
-			rank_lbl.text = "🥇 #1"
+			rank_lbl.text = "#1"
 			rank_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.25, 1.0))
 		2:
-			rank_lbl.text = "🥈 #2"
+			rank_lbl.text = "#2"
 			rank_lbl.add_theme_color_override("font_color", Color(0.85, 0.9, 0.95, 1.0))
 		3:
-			rank_lbl.text = "🥉 #3"
+			rank_lbl.text = "#3"
 			rank_lbl.add_theme_color_override("font_color", Color(0.9, 0.65, 0.45, 1.0))
 		_:
 			rank_lbl.text = "#%d" % rank
