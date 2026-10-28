@@ -2,6 +2,7 @@ extends Button
 
 var _player: Node = null
 var _press_scale := 1.0
+var base_scale := 1.0
 var _anim_time := 0.0
 var _is_dragging := false
 var _drag_start := Vector2.ZERO
@@ -69,7 +70,8 @@ func _input(event: InputEvent) -> void:
 		var touch_pos: Vector2 = event.position if (event is InputEventScreenDrag) else get_viewport().get_mouse_position()
 		var offset := touch_pos - center_screen
 		if offset.length() > 14.0:
-			var aim_dist: float = clampf(offset.length() * 2.5, 50.0, 340.0)
+			var sens: float = GameState.pebble_sensitivity
+			var aim_dist: float = clampf(offset.length() * 2.5 * sens, 50.0, 340.0)
 			var aim_dir: Vector2 = offset.normalized()
 			_player.update_aim_pebble(_player.global_position + aim_dir * aim_dist)
 			get_viewport().set_input_as_handled()
@@ -94,7 +96,7 @@ func _process(delta: float) -> void:
 	_anim_time += delta
 	if _empty_flash > 0.0:
 		_empty_flash = maxf(0.0, _empty_flash - delta * 4.0)
-	scale = Vector2(_press_scale, _press_scale)
+	scale = Vector2(_press_scale * base_scale, _press_scale * base_scale)
 	queue_redraw()
 
 

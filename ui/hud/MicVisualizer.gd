@@ -14,8 +14,14 @@ func _ready() -> void:
 	_bg_box.border_color = Color(0.25, 0.54, 0.82, 0.48)
 	_bg_box.set_border_width_all(1)
 	_bg_box.set_corner_radius_all(16)
+	if not GameState.mic_enabled:
+		visible = false
 
 func _process(delta: float) -> void:
+	if not GameState.mic_enabled:
+		if visible:
+			visible = false
+		return
 	if _player == null or not is_instance_valid(_player):
 		_player = get_tree().get_first_node_in_group("player")
 		return

@@ -12,6 +12,7 @@ var _badge_depth_lbl: Label = null
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	add_to_group("hud")
 	_build_sector_badge()
 	if has_node("Vignette"):
 		$Vignette.visible = GameState.vignette_enabled
@@ -49,6 +50,9 @@ func _ready() -> void:
 	_setup_sound_indicator_canvas()
 	_setup_virtual_joystick()
 	update_controls_layout()
+	apply_custom_hud_layout()
+	if not get_viewport().size_changed.is_connected(apply_custom_hud_layout):
+		get_viewport().size_changed.connect(apply_custom_hud_layout)
 
 func _on_voice_detected(_loudness: float) -> void:
 	if player == null or not is_instance_valid(player) or not player.can_sound or not player.alive:
@@ -107,7 +111,7 @@ func set_gameplay_buttons_visible(buttons_visible: bool) -> void:
 	if has_node("PebbleBtn"):
 		$PebbleBtn.visible = buttons_visible
 	if has_node("MicIndicator"):
-		$MicIndicator.visible = buttons_visible
+		$MicIndicator.visible = buttons_visible and GameState.mic_enabled
 	if _badge_container != null:
 		_badge_container.visible = buttons_visible
 	if not buttons_visible:
@@ -1049,6 +1053,135 @@ func update_controls_layout() -> void:
 
 	if not GameState.virtual_joystick_enabled and _joystick_active:
 		_deactivate_joystick()
+
+	apply_custom_hud_layout()
+
+
+func apply_custom_hud_layout() -> void:
+	if not is_inside_tree():
+		return
+
+	# Enforce microphone visualizer visibility according to mic_enabled
+	if has_node("MicIndicator"):
+		$MicIndicator.visible = (GameState.mic_enabled and (_badge_container == null or _badge_container.visible))
+
+	var layout: Dictionary = GameState.custom_hud_layout
+	var vp_size := get_viewport().get_visible_rect().size
+	if vp_size.x <= 10.0:
+		vp_size = Vector2(720, 1280)
+
+	# Reset scales and native baselines for untouched buttons
+	if not layout.has("SoundBtn") and has_node("SoundBtn"):
+		$SoundBtn.set("base_scale", 1.0)
+	if not layout.has("SneakBtn") and has_node("SneakBtn"):
+		$SneakBtn.set("base_scale", 1.0)
+	if not layout.has("PebbleBtn") and has_node("PebbleBtn"):
+		$PebbleBtn.set("base_scale", 1.0)
+
+	if not layout.has("PauseBtn") and has_node("PauseBtn"):
+		var p: Button = $PauseBtn
+		p.anchor_left = 1.0
+		p.anchor_right = 1.0
+		p.anchor_top = 0.0
+		p.anchor_bottom = 0.0
+		p.offset_left = -82.0
+		p.offset_top = 37.0
+		p.offset_right = -37.0
+		p.offset_bottom = 82.0
+		p.pivot_offset = Vector2(22.5, 22.5)
+		p.set("base_scale", 1.0)
+
+	if not layout.has("MicIndicator") and has_node("MicIndicator"):
+		var m: Control = $MicIndicator
+		m.anchor_left = 0.5
+		m.anchor_right = 0.5
+		m.anchor_top = 0.0
+		m.anchor_bottom = 0.0
+		m.offset_left = 0.0
+		m.offset_right = 0.0
+		m.offset_top = 52.0
+		m.offset_bottom = 52.0
+		m.pivot_offset = Vector2.ZERO
+		m.scale = Vector2.ONE
+
+	if not layout.has("LevelInfo") and _badge_container != null and is_instance_valid(_badge_container):
+		_badge_container.position = Vector2(38.0, 42.0)
+		_badge_container.pivot_offset = Vector2(80.0, 21.0)
+		_badge_container.scale = Vector2.ONE
+
+	if layout.is_empty():
+		return
+
+	if layout.has("SoundBtn") and has_node("SoundBtn"):
+		_apply_element_layout($SoundBtn, "SoundBtn", layout, vp_size)
+	if layout.has("SneakBtn") and has_node("SneakBtn"):
+		_apply_element_layout($SneakBtn, "SneakBtn", layout, vp_size)
+	if layout.has("PebbleBtn") and has_node("PebbleBtn"):
+		_apply_element_layout($PebbleBtn, "PebbleBtn", layout, vp_size)
+	if layout.has("PauseBtn") and has_node("PauseBtn"):
+		_apply_element_layout($PauseBtn, "PauseBtn", layout, vp_size)
+	if layout.has("MicIndicator") and has_node("MicIndicator"):
+		_apply_element_layout($MicIndicator, "MicIndicator", layout, vp_size)
+	if layout.has("LevelInfo") and _badge_container != null and is_instance_valid(_badge_container):
+		_apply_element_layout(_badge_container, "LevelInfo", layout, vp_size)
+
+
+func _apply_element_layout(node: Control, key: String, layout: Dictionary, vp_size: Vector2) -> void:
+	if node == null or not is_instance_valid(node) or not layout.has(key):
+		return
+	var data: Dictionary = layout[key]
+	var ax: float = float(data.get("anchor_x", 0.0))
+	var ay: float = float(data.get("anchor_y", 0.0))
+	var ox: float = float(data.get("offset_x", 0.0))
+	var oy: float = float(data.get("offset_y", 0.0))
+	var sc: float = clampf(float(data.get("scale", 1.0)), 0.5, 2.0)
+
+	if "base_scale" in node:
+		node.set("base_scale", sc)
+	else:
+		node.scale = Vector2(sc, sc)
+
+	if key == "MicIndicator":
+		node.anchor_left = ax
+		node.anchor_right = ax
+		node.anchor_top = ay
+		node.anchor_bottom = ay
+		node.offset_left = ox
+		node.offset_right = ox
+		node.offset_top = oy
+		node.offset_bottom = oy
+		node.pivot_offset = Vector2.ZERO
+		return
+
+	if key == "LevelInfo":
+		var base_top_left := Vector2(ax * vp_size.x + ox - 80.0, ay * vp_size.y + oy - 21.0)
+		node.position = base_top_left
+		node.pivot_offset = Vector2(80.0, 21.0)
+		return
+
+	var base_sizes: Dictionary = {
+		"SoundBtn": Vector2(110.0, 136.0),
+		"SneakBtn": Vector2(110.0, 136.0),
+		"PebbleBtn": Vector2(88.0, 104.0),
+		"PauseBtn": Vector2(45.0, 45.0),
+		"MicIndicator": Vector2(96.0, 28.0),
+	}
+	var b_sz: Vector2 = base_sizes.get(key, node.size)
+	var half_w: float = b_sz.x * 0.5
+	var half_h: float = b_sz.y * 0.5
+
+	node.pivot_offset = Vector2(half_w, half_h)
+
+	# Keep the Godot anchors matching anchor_x and anchor_y
+	node.anchor_left = ax
+	node.anchor_right = ax
+	node.anchor_top = ay
+	node.anchor_bottom = ay
+
+	node.offset_left = ox - half_w
+	node.offset_right = ox + half_w
+	node.offset_top = oy - half_h
+	node.offset_bottom = oy + half_h
 
 
 func _unhandled_input(event: InputEvent) -> void:

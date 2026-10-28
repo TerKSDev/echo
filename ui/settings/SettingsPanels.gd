@@ -47,10 +47,33 @@ static func build_general_panel(scene: Control) -> VBoxContainer:
 	mute_btn.custom_minimum_size = Vector2(136, 32)
 	mute_btn.focus_mode = Control.FOCUS_NONE
 	SettingsUIFactory.refresh_toggle_btn(mute_btn, not GameState.master_muted, "ENABLED", "MUTED")
+
+	# Master Volume Slider
+	var master_vol_row := SettingsUIFactory.create_slider_row("MASTER VOLUME", "Global gain for all acoustic output.", GameState.master_volume, true, func(v: float):
+		GameState.set_master_volume(v)
+	)
+
+	# Ambience & Music (BGM) Slider
+	var bgm_vol_row := SettingsUIFactory.create_slider_row("AMBIENCE & MUSIC", "Subterranean cavern drones, resonant bass hums, and title themes.", GameState.bgm_volume, true, func(v: float):
+		GameState.set_bgm_volume(v)
+	)
+
+	# Sound Effects (SFX) Slider
+	var sfx_vol_row := SettingsUIFactory.create_slider_row("SOUND EFFECTS (SFX)", "Acoustic ping sonar waves, monster roars, footsteps, and cave water droplets.", GameState.sfx_volume, true, func(v: float):
+		GameState.set_sfx_volume(v)
+	)
+
+	var update_audio_deps := func() -> void:
+		var audio_active: bool = not GameState.master_muted
+		SettingsUIFactory.set_slider_row_enabled(master_vol_row, audio_active)
+		SettingsUIFactory.set_slider_row_enabled(bgm_vol_row, audio_active)
+		SettingsUIFactory.set_slider_row_enabled(sfx_vol_row, audio_active)
+
 	mute_btn.pressed.connect(func():
 		scene.call("play_click")
 		GameState.set_master_muted(not GameState.master_muted)
 		SettingsUIFactory.refresh_toggle_btn(mute_btn, not GameState.master_muted, "ENABLED", "MUTED")
+		update_audio_deps.call()
 	)
 	scene.call("wire_juice", mute_btn)
 	root.add_child(SettingsUIFactory.create_setting_row(
@@ -58,21 +81,9 @@ static func build_general_panel(scene: Control) -> VBoxContainer:
 		"Enable or silence all master game audio while preserving your volume slider levels.",
 		mute_btn
 	))
-
-	# Master Volume Slider
-	root.add_child(SettingsUIFactory.create_slider_row("MASTER VOLUME", "Global gain for all acoustic output.", GameState.master_volume, true, func(v: float):
-		GameState.set_master_volume(v)
-	))
-
-	# Ambience & Music (BGM) Slider
-	root.add_child(SettingsUIFactory.create_slider_row("AMBIENCE & MUSIC", "Subterranean cavern drones, resonant bass hums, and title themes.", GameState.bgm_volume, true, func(v: float):
-		GameState.set_bgm_volume(v)
-	))
-
-	# Sound Effects (SFX) Slider
-	root.add_child(SettingsUIFactory.create_slider_row("SOUND EFFECTS (SFX)", "Acoustic ping sonar waves, monster roars, footsteps, and cave water droplets.", GameState.sfx_volume, true, func(v: float):
-		GameState.set_sfx_volume(v)
-	))
+	root.add_child(master_vol_row)
+	root.add_child(bgm_vol_row)
+	root.add_child(sfx_vol_row)
 
 	root.add_child(SettingsUIFactory.create_category_divider())
 
@@ -84,27 +95,12 @@ static func build_general_panel(scene: Control) -> VBoxContainer:
 	mic_btn.custom_minimum_size = Vector2(136, 32)
 	mic_btn.focus_mode = Control.FOCUS_NONE
 	SettingsUIFactory.refresh_toggle_btn(mic_btn, GameState.mic_enabled, "ENABLED", "MUTED")
-	mic_btn.pressed.connect(func():
-		scene.call("play_click")
-		GameState.mic_enabled = not GameState.mic_enabled
-		GameState.save_settings()
-		var mic: Node = scene.get("_menu_mic")
-		if mic != null:
-			mic.set("enabled", GameState.mic_enabled)
-		SettingsUIFactory.refresh_toggle_btn(mic_btn, GameState.mic_enabled, "ENABLED", "MUTED")
-	)
-	scene.call("wire_juice", mic_btn)
-	root.add_child(SettingsUIFactory.create_setting_row(
-		"MICROPHONE SENSOR",
-		"Detects real-world vocalization to generate acoustic echo waves in the abyss.",
-		mic_btn
-	))
 
 	# Mic Sensitivity Slider
-	root.add_child(SettingsUIFactory.create_slider_row("MICROPHONE SENSITIVITY", "Threshold margin above ambient room noise required to trigger sonar pulses.", GameState.mic_sensitivity, true, func(v: float):
+	var mic_sens_row := SettingsUIFactory.create_slider_row("MICROPHONE SENSITIVITY", "Threshold margin above ambient room noise required to trigger sonar pulses.", GameState.mic_sensitivity, true, func(v: float):
 		GameState.mic_sensitivity = v
 		GameState.save_settings()
-	))
+	)
 
 	# Live Mic Meter & Calibration Button
 	var calib_row := HBoxContainer.new()
@@ -143,7 +139,44 @@ static func build_general_panel(scene: Control) -> VBoxContainer:
 	hint_lbl.add_theme_color_override("font_color", Color(0.42, 0.65, 0.85, 0.65))
 	calib_container.add_child(hint_lbl)
 
+	var update_mic_deps := func() -> void:
+		var mic_active: bool = GameState.mic_enabled
+		SettingsUIFactory.set_slider_row_enabled(mic_sens_row, mic_active)
+		if calib_btn != null and is_instance_valid(calib_btn):
+			calib_btn.disabled = not mic_active
+			if mic_active:
+				SettingsUIFactory.style_action_button(calib_btn, Color(0.35, 0.85, 1.0, 0.85), Color(0.04, 0.14, 0.25, 0.85), true)
+			else:
+				SettingsUIFactory.style_disabled_button(calib_btn, true)
+		if calib_container != null and is_instance_valid(calib_container):
+			calib_container.modulate.a = 1.0 if mic_active else 0.38
+			calib_container.mouse_filter = Control.MOUSE_FILTER_PASS if mic_active else Control.MOUSE_FILTER_IGNORE
+
+	mic_btn.pressed.connect(func():
+		scene.call("play_click")
+		GameState.mic_enabled = not GameState.mic_enabled
+		GameState.save_settings()
+		var mic: Node = scene.get("_menu_mic")
+		if mic != null:
+			mic.set("enabled", GameState.mic_enabled)
+		SettingsUIFactory.refresh_toggle_btn(mic_btn, GameState.mic_enabled, "ENABLED", "MUTED")
+		var hud = scene.get_tree().get_first_node_in_group("hud")
+		if hud != null and hud.has_node("MicIndicator"):
+			hud.get_node("MicIndicator").visible = GameState.mic_enabled
+		update_mic_deps.call()
+	)
+	scene.call("wire_juice", mic_btn)
+	root.add_child(SettingsUIFactory.create_setting_row(
+		"MICROPHONE SENSOR",
+		"Detects real-world vocalization to generate acoustic echo waves in the abyss.",
+		mic_btn
+	))
+	root.add_child(mic_sens_row)
 	root.add_child(calib_container)
+
+	update_audio_deps.call()
+	update_mic_deps.call()
+
 	return root
 
 
@@ -219,6 +252,23 @@ static func build_controls_panel(scene: Control) -> VBoxContainer:
 
 	root.add_child(SettingsUIFactory.create_category_divider())
 
+	# --- Section 2: Aiming & Sensitivity ---
+	root.add_child(SettingsUIFactory.create_section_header("AIMING & THROW SENSITIVITY"))
+
+	# Pebble Throw Aiming Sensitivity (50% ~ 200%)
+	root.add_child(SettingsUIFactory.create_slider_row(
+		"PEBBLE THROW SENSITIVITY",
+		"Adjust touch drag sensitivity for pebble aiming reach and distance.",
+		GameState.pebble_sensitivity,
+		true,
+		func(v: float):
+			GameState.pebble_sensitivity = clampf(v, 0.5, 2.0)
+			GameState.save_settings()
+	, 0.5, 2.0, 0.05))
+
+	root.add_child(SettingsUIFactory.create_category_divider())
+
+	# --- Section 3: Sonar & Acoustic Assistance ---
 	root.add_child(SettingsUIFactory.create_section_header("SONAR & ACOUSTIC ASSISTANCE"))
 
 	# Fast Pulse Mode
@@ -273,6 +323,29 @@ static func build_controls_panel(scene: Control) -> VBoxContainer:
 		"UNIVERSAL ACCESSIBILITY MODE",
 		"Enhanced binaural cane echoes, wall proximity warnings, and tactile navigation support.",
 		blind_btn
+	))
+
+	root.add_child(SettingsUIFactory.create_category_divider())
+
+	# --- Section 4: HUD & On-Screen Layout ---
+	root.add_child(SettingsUIFactory.create_section_header("HUD & ON-SCREEN CONTROLS"))
+
+	# Custom HUD Layout Editor
+	var custom_btn := Button.new()
+	custom_btn.custom_minimum_size = Vector2(160, 32)
+	custom_btn.focus_mode = Control.FOCUS_NONE
+	custom_btn.text = "CUSTOMIZE HUD"
+	custom_btn.add_theme_font_size_override("font_size", 12)
+	SettingsUIFactory.style_action_button(custom_btn, Color(0.35, 0.85, 1.0, 0.85), Color(0.04, 0.14, 0.25, 0.85), true)
+	custom_btn.pressed.connect(func():
+		scene.call("play_click")
+		HudLayoutCustomizer.open(scene.get_tree().root)
+	)
+	scene.call("wire_juice", custom_btn)
+	root.add_child(SettingsUIFactory.create_setting_row(
+		"CUSTOMIZE HUD LAYOUT",
+		"Freely reposition and resize buttons, sector info, voice sensor, and pause button.",
+		custom_btn
 	))
 
 	return root

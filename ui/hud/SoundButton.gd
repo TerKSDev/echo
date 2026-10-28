@@ -2,6 +2,7 @@ extends Button
 
 var _player: Node = null
 var _press_scale := 1.0
+var base_scale := 1.0
 var _ripple_time := 0.0
 var tutorial_pulse := false
 var tutorial_hold_mode := false
@@ -26,7 +27,7 @@ func _process(delta: float) -> void:
 	if _player == null or not is_instance_valid(_player):
 		_player = get_tree().get_first_node_in_group("player")
 	_ripple_time += delta
-	scale = Vector2(_press_scale, _press_scale)
+	scale = Vector2(_press_scale * base_scale, _press_scale * base_scale)
 	queue_redraw()
 
 func _draw() -> void:

@@ -91,7 +91,10 @@ static func create_slider_row(
 	desc_text: String,
 	cur_val: float,
 	is_percent: bool,
-	on_val_changed: Callable
+	on_val_changed: Callable,
+	min_val: float = 0.0,
+	max_val: float = 1.0,
+	step_val: float = 0.05
 ) -> Control:
 	var vbox := VBoxContainer.new()
 	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -130,9 +133,9 @@ static func create_slider_row(
 
 	# Slider Row: Full-width glowing HSlider matching Pause Modal
 	var slider := HSlider.new()
-	slider.min_value = 0.0
-	slider.max_value = 1.0
-	slider.step = 0.05
+	slider.min_value = min_val
+	slider.max_value = max_val
+	slider.step = step_val
 	slider.value = cur_val
 	slider.custom_minimum_size = Vector2(0, 24)
 	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -150,7 +153,23 @@ static func create_slider_row(
 			on_val_changed.call(v)
 	)
 
+	vbox.set_meta("slider", slider)
+	vbox.set_meta("val_lbl", val_lbl)
+	vbox.set_meta("title_lbl", title_lbl)
+	vbox.set_meta("is_percent", is_percent)
+
 	return vbox
+
+
+static func set_slider_row_enabled(row: Control, enabled: bool) -> void:
+	if row == null or not is_instance_valid(row):
+		return
+	var slider: HSlider = row.get_meta("slider", null)
+	if slider != null and is_instance_valid(slider):
+		slider.editable = enabled
+		slider.mouse_filter = Control.MOUSE_FILTER_STOP if enabled else Control.MOUSE_FILTER_IGNORE
+	row.modulate.a = 1.0 if enabled else 0.38
+	row.mouse_filter = Control.MOUSE_FILTER_PASS if enabled else Control.MOUSE_FILTER_IGNORE
 
 
 static func refresh_toggle_btn(btn: Button, active: bool, on_text: String, off_text: String) -> void:

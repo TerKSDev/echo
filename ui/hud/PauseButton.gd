@@ -1,6 +1,7 @@
 extends Button
 
 var _press_scale := 1.0
+var base_scale := 1.0
 
 func _ready() -> void:
 	flat = true
@@ -18,7 +19,7 @@ func _on_up() -> void:
 	tw.tween_property(self, "_press_scale", 1.0, 0.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 func _process(_delta: float) -> void:
-	scale = Vector2(_press_scale, _press_scale)
+	scale = Vector2(_press_scale * base_scale, _press_scale * base_scale)
 	queue_redraw()
 
 func _draw() -> void:
@@ -33,7 +34,7 @@ func _draw() -> void:
 	draw_circle(center, radius * 0.8, Color(0.08, 0.2, 0.35, 0.3))
 
 	# 3. Outer Rim
-	draw_arc(center, radius, 0.0, TAU, 36, Color(0.26, 0.54, 0.82, 0.65), 1.6)
+	draw_arc(center, radius, 0.0, TAU, 36, Color(0.35, 0.65, 0.95, 0.85), 1.6)
 
 	# 4. Pause Bars Icons (Two sleek vertical bars)
 	var bar_w := 3.2

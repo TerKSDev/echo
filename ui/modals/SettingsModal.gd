@@ -196,7 +196,31 @@ func _build_streamlined_ui() -> void:
 	vbox.add_child(layout_row)
 	vbox.move_child(layout_row, 9)
 
-	# Index 10: Divider3
+	# Custom HUD Layout Row
+	var custom_row := HBoxContainer.new()
+	var custom_lbl := Label.new()
+	custom_lbl.text = "HUD LAYOUT & BUTTONS"
+	custom_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	custom_lbl.add_theme_color_override("font_color", Color(0.65, 0.85, 1.0, 0.9))
+	custom_lbl.add_theme_font_size_override("font_size", 13)
+	custom_row.add_child(custom_lbl)
+
+	var custom_btn := Button.new()
+	custom_btn.text = "CUSTOMIZE HUD"
+	custom_btn.custom_minimum_size = Vector2(130, 32)
+	custom_btn.focus_mode = Control.FOCUS_NONE
+	custom_btn.theme = close_btn.theme
+	custom_btn.add_theme_font_size_override("font_size", 12)
+	ModalTemplate.style_button(custom_btn, false, ModalTemplate.ThemeKind.SONAR)
+	custom_btn.pressed.connect(func():
+		close()
+		HudLayoutCustomizer.open(get_tree().root)
+	)
+	custom_row.add_child(custom_btn)
+	vbox.add_child(custom_row)
+	vbox.move_child(custom_row, 10)
+
+	# Index 11: Divider3
 	var div3 := ColorRect.new()
 	div3.custom_minimum_size = Vector2(0, 1)
 	div3.color = Color(0.2, 0.45, 0.7, 0.35)
@@ -268,7 +292,7 @@ func open() -> void:
 	get_tree().paused = true
 
 	volume_slider.value = GameState.master_volume
-	_update_volume_label(GameState.master_volume)
+	_update_volume_ui_state()
 	_update_mic_toggle_ui()
 	_refresh_scheme_btn_ui()
 	_refresh_layout_btn_ui()
@@ -305,9 +329,24 @@ func _on_volume_changed(val: float) -> void:
 	_update_volume_label(val)
 
 
+func _update_volume_ui_state() -> void:
+	var muted: bool = GameState.master_muted
+	volume_slider.editable = not muted
+	volume_slider.mouse_filter = Control.MOUSE_FILTER_STOP if not muted else Control.MOUSE_FILTER_IGNORE
+	var vol_row: Control = get_node_or_null("CenterContainer/Panel/VBox/VolumeRow")
+	if vol_row != null:
+		vol_row.modulate.a = 0.38 if muted else 1.0
+	_update_volume_label(volume_slider.value)
+
+
 func _update_volume_label(val: float) -> void:
 	var pct := int(round(val * 100.0))
-	volume_val.text = "%d%%" % pct
+	if GameState.master_muted:
+		volume_val.text = "%d%% (MUTED)" % pct
+		volume_val.add_theme_color_override("font_color", Color(0.65, 0.65, 0.75, 0.65))
+	else:
+		volume_val.text = "%d%%" % pct
+		volume_val.add_theme_color_override("font_color", Color(0.40, 0.90, 1.0, 0.95))
 
 
 func _on_mic_toggle_pressed() -> void:
@@ -317,6 +356,9 @@ func _on_mic_toggle_pressed() -> void:
 	if mic != null:
 		mic.enabled = GameState.mic_enabled
 	_update_mic_toggle_ui()
+	var hud := get_parent()
+	if hud != null and hud.has_node("MicIndicator"):
+		hud.get_node("MicIndicator").visible = GameState.mic_enabled
 
 
 func _update_mic_toggle_ui() -> void:

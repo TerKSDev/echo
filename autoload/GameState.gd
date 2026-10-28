@@ -763,6 +763,8 @@ var virtual_joystick_enabled := false # false = Drag & Tap, true = Virtual Joyst
 var controls_layout := "right"     # "right" = Actions Right (Left Stick), "left" = Actions Left (Right Stick)
 var sound_indicator_enabled := true # Off-screen directional sound pulse visualizer
 var blind_assist_mode := true     # Visually impaired acoustic navigation (exit beacon, wall echoes, obstacle cane radar)
+var pebble_sensitivity := 1.0          # 0.5 .. 2.0 (50% .. 200%)
+var custom_hud_layout: Dictionary = {} # {"SoundBtn": {anchor_x, offset_x, anchor_y, offset_y, scale}, ...}
 
 # Display & Graphics Settings
 var fullscreen_enabled := false
@@ -915,6 +917,8 @@ func save_settings() -> void:
 	cfg.set_value("controls", "controls_layout", controls_layout)
 	cfg.set_value("controls", "sound_indicator_enabled", sound_indicator_enabled)
 	cfg.set_value("controls", "blind_assist_mode", blind_assist_mode)
+	cfg.set_value("controls", "pebble_sensitivity", pebble_sensitivity)
+	cfg.set_value("controls", "custom_hud_layout", custom_hud_layout)
 
 	cfg.set_value("display", "fullscreen_enabled", fullscreen_enabled)
 	cfg.set_value("display", "screen_shake_intensity", screen_shake_intensity)
@@ -950,6 +954,8 @@ func load_settings() -> void:
 	controls_layout = str(cfg.get_value("controls", "controls_layout", "right"))
 	sound_indicator_enabled = (cfg.get_value("controls", "sound_indicator_enabled", true) == true)
 	blind_assist_mode = (cfg.get_value("controls", "blind_assist_mode", true) == true)
+	pebble_sensitivity = clampf(float(cfg.get_value("controls", "pebble_sensitivity", 1.0)), 0.5, 2.5)
+	custom_hud_layout = cfg.get_value("controls", "custom_hud_layout", {})
 
 	fullscreen_enabled = (cfg.get_value("display", "fullscreen_enabled", false) == true)
 	screen_shake_intensity = clampf(float(cfg.get_value("display", "screen_shake_intensity", 1.0)), 0.0, 1.0)
@@ -1149,6 +1155,8 @@ func reset_to_defaults() -> void:
 	controls_layout = "right"
 	sound_indicator_enabled = true
 	blind_assist_mode = true
+	pebble_sensitivity = 1.0
+	custom_hud_layout.clear()
 	fullscreen_enabled = false
 	screen_shake_intensity = 1.0
 	sonar_glow_boost = 1.0
@@ -1159,6 +1167,48 @@ func reset_to_defaults() -> void:
 	apply_audio_settings()
 	apply_display_settings()
 	save_settings()
+
+
+func get_default_hud_layout() -> Dictionary:
+	var is_left: bool = (controls_layout == "left")
+	var is_joy: bool = virtual_joystick_enabled
+
+	var defs: Dictionary = {}
+
+	# 1. SoundBtn (110x136)
+	if is_left:
+		defs["SoundBtn"] = { "anchor_x": 0.0, "offset_x": 95.0, "anchor_y": 1.0, "offset_y": -118.0, "scale": 1.0 }
+	else:
+		defs["SoundBtn"] = { "anchor_x": 1.0, "offset_x": -95.0, "anchor_y": 1.0, "offset_y": -118.0, "scale": 1.0 }
+
+	# 2. SneakBtn (110x136)
+	if is_joy:
+		if is_left:
+			defs["SneakBtn"] = { "anchor_x": 0.0, "offset_x": 213.0, "anchor_y": 1.0, "offset_y": -118.0, "scale": 1.0 }
+		else:
+			defs["SneakBtn"] = { "anchor_x": 1.0, "offset_x": -213.0, "anchor_y": 1.0, "offset_y": -118.0, "scale": 1.0 }
+	else:
+		if is_left:
+			defs["SneakBtn"] = { "anchor_x": 1.0, "offset_x": -95.0, "anchor_y": 1.0, "offset_y": -118.0, "scale": 1.0 }
+		else:
+			defs["SneakBtn"] = { "anchor_x": 0.0, "offset_x": 95.0, "anchor_y": 1.0, "offset_y": -118.0, "scale": 1.0 }
+
+	# 3. PebbleBtn (88x104)
+	if is_left:
+		defs["PebbleBtn"] = { "anchor_x": 0.0, "offset_x": 95.0, "anchor_y": 1.0, "offset_y": -258.0, "scale": 1.0 }
+	else:
+		defs["PebbleBtn"] = { "anchor_x": 1.0, "offset_x": -95.0, "anchor_y": 1.0, "offset_y": -258.0, "scale": 1.0 }
+
+	# 4. PauseBtn (45x45)
+	defs["PauseBtn"] = { "anchor_x": 1.0, "offset_x": -59.5, "anchor_y": 0.0, "offset_y": 59.5, "scale": 1.0 }
+
+	# 5. MicIndicator (96x28)
+	defs["MicIndicator"] = { "anchor_x": 0.5, "offset_x": 0.0, "anchor_y": 0.0, "offset_y": 52.0, "scale": 1.0 }
+
+	# 6. LevelInfo (160x42)
+	defs["LevelInfo"] = { "anchor_x": 0.0, "offset_x": 118.0, "anchor_y": 0.0, "offset_y": 63.0, "scale": 1.0 }
+
+	return defs
 
 
 func reset_progress() -> void:

@@ -2,6 +2,7 @@ extends Button
 
 var _player: Node = null
 var _press_scale := 1.0
+var base_scale := 1.0
 var _timer := 0.0
 var _active_blend := 0.0
 var tutorial_pulse := false
@@ -30,7 +31,7 @@ func _process(delta: float) -> void:
 	if _player != null and is_instance_valid(_player):
 		is_sneaking = (_player.get("sneaking") == true)
 	_active_blend = move_toward(_active_blend, 1.0 if is_sneaking else 0.0, delta * 9.0)
-	scale = Vector2(_press_scale, _press_scale)
+	scale = Vector2(_press_scale * base_scale, _press_scale * base_scale)
 	queue_redraw()
 
 func _draw() -> void:
