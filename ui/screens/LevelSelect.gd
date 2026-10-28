@@ -140,8 +140,8 @@ func _on_scroll_container_gui_input(event: InputEvent) -> void:
 		var max_scroll := maxf(0.0, vbar.max_value - page)
 
 		if GameState.current_mode == GameState.GameMode.STORY:
-			# At bottom of story mode: dragging upwards pulls downward past the abyss (only active once story completed)
-			if GameState.is_story_completed() and scroll_container.scroll_vertical >= max_scroll - 10.0 and rel_y < -3.0:
+			# At bottom of story mode: dragging upwards pulls downward past the abyss (only active once challenge unlocked)
+			if GameState.is_challenge_unlocked() and scroll_container.scroll_vertical >= max_scroll - 10.0 and rel_y < -3.0:
 				_overscroll_dist += absf(rel_y)
 				if _overscroll_dist >= 45.0:
 					_overscroll_dist = 0.0
@@ -164,7 +164,7 @@ func _on_scroll_container_gui_input(event: InputEvent) -> void:
 		var max_scroll := maxf(0.0, vbar.max_value - page)
 
 		if event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			if GameState.current_mode == GameState.GameMode.STORY and GameState.is_story_completed() and scroll_container.scroll_vertical >= max_scroll - 10.0:
+			if GameState.current_mode == GameState.GameMode.STORY and GameState.is_challenge_unlocked() and scroll_container.scroll_vertical >= max_scroll - 10.0:
 				_overscroll_dist += 25.0
 				if _overscroll_dist >= 45.0:
 					_overscroll_dist = 0.0
@@ -185,7 +185,7 @@ func _setup_mode_toggle() -> void:
 	if mode_toggle == null:
 		return
 	# Challenge mode is completely hidden until all 21 story sectors are cleared!
-	mode_toggle.visible = GameState.is_story_completed()
+	mode_toggle.visible = GameState.is_challenge_unlocked()
 	mode_toggle.custom_minimum_size = Vector2(0, 50)
 	mode_toggle.flat = true
 	mode_toggle.focus_mode = Control.FOCUS_NONE
@@ -223,7 +223,7 @@ func _style_mode_toggle(btn: Button, is_challenge: bool) -> void:
 
 func _on_mode_toggle_pressed() -> void:
 	if GameState.current_mode == GameState.GameMode.STORY:
-		if GameState.is_story_completed():
+		if GameState.is_challenge_unlocked():
 			_descend_to_challenge_mode()
 	else:
 		_ascend_to_story_mode()
@@ -464,7 +464,7 @@ func _create_level_buttons() -> void:
 				level_grid.add_child(button)
 
 		# At the deepest bottom of Story Mode:
-		var is_unlocked := GameState.is_story_completed()
+		var is_unlocked: bool = GameState.is_challenge_unlocked()
 		if is_unlocked:
 			# Large subtle downward arrow indicating players can pull down to descend into Challenge Mode
 			var arrow_canvas := Control.new()
@@ -524,7 +524,7 @@ func _update_header_and_mode_ui() -> void:
 		if sector_label != null:
 			sector_label.visible = false
 		if mode_toggle != null:
-			mode_toggle.visible = GameState.is_story_completed()
+			mode_toggle.visible = GameState.is_challenge_unlocked()
 			_style_mode_toggle(mode_toggle, false)
 
 	# Leaderboard and Reset Run are exclusive to Challenge Mode
@@ -550,7 +550,7 @@ func _update_header_and_mode_ui() -> void:
 
 
 func _on_rift_descend_triggered() -> void:
-	if GameState.is_story_completed():
+	if GameState.is_challenge_unlocked():
 		_descend_to_challenge_mode()
 
 

@@ -468,7 +468,7 @@ static func build_advanced_panel(scene: Control) -> VBoxContainer:
 		reset_btn.disabled = true
 		SettingsUIFactory.style_disabled_button(reset_btn, true)
 
-	var adv_desc := "Reset Story Mode's 20 sectors back to Sector 01. Challenge Mode and Tutorial progress are preserved."
+	var adv_desc := "Reset Story Mode's 20 sectors back to Sector 01. Challenge Mode and Tutorial progress are preserved." if GameState.is_challenge_unlocked() else "Reset Story Mode's 20 sectors back to Sector 01. Tutorial progress is preserved."
 
 	root.add_child(SettingsUIFactory.create_setting_row(
 		"RETURN TO ABYSS",

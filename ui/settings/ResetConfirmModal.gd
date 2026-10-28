@@ -64,7 +64,10 @@ static func show_modal(
 	vbox.add_child(div)
 
 	var desc := Label.new()
-	desc.text = "WARNING: This action is completely IRREVERSIBLE.\n\nStory Mode's 20 star-bearing sectors (Sectors 01–20) will be reset back to Sector 01. Challenge Mode access, high scores, and the tutorial remain unlocked."
+	if GameState.is_challenge_unlocked():
+		desc.text = "WARNING: This action is completely IRREVERSIBLE.\n\nStory Mode's 20 star-bearing sectors (Sectors 01–20) will be reset back to Sector 01. Challenge Mode access, high scores, and the tutorial remain unlocked."
+	else:
+		desc.text = "WARNING: This action is completely IRREVERSIBLE.\n\nStory Mode's 20 star-bearing sectors (Sectors 01–20) will be reset back to Sector 01. The tutorial remains unlocked."
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	desc.add_theme_font_size_override("font_size", 13)
 	desc.add_theme_color_override("font_color", Color(0.95, 0.82, 0.85, 0.95))

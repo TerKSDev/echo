@@ -144,6 +144,7 @@ var current_level := 0
 var story_highest_unlocked := 1
 var challenge_highest_unlocked := 1
 var story_completed := false
+var challenge_unlocked := false
 var has_seen_intro := false
 var story_tutorial_completed := false
 var force_level_0_story := false
@@ -168,6 +169,10 @@ func is_touch_or_mobile() -> bool:
 
 func is_story_completed() -> bool:
 	return story_completed or story_highest_unlocked > STORY_LEVELS.size()
+
+
+func is_challenge_unlocked() -> bool:
+	return challenge_unlocked or is_story_completed() or challenge_highest_unlocked > 1 or challenge_records.size() > 0
 
 func is_story_tutorial_completed() -> bool:
 	return story_tutorial_completed or story_highest_unlocked > 1 or is_level_cleared(1)
@@ -1160,10 +1165,13 @@ func reset_progress() -> void:
 	# Resets Story Mode's 20 star-bearing sectors (Levels 2 to 21) back to Sector 01.
 	# Level 1 (Tutorial) does NOT need to be replayed.
 	# Challenge Mode access, records, and modifiers are preserved.
+	var had_challenge: bool = is_challenge_unlocked()
 	story_highest_unlocked = 2
 	story_completed = false
 	story_tutorial_completed = true
 	has_seen_intro = true
+	if had_challenge:
+		challenge_unlocked = true
 	current_level = 1
 	seen_act_milestones.clear()
 	seen_campaign_endings.erase("story")
@@ -1185,6 +1193,8 @@ func reset_progress() -> void:
 		cfg.set_value("progress", "story_completed", false)
 		cfg.set_value("progress", "story_tutorial_completed", true)
 		cfg.set_value("progress", "has_seen_intro", true)
+		if had_challenge:
+			cfg.set_value("progress", "challenge_unlocked", true)
 		cfg.set_value("narrative", "seen_act_milestones", [])
 		var endings: Array = []
 		if seen_campaign_endings.has("challenge"):
@@ -1245,6 +1255,7 @@ func load_progress() -> void:
 		story_highest_unlocked = 1
 		challenge_highest_unlocked = 1
 		story_completed = false
+		challenge_unlocked = false
 		has_seen_intro = false
 		story_tutorial_completed = false
 		force_level_0_story = false
@@ -1283,6 +1294,10 @@ func load_progress() -> void:
 		CHALLENGE_LEVELS.size() + 1
 	)
 	story_completed = (cfg.get_value("progress", "story_completed", story_highest_unlocked > STORY_LEVELS.size()) == true)
+	challenge_unlocked = (cfg.get_value("progress", "challenge_unlocked", false) == true) \
+		or (challenge_highest_unlocked > 1) \
+		or story_completed \
+		or (story_highest_unlocked > STORY_LEVELS.size())
 	has_seen_intro = (cfg.get_value("progress", "has_seen_intro", false) == true)
 	story_tutorial_completed = (cfg.get_value("progress", "story_tutorial_completed", story_highest_unlocked > 1) == true)
 	challenge_sp_revealed = (cfg.get_value("progress", "challenge_sp_revealed", false) == true)
@@ -1308,6 +1323,8 @@ func load_progress() -> void:
 				"best_time": float(cfg.get_value(sec, "best_time", 999.0)),
 				"best_pings": int(cfg.get_value(sec, "best_pings", 999))
 			}
+	if challenge_records.size() > 0:
+		challenge_unlocked = true
 
 
 func get_level_par(lvl: int) -> Dictionary:
@@ -1474,6 +1491,7 @@ func complete_level(level_number: int) -> void:
 			story_highest_unlocked = next_unlocked
 		if level_number >= active_levels.size() or story_highest_unlocked > active_levels.size():
 			story_completed = true
+			challenge_unlocked = true
 	else:
 		if next_unlocked > challenge_highest_unlocked:
 			challenge_highest_unlocked = next_unlocked
@@ -1484,6 +1502,7 @@ func complete_level(level_number: int) -> void:
 	cfg.set_value("progress", "story_highest_unlocked", story_highest_unlocked)
 	cfg.set_value("progress", "challenge_highest_unlocked", challenge_highest_unlocked)
 	cfg.set_value("progress", "story_completed", story_completed)
+	cfg.set_value("progress", "challenge_unlocked", is_challenge_unlocked())
 	var error := cfg.save(PROGRESS_PATH)
 
 	if error != OK:
