@@ -156,18 +156,22 @@ func _draw() -> void:
 
 	_draw_pebble_icon(center, icon_col, is_empty)
 
-	# 5. Pebble Count Badge (compact top-right pip)
-	var badge_pos := center + Vector2(18.0, -16.0)
-	var badge_bg := Color(0.08, 0.06, 0.02, 0.92 * empty_alpha_mult) if not is_empty else Color(0.10, 0.10, 0.12, 0.5)
+	# 5. Pebble Count Badge (prominent top-right notch badge breaking the circle silhouette)
+	var badge_pos := center + Vector2(25.0, -23.0)
+	var badge_bg := Color(0.12, 0.09, 0.03, 0.98 * empty_alpha_mult) if not is_empty else Color(0.06, 0.08, 0.11, 0.85)
 	var badge_border := col_rim
 	if _empty_flash > 0.01:
-		badge_bg = badge_bg.lerp(Color(0.45, 0.06, 0.08, 0.95), _empty_flash)
+		badge_bg = badge_bg.lerp(Color(0.48, 0.05, 0.08, 0.98), _empty_flash)
 		badge_border = badge_border.lerp(Color(1.0, 0.35, 0.45, 1.0), _empty_flash)
 
-	draw_circle(badge_pos, 8.5, badge_bg)
-	draw_arc(badge_pos, 8.5, 0.0, TAU, 20, badge_border, 1.2)
+	# Dark backing disc to punch out the main button rim underneath
+	draw_circle(badge_pos, 11.5, Color(0.015, 0.025, 0.04, 0.98))
+	draw_circle(badge_pos, 10.0, badge_bg)
+	draw_arc(badge_pos, 10.0, 0.0, TAU, 24, badge_border, 1.6)
+
 	var count_str := str(pebbles_left)
-	draw_string(ThemeDB.fallback_font, badge_pos + Vector2(-8.0, 3.5), count_str, HORIZONTAL_ALIGNMENT_CENTER, 16, 10, icon_col)
+	var num_col := Color(1.0, 0.96, 0.82) if not is_empty else Color(0.65, 0.72, 0.82, 0.45)
+	draw_string(ThemeDB.fallback_font, badge_pos + Vector2(-9.0, 4.0), count_str, HORIZONTAL_ALIGNMENT_CENTER, 18, 11, num_col)
 
 	# 6. Micro Label Below
 	var label_text := "STUNNED" if is_stunned else ("AIMING..." if is_aiming else ("EMPTY" if is_empty else "PEBBLE"))

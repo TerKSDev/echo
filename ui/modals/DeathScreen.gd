@@ -44,8 +44,12 @@ var _anim_time := 0.0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	z_index = 100
 	visible = false
 	modulate.a = 0.0
+	panel.custom_minimum_size.x = ModalTemplate.CARD_WIDTH
+	panel.add_theme_stylebox_override("panel", ModalTemplate.make_card_style(ModalTemplate.ThemeKind.CRIMSON))
+	_sync_viewport_size()
 	wave_canvas.draw.connect(_draw_flatline_wave)
 	retry_btn.pressed.connect(_on_retry_pressed)
 	menu_btn.pressed.connect(_on_menu_pressed)
@@ -66,6 +70,19 @@ func _ready() -> void:
 			b.pivot_offset = b.size * 0.5
 			create_tween().tween_property(b, "scale", Vector2(1.02, 1.02), 0.1)
 		)
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_RESIZED or what == NOTIFICATION_ENTER_TREE:
+		_sync_viewport_size()
+
+
+func _sync_viewport_size() -> void:
+	ModalTemplate.apply_full_rect(self)
+	if has_node("Dimmer"):
+		ModalTemplate.apply_full_rect($Dimmer)
+	if has_node("CenterContainer"):
+		ModalTemplate.apply_full_rect($CenterContainer)
 
 
 func _process(delta: float) -> void:
@@ -92,6 +109,7 @@ func open(killer_type: int = -1) -> void:
 	_is_open = true
 	_anim_time = 0.0
 	visible = true
+	_sync_viewport_size()
 	get_tree().paused = true
 
 	if killer_type >= 0 and killer_type < KILLER_INFO.size():
@@ -116,7 +134,7 @@ func open(killer_type: int = -1) -> void:
 	var tw := create_tween().set_parallel(true)
 	tw.tween_property(self, "modulate:a", 1.0, 0.32).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	panel.scale = Vector2(0.92, 0.92)
-	panel.pivot_offset = Vector2(230.0, 210.0)
+	panel.pivot_offset = Vector2(ModalTemplate.CARD_WIDTH * 0.5, 210.0)
 	tw.tween_property(panel, "scale", Vector2.ONE, 0.36).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 

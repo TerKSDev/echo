@@ -149,7 +149,7 @@ func _play_entry_sequence() -> void:
 		subtitle_text = GameState.get_sector_log(cur_lvl)
 
 	if title_text == "" and _level_root != null:
-		if _level_root.level_name != "" and _level_root.level_name != "UNTITLED" and _level_root.level_name != "未命名":
+		if _level_root.level_name != "" and _level_root.level_name != "UNTITLED" and _level_root.level_name != "UNNAMED":
 			title_text = _level_root.level_name
 
 	hud.play_level_intro(title_text, subtitle_text)
@@ -163,7 +163,7 @@ func _play_entry_sequence() -> void:
 	# Emit a safe visual and acoustic awakening echo wave at 0.22s so the player senses their spawn surroundings
 	get_tree().create_timer(0.22).timeout.connect(func():
 		if is_instance_valid(player) and is_instance_valid(echo_layer):
-			var exclude: Array[RID] = [player.get_rid()]
+			var exclude: Array = [player.get_rid()]
 			echo_layer.emit_echo(player.global_position, 220.0, exclude, true)
 			if GameState.blind_assist_mode and player.has_method("_emit_wall_echos"):
 				player._emit_wall_echos(0.35)
@@ -770,10 +770,11 @@ func _ingest_markers() -> void:
 		for idx in range(_temp_note_markers.size()):
 			var mcell: Vector2i = _temp_note_markers[idx]
 			var nid := "L%02d_%d" % [cur_lvl, idx + 1]
-			if GameState.LORE_NOTES.has(nid):
+			if not GameState.LORE_NOTES.has(nid):
+				nid = "L%02d_1" % cur_lvl
+			# Only place notes that haven't been collected yet; once collected, permanently gone
+			if not GameState.is_note_collected(nid):
 				note_cells[mcell] = nid
-			else:
-				note_cells[mcell] = "L%02d_1" % cur_lvl
 
 
 func _make_door(cell: Vector2i, id: String) -> void:
@@ -932,10 +933,13 @@ func _trigger_read_note(cell: Vector2i) -> void:
 	var note_data: Dictionary = GameState.LORE_NOTES[nid].duplicate()
 	note_data["id"] = nid
 	GameState.collect_note(nid)
+	note_cells.erase(cell)
 	_echo_features_dirty = true
 
 	if echo_layer != null and is_instance_valid(echo_layer):
-		var exclude: Array[RID] = [player.get_rid()] if (player != null and is_instance_valid(player)) else []
+		var exclude: Array = []
+		if player != null and is_instance_valid(player):
+			exclude.append(player.get_rid())
 		echo_layer.emit_echo(cell_to_world(cell), 190.0, exclude, true, Color(1.0, 0.84, 0.35))
 
 	get_tree().paused = true
@@ -944,9 +948,14 @@ func _trigger_read_note(cell: Vector2i) -> void:
 		player.velocity = Vector2.ZERO
 
 	var script: GDScript = load("res://ui/modals/NoteReadModal.gd") as GDScript
+	var modal_parent: Node = hud if (hud != null and is_instance_valid(hud)) else self
 	if script != null:
-		script.open_note(self, note_data, func():
+		if hud != null and is_instance_valid(hud):
+			hud.set_gameplay_buttons_visible(false)
+		script.open_note(modal_parent, note_data, func():
 			get_tree().paused = false
+			if hud != null and is_instance_valid(hud):
+				hud.set_gameplay_buttons_visible(true)
 			if player != null and is_instance_valid(player):
 				player.can_move = true
 		)

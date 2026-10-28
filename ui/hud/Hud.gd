@@ -6,7 +6,10 @@ const DebriefModal = preload("res://ui/modals/DebriefModal.gd")
 @onready var story_overlay: Control = get_node_or_null("StoryOverlay")
 
 var _base_inner_radius := 0.42
-var _sector_badge: Label = null
+var _badge_container: HBoxContainer = null
+var _badge_icon_lbl: Label = null
+var _badge_name_lbl: Label = null
+var _badge_depth_lbl: Label = null
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -100,8 +103,8 @@ func set_gameplay_buttons_visible(buttons_visible: bool) -> void:
 		$PebbleBtn.visible = buttons_visible
 	if has_node("MicIndicator"):
 		$MicIndicator.visible = buttons_visible
-	if _sector_badge != null:
-		_sector_badge.visible = buttons_visible
+	if _badge_container != null:
+		_badge_container.visible = buttons_visible
 	if not buttons_visible:
 		hide_tutorial_callout()
 
@@ -491,23 +494,28 @@ func show_victory_screen() -> void:
 
 	var victory_root := Control.new()
 	victory_root.process_mode = Node.PROCESS_MODE_ALWAYS
-	victory_root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	victory_root.z_index = 105
+	ModalTemplate.apply_full_rect(victory_root)
 	victory_root.modulate.a = 0.0
 	add_child(victory_root)
 
 	var is_challenge: bool = GameState.current_mode == GameState.GameMode.CHALLENGE
 
 	var bg := ColorRect.new()
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	bg.color = Color(0.06, 0.02, 0.07, 0.96) if is_challenge else Color(0.02, 0.05, 0.09, 0.95)
+	ModalTemplate.apply_full_rect(bg)
+	bg.color = ModalTemplate.DIMMER_COLOR
 	victory_root.add_child(bg)
 
 	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ModalTemplate.apply_full_rect(center)
 	victory_root.add_child(center)
 
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(480.0, 380.0)
+	panel.custom_minimum_size = Vector2(ModalTemplate.CARD_WIDTH, 380.0)
+	panel.add_theme_stylebox_override(
+		"panel",
+		ModalTemplate.make_card_style(ModalTemplate.ThemeKind.SINGULARITY if is_challenge else ModalTemplate.ThemeKind.ARCHIVE)
+	)
 	center.add_child(panel)
 
 	var vbox := VBoxContainer.new()
@@ -575,13 +583,34 @@ func show_victory_screen() -> void:
 
 
 func _build_sector_badge() -> void:
-	_sector_badge = Label.new()
-	_sector_badge.position = Vector2(38.0, 52.0)
-	_sector_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_sector_badge.add_theme_color_override("font_color", Color(0.45, 0.78, 0.98, 0.55))
-	_sector_badge.add_theme_font_size_override("font_size", 12)
-	_sector_badge.text = "◈  PROLOGUE • FIRST STEPS  (-4,200 M)"
-	add_child(_sector_badge)
+	_badge_container = HBoxContainer.new()
+	_badge_container.position = Vector2(36.0, 42.0)
+	_badge_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_badge_container.add_theme_constant_override("separation", 6)
+	add_child(_badge_container)
+
+	_badge_icon_lbl = Label.new()
+	_badge_icon_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_badge_icon_lbl.add_theme_color_override("font_color", Color(0.42, 0.88, 1.0, 0.9))
+	_badge_icon_lbl.add_theme_font_size_override("font_size", 12)
+	_badge_container.add_child(_badge_icon_lbl)
+
+	var text_vbox := VBoxContainer.new()
+	text_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	text_vbox.add_theme_constant_override("separation", 2)
+	_badge_container.add_child(text_vbox)
+
+	_badge_name_lbl = Label.new()
+	_badge_name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_badge_name_lbl.add_theme_color_override("font_color", Color(0.85, 0.94, 1.0, 0.85))
+	_badge_name_lbl.add_theme_font_size_override("font_size", 12)
+	text_vbox.add_child(_badge_name_lbl)
+
+	_badge_depth_lbl = Label.new()
+	_badge_depth_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_badge_depth_lbl.add_theme_color_override("font_color", Color(0.45, 0.75, 0.95, 0.60))
+	_badge_depth_lbl.add_theme_font_size_override("font_size", 10)
+	text_vbox.add_child(_badge_depth_lbl)
 
 
 # Atmospheric fade-from-black + sonar title banner on level entry
@@ -591,29 +620,35 @@ func play_level_intro(title_text: String, subtitle_text: String = "Listen closel
 	var cur_lvl: int = GameState.current_level
 	var is_challenge: bool = (GameState.current_mode == GameState.GameMode.CHALLENGE)
 	var kicker_str: String = "((   A C O U S T I C   A S C E N T   ))"
-	var badge_str: String = "◈  " + title_text
+	var raw_depth: String = ""
 
 	if is_challenge:
 		var c_idx := clampi(cur_lvl, 0, GameState.CHALLENGE_SECTORS.size() - 1)
-		var raw_depth: String = str(GameState.CHALLENGE_SECTORS[c_idx]["depth"])
+		raw_depth = str(GameState.CHALLENGE_SECTORS[c_idx]["depth"])
 		if cur_lvl >= 20:
 			kicker_str = "((   K I N G   S E C T O R   •   D E P T H   %s   •   S I N G U L A R I T Y   ))" % raw_depth
-			badge_str = "👑  KING SECTOR • %s  (%s)" % [title_text, raw_depth]
 		else:
 			kicker_str = "((   A B Y S S   R I F T   %02d   •   D E P T H   %s   •   D E S C E N T   ))" % [cur_lvl + 1, raw_depth]
-			badge_str = "◈  ABYSS %02d • %s  (%s)" % [cur_lvl + 1, title_text, raw_depth]
 	else:
 		if cur_lvl == 0:
 			kicker_str = "((   P R O L O G U E   •   D E P T H   - 4 , 2 0 0   M   •   A W A K E N I N G   ))"
-			badge_str = "◈  PROLOGUE • %s  (-4,200 M)" % title_text
+			raw_depth = "-4,200 M"
 		else:
 			var s_idx := clampi(cur_lvl - 1, 0, GameState.STORY_SECTORS.size() - 1)
-			var raw_depth: String = str(GameState.STORY_SECTORS[s_idx]["depth"])
+			raw_depth = str(GameState.STORY_SECTORS[s_idx]["depth"])
 			kicker_str = "((   S E C T O R   %02d   •   D E P T H   %s   •   A S C E N T   ))" % [cur_lvl, raw_depth]
-			badge_str = "◈  SECTOR %02d • %s  (%s)" % [cur_lvl, title_text, raw_depth]
 
-	if _sector_badge != null:
-		_sector_badge.text = badge_str
+	if _badge_icon_lbl != null:
+		_badge_icon_lbl.text = "👑" if (is_challenge and cur_lvl >= 20) else "◈"
+		if is_challenge and cur_lvl >= 20:
+			_badge_icon_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.35, 0.95))
+		else:
+			_badge_icon_lbl.add_theme_color_override("font_color", Color(0.42, 0.88, 1.0, 0.9))
+
+	if _badge_name_lbl != null:
+		_badge_name_lbl.text = title_text
+	if _badge_depth_lbl != null:
+		_badge_depth_lbl.text = raw_depth
 
 	# 1. Fullscreen abyss curtain fading out smoothly
 	var curtain := ColorRect.new()

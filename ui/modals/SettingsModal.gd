@@ -29,8 +29,11 @@ var _blind_btn: Button
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	z_index = 100
 	visible = false
 	modulate.a = 0.0
+	panel.custom_minimum_size.x = ModalTemplate.CARD_WIDTH
+	panel.add_theme_stylebox_override("panel", ModalTemplate.make_card_style(ModalTemplate.ThemeKind.SONAR))
 	_sync_viewport_size()
 
 	var bus_idx := AudioServer.get_bus_index("Master")
@@ -71,13 +74,11 @@ func _notification(what: int) -> void:
 
 
 func _sync_viewport_size() -> void:
-	var vp := get_viewport_rect().size
-	if vp.x > 50.0 and vp.y > 50.0:
-		size = vp
-		if has_node("Dimmer"):
-			$Dimmer.size = vp
-		if has_node("CenterContainer"):
-			$CenterContainer.size = vp
+	ModalTemplate.apply_full_rect(self)
+	if has_node("Dimmer"):
+		ModalTemplate.apply_full_rect($Dimmer)
+	if has_node("CenterContainer"):
+		ModalTemplate.apply_full_rect($CenterContainer)
 
 
 func _wire_btn_anim(btn: Button) -> void:
@@ -418,7 +419,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _player != null and is_instance_valid(_player) and not _player.get("alive"):
 		return
 	var hud := get_parent()
-	if hud != null and hud.has_node("DeathScreen") and hud.get_node("DeathScreen").visible:
+	if hud != null and ((hud.has_node("DeathScreen") and hud.get_node("DeathScreen").visible) or (hud.has_node("NoteReadModal") and hud.get_node("NoteReadModal").visible)):
+		return
+	if get_tree().paused and not _is_open:
 		return
 	if event.is_action_pressed("ui_cancel") or (event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE):
 		if _is_open:
@@ -437,6 +440,7 @@ func open() -> void:
 		return
 	_is_open = true
 	visible = true
+	_sync_viewport_size()
 	get_tree().paused = true
 
 	volume_slider.value = GameState.master_volume
@@ -463,7 +467,7 @@ func open() -> void:
 	var tw := create_tween().set_parallel(true)
 	tw.tween_property(self, "modulate:a", 1.0, 0.18).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	panel.scale = Vector2(0.92, 0.92)
-	panel.pivot_offset = panel.size * 0.5 if panel.size.x > 50.0 else Vector2(290.0, 260.0)
+	panel.pivot_offset = panel.size * 0.5 if panel.size.x > 50.0 else Vector2(ModalTemplate.CARD_WIDTH * 0.5, 260.0)
 	tw.tween_property(panel, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 

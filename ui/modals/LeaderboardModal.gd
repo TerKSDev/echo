@@ -22,10 +22,11 @@ var _is_open := false
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	z_index = 105
 	visible = false
 	modulate.a = 0.0
-	_sync_viewport_size()
 	_build_ui()
+	_sync_viewport_size()
 	HMSService.auth_status_changed.connect(func(_logged): _refresh_view())
 
 
@@ -48,13 +49,11 @@ func _notification(what: int) -> void:
 
 
 func _sync_viewport_size() -> void:
-	var vp := get_viewport_rect().size
-	if vp.x > 50.0 and vp.y > 50.0:
-		size = vp
-		if _dimmer != null:
-			_dimmer.size = vp
-		if _center != null:
-			_center.size = vp
+	ModalTemplate.apply_full_rect(self)
+	if _dimmer != null:
+		ModalTemplate.apply_full_rect(_dimmer)
+	if _center != null:
+		ModalTemplate.apply_full_rect(_center)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -78,7 +77,7 @@ func open(default_sector: int = 1) -> void:
 	var tw := create_tween().set_parallel(true)
 	tw.tween_property(self, "modulate:a", 1.0, 0.18).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	_card.scale = Vector2(0.94, 0.94)
-	_card.pivot_offset = _card.size * 0.5 if _card.size.x > 50.0 else Vector2(290.0, 310.0)
+	_card.pivot_offset = _card.size * 0.5 if _card.size.x > 50.0 else Vector2(ModalTemplate.CARD_WIDTH * 0.5, 310.0)
 	tw.tween_property(_card, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
@@ -99,7 +98,7 @@ func _build_ui() -> void:
 	# 1. Fullscreen Dimmer
 	_dimmer = ColorRect.new()
 	_dimmer.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_dimmer.color = Color(0.015, 0.03, 0.055, 0.92)
+	_dimmer.color = ModalTemplate.DIMMER_COLOR
 	_dimmer.mouse_filter = Control.MOUSE_FILTER_STOP
 	_dimmer.gui_input.connect(func(ev: InputEvent):
 		if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
@@ -114,19 +113,8 @@ func _build_ui() -> void:
 
 	# 3. Glassmorphic Card
 	_card = PanelContainer.new()
-	_card.custom_minimum_size = Vector2(580, 620)
-	var card_style := StyleBoxFlat.new()
-	card_style.bg_color = Color(0.024, 0.055, 0.09, 0.98)
-	card_style.set_border_width_all(2)
-	card_style.border_color = Color(0.85, 0.20, 0.25, 0.85) # Huawei Red border accent
-	card_style.set_corner_radius_all(18)
-	card_style.shadow_color = Color(0.85, 0.20, 0.25, 0.32)
-	card_style.shadow_size = 20
-	card_style.content_margin_left = 24
-	card_style.content_margin_right = 24
-	card_style.content_margin_top = 22
-	card_style.content_margin_bottom = 22
-	_card.add_theme_stylebox_override("panel", card_style)
+	_card.custom_minimum_size = Vector2(ModalTemplate.CARD_WIDTH, 620)
+	_card.add_theme_stylebox_override("panel", ModalTemplate.make_card_style(ModalTemplate.ThemeKind.CRIMSON))
 	_center.add_child(_card)
 
 	var vbox := VBoxContainer.new()
@@ -163,18 +151,12 @@ func _build_ui() -> void:
 	titles.add_child(title_lbl)
 
 	var sub_lbl := Label.new()
-	sub_lbl.text = "Abyssal Speedrun & Stealth Par Challenge (深渊全球挑战榜)"
+	sub_lbl.text = "Abyssal Speedrun & Stealth Par Challenge (Global Ranking)"
 	sub_lbl.add_theme_font_size_override("font_size", 11)
 	sub_lbl.add_theme_color_override("font_color", Color(0.65, 0.82, 0.95, 0.8))
 	titles.add_child(sub_lbl)
 
-	var close_btn := Button.new()
-	close_btn.text = "✕"
-	close_btn.custom_minimum_size = Vector2(32, 32)
-	close_btn.focus_mode = Control.FOCUS_NONE
-	close_btn.flat = true
-	close_btn.add_theme_color_override("font_color", Color(0.7, 0.85, 1.0, 0.8))
-	close_btn.pressed.connect(close)
+	var close_btn := ModalTemplate.make_close_button(close, ModalTemplate.ThemeKind.CRIMSON)
 	header.add_child(close_btn)
 
 	# --- Progressive Login Banner ---

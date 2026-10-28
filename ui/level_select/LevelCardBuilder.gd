@@ -263,8 +263,8 @@ static func build_level_card(
 	var margin := MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
 	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	margin.add_theme_constant_override("margin_left", 16)
-	margin.add_theme_constant_override("margin_right", 12)
+	margin.add_theme_constant_override("margin_left", 14)
+	margin.add_theme_constant_override("margin_right", 10)
 	margin.add_theme_constant_override("margin_top", 10)
 	margin.add_theme_constant_override("margin_bottom", 10)
 	button.add_child(margin)
@@ -285,22 +285,30 @@ static func build_level_card(
 	title_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	title_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_lbl.clip_text = true
+	title_lbl.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	title_lbl.text = ("👑 " + display_title) if is_king_sector else display_title
+
+	var t_len := display_title.length()
+	var fsize := 16
 	if is_king_sector:
-		title_lbl.add_theme_font_size_override("font_size", 18)
+		fsize = 15 if t_len >= 18 else (16 if t_len >= 14 else 18)
+		title_lbl.add_theme_font_size_override("font_size", fsize)
 		title_lbl.add_theme_color_override("font_color", Color(1.0, 0.92, 0.45))
 		title_lbl.add_theme_color_override("font_shadow_color", Color(0.75, 0.12, 0.20, 0.95))
 		title_lbl.add_theme_constant_override("shadow_offset_y", 1)
 	elif is_active:
-		title_lbl.add_theme_font_size_override("font_size", 18)
+		fsize = 15 if t_len >= 18 else (16 if t_len >= 14 else 18)
+		title_lbl.add_theme_font_size_override("font_size", fsize)
 		title_lbl.add_theme_color_override("font_color", Color(0.96, 0.98, 1.0))
 		title_lbl.add_theme_color_override("font_shadow_color", Color(0.05, 0.48, 0.95, 0.9))
 		title_lbl.add_theme_constant_override("shadow_offset_y", 1)
 	elif is_cleared:
-		title_lbl.add_theme_font_size_override("font_size", 17)
+		fsize = 14 if t_len >= 18 else (15 if t_len >= 14 else 17)
+		title_lbl.add_theme_font_size_override("font_size", fsize)
 		title_lbl.add_theme_color_override("font_color", Color(0.85, 0.94, 1.0))
 	else:
-		title_lbl.add_theme_font_size_override("font_size", 16)
+		fsize = 14 if t_len >= 18 else (15 if t_len >= 14 else 16)
+		title_lbl.add_theme_font_size_override("font_size", fsize)
 		title_lbl.add_theme_color_override("font_color", Color(0.65, 0.78, 0.90, 0.92))
 	row1.add_child(title_lbl)
 
@@ -310,6 +318,7 @@ static func build_level_card(
 		status_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		status_box.add_theme_constant_override("separation", 6)
 		status_box.alignment = BoxContainer.ALIGNMENT_CENTER
+		status_box.size_flags_horizontal = Control.SIZE_SHRINK_END
 		status_box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row1.add_child(status_box)
 
@@ -336,6 +345,7 @@ static func build_level_card(
 		status_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		status_box.add_theme_constant_override("separation", 6)
 		status_box.alignment = BoxContainer.ALIGNMENT_CENTER
+		status_box.size_flags_horizontal = Control.SIZE_SHRINK_END
 		status_box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row1.add_child(status_box)
 
@@ -378,8 +388,19 @@ static func build_level_card(
 		sub_lbl.add_theme_color_override("font_color", Color(0.46, 0.58, 0.72, 0.88))
 	row2.add_child(sub_lbl)
 
-	# Display earned stars and best time on cleared levels
-	if is_unlocked and stars > 0:
+	# Display earned stars and best time on cleared levels (Level 0 is tutorial: no stars)
+	var is_tutorial: bool = (GameState.current_mode == GameState.GameMode.STORY and (level_path.ends_with("level_0.tscn") or level_number == 1))
+	if is_tutorial:
+		if is_unlocked and is_cleared:
+			var comp_lbl := Label.new()
+			comp_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			comp_lbl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			comp_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			comp_lbl.text = "COMPLETED"
+			comp_lbl.add_theme_font_size_override("font_size", 12)
+			comp_lbl.add_theme_color_override("font_color", Color(0.4, 0.9, 0.7, 0.9))
+			row2.add_child(comp_lbl)
+	elif is_unlocked and stars > 0:
 		var best_time: float = GameState.get_level_best_time(level_number)
 		var is_ghost: bool = GameState.is_level_ghost_cleared(level_number)
 

@@ -6,7 +6,7 @@ const WAVE_SPEED := 400.0
 const MARK_HALF_LENGTH := 5.5
 const MARK_WIDTH := 2.0
 const MAX_POINTS := 520
-const MAX_MARKS := 120
+const MAX_MARKS := 1400
 const MAX_BOUNCES := 2
 const BOUNCE_ATTENUATION := 0.58
 const MIN_BOUNCE_REMAINING := 20.0
@@ -36,6 +36,7 @@ func _load_icons() -> void:
 var points: Array = []
 var waves: Array = []
 var marks: Array = []
+var _marks_by_pos: Dictionary = {}
 var motes: Array = []
 var _was_active := false
 
@@ -44,6 +45,7 @@ func clear_all() -> void:
 	points.clear()
 	waves.clear()
 	marks.clear()
+	_marks_by_pos.clear()
 	motes.clear()
 	queue_redraw()
 
@@ -79,6 +81,7 @@ func emit_echo(origin: Vector2, radius: float, exclude: Array = [], show_wave: b
 	var last_bounce_hit := Vector2(-99999.0, -99999.0)
 	var ray_query := PhysicsRayQueryParameters2D.new()
 	ray_query.collision_mask = 1
+	ray_query.hit_from_inside = true
 	ray_query.exclude = wall_exclude_rids
 
 	for i in ray_count:
@@ -102,11 +105,11 @@ func emit_echo(origin: Vector2, radius: float, exclude: Array = [], show_wave: b
 
 			var hit_pos: Vector2 = hit.position
 			var seg_len: float = cur_origin.distance_to(hit_pos)
-			if seg_len < 1.0:
-				break
-
 			if bounce == 0:
 				wave_clip_dists[i] = seg_len
+
+			if seg_len < 1.0:
+				break
 
 			cum_dist += seg_len
 			remaining_dist -= seg_len
@@ -284,23 +287,21 @@ func _reveal_features(space: PhysicsDirectSpaceState2D, origin: Vector2, max_dis
 			var s: float = (1.0 if f_type == "exit" else clampf(1.0 - path_len / max_dist, 0.38, 1.0)) * s_mult
 			var new_age: float = -path_len / WAVE_SPEED
 			var is_pressed: bool = bool(f.get("pressed", false))
-			var updated := false
-			for existing in marks:
-				if Vector2(existing["pos"]).distance_squared_to(f_pos) < 4.0:
-					if existing["age"] >= 0.0:
-						existing["age"] = minf(existing["age"], 0.08)
-					else:
-						existing["age"] = minf(existing["age"], new_age)
-					existing["strength"] = maxf(float(existing["strength"]), s)
-					existing["pressed"] = is_pressed
-					existing["open"] = bool(f.get("open", false))
-					existing["locked"] = bool(f.get("locked", false))
-					existing["collected"] = bool(f.get("collected", false))
-					existing["color"] = f.get("color", Color.WHITE)
-					updated = true
-					break
-			if not updated:
-				marks.append({
+			var m_key := Vector2i(round(f_pos.x), round(f_pos.y))
+			if _marks_by_pos.has(m_key):
+				var existing: Dictionary = _marks_by_pos[m_key]
+				if existing["age"] >= 0.0:
+					existing["age"] = minf(existing["age"], 0.08)
+				else:
+					existing["age"] = minf(existing["age"], new_age)
+				existing["strength"] = maxf(float(existing["strength"]), s)
+				existing["pressed"] = is_pressed
+				existing["open"] = bool(f.get("open", false))
+				existing["locked"] = bool(f.get("locked", false))
+				existing["collected"] = bool(f.get("collected", false))
+				existing["color"] = f.get("color", Color.WHITE)
+			else:
+				var new_mark := {
 					"type": f_type,
 					"pos": f_pos,
 					"age": new_age,
@@ -310,9 +311,15 @@ func _reveal_features(space: PhysicsDirectSpaceState2D, origin: Vector2, max_dis
 					"locked": bool(f.get("locked", false)),
 					"collected": bool(f.get("collected", false)),
 					"color": f.get("color", Color.WHITE)
-				})
+				}
+				marks.append(new_mark)
+				_marks_by_pos[m_key] = new_mark
 	if marks.size() > MAX_MARKS:
-		marks = marks.slice(marks.size() - MAX_MARKS)
+		var excess: int = marks.size() - MAX_MARKS
+		for k in excess:
+			var old_pos: Vector2 = marks[k]["pos"]
+			_marks_by_pos.erase(Vector2i(round(old_pos.x), round(old_pos.y)))
+		marks = marks.slice(excess)
 
 
 # Update the age of each point and remove old points
@@ -343,12 +350,15 @@ func _process(delta):
 	if not marks.is_empty():
 		var wm := 0
 		var max_mark_age: float = LIFETIME * 1.35
+		_marks_by_pos.clear()
 		for i in marks.size():
 			var m: Dictionary = marks[i]
 			var next_age: float = float(m["age"]) + delta
 			if next_age < max_mark_age:
 				m["age"] = next_age
 				marks[wm] = m
+				var m_pos: Vector2 = m["pos"]
+				_marks_by_pos[Vector2i(round(m_pos.x), round(m_pos.y))] = m
 				wm += 1
 		if wm < marks.size():
 			marks.resize(wm)
@@ -490,7 +500,8 @@ func _draw():
 			var draw_trail: bool = radius > 7.0
 			var step_ang: float = TAU / float(n_seg)
 			for i in n_seg:
-				if radius <= clip_arr[i] + 2.0:
+				var max_clip: float = clip_arr[i]
+				if max_clip > 2.5 and radius <= max_clip + 2.0:
 					var a0: float = i * step_ang
 					var a1: float = (i + 1) * step_ang
 					var d0 := Vector2.from_angle(a0)
@@ -620,13 +631,14 @@ func _draw_mark(m: Dictionary, a: float) -> void:
 		"note":
 			# Expedition archive / journal fragment: glowing golden parchment / diamond glyph
 			var is_collected: bool = bool(m.get("collected", false))
-			var nc := Color(1.0, 0.82, 0.35, a * (0.45 if is_collected else 1.0))
-			if not is_collected:
-				var t := Time.get_ticks_msec() / 1000.0
-				var pulse := 0.5 + 0.5 * sin(t * 4.2)
-				var r_out := 15.0 + pulse * 3.0
-				draw_circle(p, 9.5, Color(1.0, 0.85, 0.35, a * 0.14))
-				draw_arc(p, r_out, 0.0, TAU, 28, Color(1.0, 0.90, 0.48, a * (0.32 + 0.18 * pulse)), 1.2)
+			if is_collected:
+				return
+			var nc := Color(1.0, 0.82, 0.35, a)
+			var t := Time.get_ticks_msec() / 1000.0
+			var pulse := 0.5 + 0.5 * sin(t * 4.2)
+			var r_out := 15.0 + pulse * 3.0
+			draw_circle(p, 9.5, Color(1.0, 0.85, 0.35, a * 0.14))
+			draw_arc(p, r_out, 0.0, TAU, 28, Color(1.0, 0.90, 0.48, a * (0.32 + 0.18 * pulse)), 1.2)
 			var pts := PackedVector2Array([
 				p + Vector2(0.0, -11.0),
 				p + Vector2(10.0, 0.0),

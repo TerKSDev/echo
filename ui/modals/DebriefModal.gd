@@ -35,10 +35,11 @@ var _cur_lvl_num: int = 1
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	z_index = 100
 	visible = false
 	modulate.a = 0.0
-	_sync_viewport_size()
 	_build_ui()
+	_sync_viewport_size()
 	HMSService.auth_status_changed.connect(func(_logged): _update_hms_button_state())
 
 
@@ -48,13 +49,11 @@ func _notification(what: int) -> void:
 
 
 func _sync_viewport_size() -> void:
-	var vp := get_viewport_rect().size
-	if vp.x > 50.0 and vp.y > 50.0:
-		size = vp
-		if _dimmer != null:
-			_dimmer.size = vp
-		if _center != null:
-			_center.size = vp
+	ModalTemplate.apply_full_rect(self)
+	if _dimmer != null:
+		ModalTemplate.apply_full_rect(_dimmer)
+	if _center != null:
+		ModalTemplate.apply_full_rect(_center)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -78,7 +77,7 @@ func _build_ui() -> void:
 	# 1. Fullscreen Dimmer
 	_dimmer = ColorRect.new()
 	_dimmer.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_dimmer.color = Color(0.015, 0.03, 0.055, 0.92)
+	_dimmer.color = ModalTemplate.DIMMER_COLOR
 	_dimmer.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(_dimmer)
 
@@ -91,27 +90,10 @@ func _build_ui() -> void:
 
 	# 3. Main Glassmorphic Card
 	_card = PanelContainer.new()
-	_card.custom_minimum_size = Vector2(580, 555)
+	_card.custom_minimum_size = Vector2(ModalTemplate.CARD_WIDTH, 555)
 	_card.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_card.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	var card_style := StyleBoxFlat.new()
-	card_style.bg_color = Color(0.024, 0.055, 0.09, 0.98)
-	card_style.border_width_left = 2
-	card_style.border_width_top = 2
-	card_style.border_width_right = 2
-	card_style.border_width_bottom = 2
-	card_style.border_color = Color(0.25, 0.82, 0.95, 0.9)
-	card_style.corner_radius_top_left = 18
-	card_style.corner_radius_top_right = 18
-	card_style.corner_radius_bottom_right = 18
-	card_style.corner_radius_bottom_left = 18
-	card_style.shadow_color = Color(0.08, 0.55, 0.95, 0.35)
-	card_style.shadow_size = 24
-	card_style.content_margin_left = 32
-	card_style.content_margin_right = 32
-	card_style.content_margin_top = 28
-	card_style.content_margin_bottom = 28
-	_card.add_theme_stylebox_override("panel", card_style)
+	_card.add_theme_stylebox_override("panel", ModalTemplate.make_card_style(ModalTemplate.ThemeKind.SONAR))
 	_center.add_child(_card)
 
 	var vbox := VBoxContainer.new()

@@ -186,14 +186,18 @@ func on_sound(pos: Vector2, loudness: float, radius: float, is_voice: bool = fal
 	if dist > effective_max:
 		return
 
-	# Wall occlusion: footsteps cannot pass through walls; shouts lose 75% volume
-	if _is_blocked_by_wall(pos, global_position):
+	# Wall occlusion: footsteps cannot pass through walls; shouts muffled by dense rock only travel <= 140px (~4 tiles)
+	var wall_blocked := _is_blocked_by_wall(pos, global_position)
+	if wall_blocked:
 		if not is_voice:
 			return
-		loudness *= 0.25
+		if dist > 140.0:
+			return
+		loudness *= 0.20
 
+	var thresh := 0.07 if (enemy_type == EnemyType.SLEEPER and state != State.SLEEP) else hearing_threshold
 	var heard := loudness * (1.0 - dist / effective_max)
-	if heard < hearing_threshold:
+	if heard < thresh:
 		return
 
 	match enemy_type:
@@ -202,29 +206,45 @@ func on_sound(pos: Vector2, loudness: float, radius: float, is_voice: bool = fal
 		EnemyType.LISTENER:
 			_handle_listener_sound(is_voice)
 		_:
-			_notice(pos)
+			_notice(pos, wall_blocked)
 
 
-func _notice(pos: Vector2) -> void:
+func _notice(pos: Vector2, wall_blocked: bool = false) -> void:
 	is_investigating_decoy = false
-	target = pos
+	var to_sound := (pos - global_position).normalized()
+	if not to_sound.is_zero_approx():
+		facing_dir = to_sound
 	_stuck_timer = 0.0
+
+	# If the sound is occluded behind a solid wall (muffled shout):
+	# The predator is awakened / alerted facing the wall, but does NOT blindly charge into solid rock.
+	if wall_blocked:
+		reveal(0.7)
+		match state:
+			State.SLEEP, State.RETURN:
+				_enter(State.ALERT)
+				woke_up.emit(global_position)
+			State.PATROL:
+				_enter(State.ALERT)
+		return
+
+	target = pos
 	match state:
 		State.SLEEP, State.PATROL, State.RETURN:
 			_enter(State.ALERT)
 			woke_up.emit(global_position)
 		State.SEARCH:
 			# Already actively hunting after a chase: snap back to chasing without re-roaring every step
-			if timer >= 0.4:
+			if timer >= 0.15:
 				_enter(State.INVESTIGATE)
 		State.INVESTIGATE:
 			# While already chasing, update destination toward latest sound,
-			# but do not reset chase timer so chase timeout lets the player escape.
-			pass
+			# and give a small chase timer refresh so continuous loud running keeps the pursuit alive.
+			timer = maxf(0.0, timer - 0.5)
 
 
 # Decoy stone sound reaction: luring/distraction behavior
-func on_decoy_sound(pos: Vector2, loudness: float, radius: float) -> void:
+func on_decoy_sound(pos: Vector2, loudness: float, radius: float, is_wall_clink: bool = false) -> void:
 	if enemy_type == EnemyType.LISTENER:
 		return
 
@@ -233,27 +253,41 @@ func on_decoy_sound(pos: Vector2, loudness: float, radius: float) -> void:
 	if dist > effective_max:
 		return
 
-	if _is_blocked_by_wall(pos, global_position):
-		loudness *= 0.35
+	var wall_blocked := _is_blocked_by_wall(pos, global_position)
+	if wall_blocked:
+		# Floor impact in adjacent room: solid basalt wall 100% blocks airborne sound
+		if not is_wall_clink:
+			return
+		# Physical wall clink: structure-borne vibration, only audible within 110px (~3.5 tiles) across the wall
+		if dist > 110.0:
+			return
+		loudness *= 0.28
 
 	var heard := loudness * (1.0 - dist / effective_max)
 	if heard < hearing_threshold * 0.8:
 		return
 
-	if enemy_type == EnemyType.SCREAMER:
-		var dir := (pos - global_position).normalized()
-		if not dir.is_zero_approx():
-			facing_dir = dir
-		reveal(0.7)
-		return
-
-	# Mobile enemies (SLEEPER, PATROLLER, CHASER)
-	target = pos
-	is_investigating_decoy = true
-	_stuck_timer = 0.0
 	var to_sound := (pos - global_position).normalized()
 	if not to_sound.is_zero_approx():
 		facing_dir = to_sound
+
+	if enemy_type == EnemyType.SCREAMER:
+		reveal(0.7)
+		return
+
+	# If blocked by wall: the monster perceives the knock/vibration through the rock,
+	# but does NOT mindlessly sprint into the dead wall. It wakes up, turns to face the wall, and stays on high alert.
+	if wall_blocked:
+		reveal(0.75)
+		if state == State.SLEEP or state == State.RETURN:
+			_enter(State.ALERT)
+			woke_up.emit(global_position)
+		return
+
+	# Clear path / open space: full decoy investigation (runs to the pebble)
+	target = pos
+	is_investigating_decoy = true
+	_stuck_timer = 0.0
 
 	match state:
 		State.SLEEP, State.PATROL, State.RETURN, State.SEARCH:
@@ -441,6 +475,8 @@ func _is_blocked_by_wall(from_pos: Vector2, to_pos: Vector2) -> bool:
 func _sense_player() -> void:
 	if state == State.ALERT or state == State.SCREAM or state == State.ALARM:
 		return
+	if is_investigating_decoy:
+		return
 	var player := _get_player()
 	if player == null:
 		return
@@ -461,7 +497,11 @@ func _sense_player() -> void:
 				_notice(player.global_position)
 		return
 
-	var radius: float = sneak_sense_radius if player.sneaking else sense_radius
+	# While awake (PATROL, INVESTIGATE, SEARCH, RETURN):
+	# If player is walking openly with no walls during a chase, maintain visual awareness (140px);
+	# Sneaking collapses detection radius down to sneak_sense_radius (24~32px).
+	var active_sense: float = 140.0 if state == State.INVESTIGATE else sense_radius
+	var radius: float = sneak_sense_radius if player.sneaking else active_sense
 	if dist <= radius:
 		_notice(player.global_position)
 

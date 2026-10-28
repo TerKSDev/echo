@@ -15,7 +15,7 @@ func _ready() -> void:
 
 func spawn_enemy(parent: Node) -> Node:
 	if enemy_scene == null:
-		push_warning("EnemySpawn '%s' 未设置 enemy_scene" % name)
+		push_warning("EnemySpawn '%s' has no enemy_scene assigned" % name)
 		return null
 	var enemy := enemy_scene.instantiate()
 	enemy.global_position = global_position

@@ -84,6 +84,7 @@ var _wall_bump_pos := Vector2.ZERO
 var _wall_bump_normal := Vector2.UP
 var _wall_bump_alpha := 0.0
 var _stuck_timer := 0.0
+var _last_progress_pos := Vector2.ZERO
 var _water_splash_timer := 0.0
 var _facing_dir := Vector2.DOWN
 var _cane_timer := 0.0
@@ -484,25 +485,36 @@ func _physics_process(delta: float) -> void:
 				_wall_bump_alpha = 0.85
 
 			var heading_into_wall: float = desired.normalized().dot(normal)
-			if (moving or input_vec != Vector2.ZERO) and heading_into_wall < -0.7:
-				if _wall_bump_sound_cooldown <= 0.0:
+			if (moving or input_vec != Vector2.ZERO) and heading_into_wall < -0.4:
+				# Play impact bump sound only on distinct collision, not repeatedly when resting against wall
+				if _wall_bump_sound_cooldown <= 0.0 and velocity.length() > 20.0:
 					_wall_bump_sound_cooldown = 0.38
 					var sfx_bump := get_node_or_null("../SfxManager") as SfxManager
 					if sfx_bump != null:
 						sfx_bump.play_wall_bump()
 					Input.vibrate_handheld(40)
 
-			if moving and velocity.length() < 6.0 and heading_into_wall < -0.82:
-				_stuck_timer += delta
-				if _stuck_timer > 0.14:
-					moving = false
-					desired = Vector2.ZERO
-					velocity = Vector2.ZERO
-					camera_shake(0.08, 1.2)
+			# Stuck detection while moving: if tap target is unreachable or blocked by walls/corners
+			if moving:
+				var d_moved: float = global_position.distance_to(_last_progress_pos)
+				if d_moved < 2.0:
+					_stuck_timer += delta
+					if _stuck_timer > 0.16:
+						moving = false
+						marker = 0.0
+						desired = Vector2.ZERO
+						velocity = Vector2.ZERO
+						_stuck_timer = 0.0
+						camera_shake(0.06, 1.0)
+				else:
+					_stuck_timer = 0.0
+					_last_progress_pos = global_position
 			else:
 				_stuck_timer = 0.0
+				_last_progress_pos = global_position
 	else:
 		_stuck_timer = 0.0
+		_last_progress_pos = global_position
 
 	# Continuous hydrodynamic fluid ripples while wading through water
 	if water_count > 0 and velocity.length() > 14.0:

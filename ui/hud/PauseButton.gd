@@ -55,6 +55,3 @@ func _draw() -> void:
 		col,
 		bar_w
 	)
-
-	# 5. Micro Shortcut Hint Below
-	draw_string(ThemeDB.fallback_font, Vector2(0.0, size.y + 12.0), "[ESC]", HORIZONTAL_ALIGNMENT_CENTER, int(size.x), 9, Color(col, 0.45))

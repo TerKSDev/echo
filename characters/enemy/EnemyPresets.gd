@@ -12,16 +12,16 @@ const PRESETS: Array[Dictionary] = [
 	{ # SLEEPER - hard to wake (walk ~67px), slow chase, deaf to sneaking
 		"hearing_range": 350.0, "hearing_threshold": 0.14,
 		"can_hear_sneak": false, "can_hear_walk": true, "can_hear_voice": true,
-		"patrol_speed": 60.0, "chase_speed": 135.0,
-		"alert_time": 0.85, "investigate_timeout": 3.0,
+		"patrol_speed": 60.0, "chase_speed": 190.0,
+		"alert_time": 0.55, "investigate_timeout": 3.2,
 		"init_state": 0, "sleep_wake_radius": 65.0, "sneak_wake_radius": 28.0, "sneak_sense_radius": 24.0,
 		"color": Color(0.68, 0.42, 0.98), # Amethyst purple
 	},
 	{ # PATROLLER - walks a route, hears walking (~152px) but not distant sneaking
 		"hearing_range": 400.0, "hearing_threshold": 0.04,
 		"can_hear_sneak": true, "can_hear_walk": true, "can_hear_voice": true,
-		"patrol_speed": 75.0, "chase_speed": 150.0,
-		"alert_time": 0.7, "investigate_timeout": 3.5,
+		"patrol_speed": 75.0, "chase_speed": 175.0,
+		"alert_time": 0.65, "investigate_timeout": 3.5,
 		"init_state": 1, "sleep_wake_radius": 75.0, "sneak_wake_radius": 36.0, "sneak_sense_radius": 32.0,
 		"color": Color(1.0, 0.82, 0.25), # Amber gold
 	},

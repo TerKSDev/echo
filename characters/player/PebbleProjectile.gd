@@ -89,15 +89,25 @@ func _process(delta: float) -> void:
 func _on_bounce_wall(wall_pos: Vector2) -> void:
 	var sb := get_tree().get_first_node_in_group("sound_bus") as SoundBus
 	if sb != null and is_instance_valid(sb):
+		# Calculate reflection normal away from wall back into playable room
+		var in_dir: Vector2 = (wall_pos - path_points[cur_segment]).normalized() if cur_segment < path_points.size() else Vector2.ZERO
+		var next_idx: int = cur_segment + 1
+		var out_dir: Vector2 = (path_points[next_idx] - wall_pos).normalized() if next_idx < path_points.size() else -in_dir
+		var n: Vector2 = (out_dir - in_dir).normalized()
+		if n.is_zero_approx():
+			n = -in_dir
+		var sound_pos: Vector2 = wall_pos + n * 6.0
 		# Emits sharp acoustic stone clink wave on wall impact
-		sb.emit_decoy_sound(wall_pos, 0.24, 150.0, true)
+		sb.emit_decoy_sound(sound_pos, 0.24, 150.0, true)
 
-	# Spawn wall spark chips
+	# Spawn wall spark chips directed back into room
+	var p0 := path_points[cur_segment] if cur_segment < path_points.size() else wall_pos
+	var spark_n := (p0 - wall_pos).normalized() if not (p0 - wall_pos).is_zero_approx() else Vector2.UP
 	for i in 4:
-		var ang := randf() * TAU
+		var ang := randf_range(-1.1, 1.1)
 		_wall_sparks.append({
-			"pos": to_local(wall_pos),
-			"vel": Vector2.from_angle(ang) * randf_range(30.0, 85.0),
+			"pos": to_local(wall_pos + spark_n * 2.0),
+			"vel": spark_n.rotated(ang) * randf_range(30.0, 85.0),
 			"life": randf_range(0.12, 0.22),
 			"col": Color(1.0, 0.9, 0.5)
 		})

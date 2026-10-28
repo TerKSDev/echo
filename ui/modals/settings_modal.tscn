@@ -7,18 +7,18 @@
 content_margin_left = 28.0
 content_margin_top = 24.0
 content_margin_right = 28.0
-content_margin_bottom = 28.0
-bg_color = Color(0.045, 0.12, 0.21, 0.94)
+content_margin_bottom = 24.0
+bg_color = Color(0.028, 0.068, 0.125, 0.96)
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
-border_color = Color(0.28, 0.58, 0.85, 0.8)
-corner_radius_top_left = 18
-corner_radius_top_right = 18
-corner_radius_bottom_right = 18
-corner_radius_bottom_left = 18
-shadow_color = Color(0.08, 0.35, 0.65, 0.3)
+border_color = Color(0.26, 0.6, 0.86, 0.72)
+corner_radius_top_left = 16
+corner_radius_top_right = 16
+corner_radius_bottom_right = 16
+corner_radius_bottom_left = 16
+shadow_color = Color(0.05, 0.26, 0.52, 0.2)
 shadow_size = 12
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_close_normal"]
@@ -52,7 +52,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0, 0.02, 0.05, 0.68)
+color = Color(0.01, 0.02, 0.045, 0.86)
 
 [node name="CenterContainer" type="CenterContainer" parent="."]
 layout_mode = 1
@@ -63,7 +63,7 @@ grow_horizontal = 2
 grow_vertical = 2
 
 [node name="Panel" type="PanelContainer" parent="CenterContainer"]
-custom_minimum_size = Vector2(580, 0)
+custom_minimum_size = Vector2(560, 0)
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_card")
 

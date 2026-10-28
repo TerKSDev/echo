@@ -27,11 +27,12 @@ var _wav_click: AudioStreamWAV
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	z_index = 105
 	visible = false
 	modulate.a = 0.0
-	_sync_viewport_size()
 	_build_ui_audio()
 	_build_modal_shell()
+	_sync_viewport_size()
 
 
 func _notification(what: int) -> void:
@@ -40,13 +41,11 @@ func _notification(what: int) -> void:
 
 
 func _sync_viewport_size() -> void:
-	var vp := get_viewport_rect().size
-	if vp.x > 50.0 and vp.y > 50.0:
-		size = vp
-		if _dimmer != null:
-			_dimmer.size = vp
-		if _center != null:
-			_center.size = vp
+	ModalTemplate.apply_full_rect(self)
+	if _dimmer != null:
+		ModalTemplate.apply_full_rect(_dimmer)
+	if _center != null:
+		ModalTemplate.apply_full_rect(_center)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -101,7 +100,7 @@ func open() -> void:
 	var tw := create_tween().set_parallel(true)
 	tw.tween_property(self, "modulate:a", 1.0, 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	_panel.scale = Vector2(0.93, 0.93)
-	_panel.pivot_offset = Vector2(290.0, 300.0)
+	_panel.pivot_offset = Vector2(ModalTemplate.CARD_WIDTH * 0.5, 300.0)
 	tw.tween_property(_panel, "scale", Vector2.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
@@ -122,7 +121,7 @@ func _build_modal_shell() -> void:
 
 	_dimmer = ColorRect.new()
 	_dimmer.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_dimmer.color = Color(0.0, 0.02, 0.05, 0.85)
+	_dimmer.color = ModalTemplate.DIMMER_COLOR
 	_dimmer.gui_input.connect(func(ev: InputEvent):
 		if (ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT) or (ev is InputEventScreenTouch and ev.pressed):
 			close()
@@ -134,19 +133,8 @@ func _build_modal_shell() -> void:
 	add_child(_center)
 
 	_panel = PanelContainer.new()
-	_panel.custom_minimum_size = Vector2(580, 620)
-	var card_style := StyleBoxFlat.new()
-	card_style.content_margin_left = 24.0
-	card_style.content_margin_top = 20.0
-	card_style.content_margin_right = 24.0
-	card_style.content_margin_bottom = 22.0
-	card_style.bg_color = Color(0.04, 0.11, 0.2, 0.96)
-	card_style.set_border_width_all(2)
-	card_style.border_color = Color(0.28, 0.6, 0.88, 0.85)
-	card_style.set_corner_radius_all(18)
-	card_style.shadow_color = Color(0.08, 0.38, 0.72, 0.35)
-	card_style.shadow_size = 14
-	_panel.add_theme_stylebox_override("panel", card_style)
+	_panel.custom_minimum_size = Vector2(ModalTemplate.CARD_WIDTH, 620)
+	_panel.add_theme_stylebox_override("panel", ModalTemplate.make_card_style(ModalTemplate.ThemeKind.SONAR))
 	_center.add_child(_panel)
 
 	var outer_vbox := VBoxContainer.new()
@@ -173,25 +161,7 @@ func _build_modal_shell() -> void:
 	_subtitle_lbl.add_theme_font_size_override("font_size", 11)
 	title_box.add_child(_subtitle_lbl)
 
-	var close_btn := Button.new()
-	close_btn.custom_minimum_size = Vector2(40, 40)
-	close_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	close_btn.focus_mode = Control.FOCUS_NONE
-	close_btn.text = "✕"
-	close_btn.add_theme_font_size_override("font_size", 16)
-	var close_normal := StyleBoxFlat.new()
-	close_normal.bg_color = Color(0.05, 0.14, 0.24, 0.45)
-	close_normal.set_corner_radius_all(20)
-	var close_hover := StyleBoxFlat.new()
-	close_hover.bg_color = Color(0.14, 0.32, 0.50, 0.7)
-	close_hover.set_corner_radius_all(20)
-	close_btn.add_theme_stylebox_override("normal", close_normal)
-	close_btn.add_theme_stylebox_override("hover", close_hover)
-	close_btn.add_theme_stylebox_override("pressed", close_hover)
-	close_btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-	close_btn.add_theme_color_override("font_color", Color(0.70, 0.85, 0.98, 0.85))
-	close_btn.add_theme_color_override("font_hover_color", Color.WHITE)
-	close_btn.pressed.connect(close)
+	var close_btn := ModalTemplate.make_close_button(close, ModalTemplate.ThemeKind.SONAR)
 	header.add_child(close_btn)
 
 	var top_div := ColorRect.new()
@@ -223,7 +193,7 @@ func _build_modal_shell() -> void:
 
 	_scroll = ScrollContainer.new()
 	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_scroll.custom_minimum_size = Vector2(530, 440)
+	_scroll.custom_minimum_size = Vector2(0, 440)
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	outer_vbox.add_child(_scroll)
@@ -532,12 +502,12 @@ func _add_lore_note_card(note_data: Dictionary) -> void:
 
 
 func _populate_ethos() -> void:
-	_add_section_header("CORE ETHOS • 核心正向价值与非暴力生存")
+	_add_section_header("CORE ETHOS • POSITIVE VALUES & MINDFUL SURVIVAL")
 	_add_guide_row(Color(0.35, 0.95, 0.75), "NON-VIOLENCE", "ECHO contains zero weapons and zero violence. Survival is achieved through mindfulness, calmness, and acoustic deflection rather than destruction.")
 	_add_guide_row(Color(0.45, 0.82, 1.0), "INNER RESILIENCE", "The subterranean ascent represents overcoming mental darkness, anxiety, and panic. Silence is your shield; resonance is your compass.")
 
 	_add_divider()
-	_add_section_header("UNIVERSAL ACCESSIBILITY • 双向无障碍设计")
+	_add_section_header("UNIVERSAL ACCESSIBILITY • DUAL-SPECTRUM DESIGN")
 	_add_guide_row(Color(0.35, 0.95, 0.75), "BLIND PLAYABLE", "Full 3D binaural audio & haptic blind navigation: periodic exit beacons, acoustic wall reflection echoes, obstacle cane feelers, and directional keyboard controls enable players to navigate and complete sectors purely by ear.")
 	_add_guide_row(Color(1.0, 0.78, 0.28), "DEAF INCLUSIVE", "100% of spatial sounds are translated into visual acoustic waveforms and off-screen indicators. Hearing-impaired players can achieve S-Rank mastery in pure silence.")
 	_add_guide_row(Color(0.85, 0.70, 1.0), "TACTILE & SPEECH", "Full touch alternatives for voice input allow seamless play in public spaces or for players with vocal/speech considerations.")

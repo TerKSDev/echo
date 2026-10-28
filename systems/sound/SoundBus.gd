@@ -62,7 +62,7 @@ func _on_player_sound(pos: Vector2, loudness: float, is_voice: bool, is_sneak: b
 			_sfx.play_step_walk()
 
 	var radius := BASE_RADIUS + loudness * RADIUS_PER_LOUDNESS
-	var exclude: Array[RID] = [_player.get_rid()]
+	var exclude: Array = [_player.get_rid()]
 	var w_col: Color = GameState.get_sonar_color()
 	if is_instance_valid(_player) and _player.get("water_count") != null and _player.water_count > 0 and not is_voice:
 		w_col = w_col.lerp(Color(0.28, 0.75, 1.0), 0.45)
@@ -79,14 +79,14 @@ func emit_decoy_sound(pos: Vector2, loudness: float = 0.38, radius: float = 260.
 			_sfx.play_pebble_clink(pos)
 		else:
 			_sfx.play_pebble_clatter(pos)
-	var exclude: Array[RID] = []
+	var exclude: Array = []
 	if is_instance_valid(_player):
 		exclude.append(_player.get_rid())
 	var pebble_color := Color(1.0, 0.78, 0.28) # Warm golden amber ripple
 	_echo.emit_echo(pos, radius, exclude, true, pebble_color)
 	offscreen_sound_emitted.emit(pos, pebble_color)
 	for enemy in _enemies():
-		enemy.on_decoy_sound(pos, loudness, radius)
+		enemy.on_decoy_sound(pos, loudness, radius, is_wall_clink)
 
 
 func _on_enemy_woke_up(pos: Vector2, enemy: Enemy) -> void:
@@ -112,7 +112,7 @@ func _on_enemy_screamed(pos: Vector2, radius: float) -> void:
 	offscreen_sound_emitted.emit(pos, Color(1.0, 0.25, 0.52))
 	if _sfx != null:
 		_sfx.play_screamer_shriek(pos)
-	var no_exclude: Array[RID] = []
+	var no_exclude: Array = []
 	_echo.emit_echo(pos, radius, no_exclude, true, Color(1.0, 0.28, 0.52))
 
 	if is_instance_valid(_player) and _player.alive:
@@ -146,7 +146,7 @@ func _on_enemy_alarmed(pos: Vector2, _target_pos: Vector2) -> void:
 	offscreen_sound_emitted.emit(pos, Color(1.0, 0.75, 0.2))
 	if _sfx != null:
 		_sfx.play_listener_alarm(pos)
-	var no_exclude: Array[RID] = []
+	var no_exclude: Array = []
 	_echo.emit_echo(pos, 1100.0, no_exclude, true, Color(1.0, 0.38, 0.16))
 
 	if is_instance_valid(_player) and _player.alive:

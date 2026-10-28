@@ -30,11 +30,12 @@ func _init() -> void:
 
 
 func _ready() -> void:
+	z_index = 110
 	visible = false
 	modulate.a = 0.0
-	_sync_viewport_size()
 	_build_ui_audio()
 	_build_modal_shell()
+	_sync_viewport_size()
 
 
 func _notification(what: int) -> void:
@@ -43,13 +44,11 @@ func _notification(what: int) -> void:
 
 
 func _sync_viewport_size() -> void:
-	var vp := get_viewport_rect().size
-	if vp.x > 50.0 and vp.y > 50.0:
-		size = vp
-		if _dimmer != null:
-			_dimmer.size = vp
-		if _center != null:
-			_center.size = vp
+	ModalTemplate.apply_full_rect(self)
+	if _dimmer != null:
+		ModalTemplate.apply_full_rect(_dimmer)
+	if _center != null:
+		ModalTemplate.apply_full_rect(_center)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -81,14 +80,17 @@ func _process(delta: float) -> void:
 
 
 static func open_note(parent: Node, note_data: Dictionary, on_closed: Callable = Callable()) -> Control:
-	var existing = parent.get_node_or_null("NoteReadModal")
+	var host: Node = parent
+	if host is Node2D and host.has_node("Hud"):
+		host = host.get_node("Hud")
+	var existing = host.get_node_or_null("NoteReadModal")
 	if existing != null:
 		existing.display_note(note_data, on_closed)
 		return existing
 	var script: GDScript = load("res://ui/modals/NoteReadModal.gd") as GDScript
 	var modal := script.new() as Control
 	modal.name = "NoteReadModal"
-	parent.add_child(modal)
+	host.add_child(modal)
 	modal.display_note(note_data, on_closed)
 	return modal
 
@@ -132,7 +134,7 @@ func display_note(note_data: Dictionary, on_closed: Callable = Callable()) -> vo
 	var tw := create_tween().set_parallel(true)
 	tw.tween_property(self, "modulate:a", 1.0, 0.22).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	_panel.scale = Vector2(0.92, 0.92)
-	_panel.pivot_offset = Vector2(260.0, 220.0)
+	_panel.pivot_offset = Vector2(ModalTemplate.CARD_WIDTH * 0.5, 220.0)
 	tw.tween_property(_panel, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
@@ -153,7 +155,7 @@ func _build_modal_shell() -> void:
 
 	_dimmer = ColorRect.new()
 	_dimmer.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_dimmer.color = Color(0.01, 0.02, 0.04, 0.88)
+	_dimmer.color = ModalTemplate.DIMMER_COLOR
 	_dimmer.gui_input.connect(func(ev: InputEvent):
 		if (ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT) or (ev is InputEventScreenTouch and ev.pressed):
 			if _is_typing:
@@ -168,19 +170,8 @@ func _build_modal_shell() -> void:
 	add_child(_center)
 
 	_panel = PanelContainer.new()
-	_panel.custom_minimum_size = Vector2(520, 440)
-	var card_style := StyleBoxFlat.new()
-	card_style.content_margin_left = 26.0
-	card_style.content_margin_top = 22.0
-	card_style.content_margin_right = 26.0
-	card_style.content_margin_bottom = 22.0
-	card_style.bg_color = Color(0.04, 0.06, 0.09, 0.96)
-	card_style.set_border_width_all(2)
-	card_style.border_color = Color(0.95, 0.78, 0.35, 0.85)
-	card_style.set_corner_radius_all(16)
-	card_style.shadow_color = Color(0.85, 0.65, 0.2, 0.25)
-	card_style.shadow_size = 18
-	_panel.add_theme_stylebox_override("panel", card_style)
+	_panel.custom_minimum_size = Vector2(ModalTemplate.CARD_WIDTH, 440)
+	_panel.add_theme_stylebox_override("panel", ModalTemplate.make_card_style(ModalTemplate.ThemeKind.ARCHIVE))
 	_center.add_child(_panel)
 
 	var outer_vbox := VBoxContainer.new()
@@ -194,23 +185,12 @@ func _build_modal_shell() -> void:
 	var tag := Label.new()
 	tag.text = "◈   E X P E D I T I O N   A R C H I V E   ◈"
 	tag.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	tag.add_theme_color_override("font_color", Color(1.0, 0.82, 0.35, 0.88))
+	tag.add_theme_color_override("font_color", Color(0.92, 0.76, 0.36, 0.85))
 	tag.add_theme_font_size_override("font_size", 11)
 	header.add_child(tag)
 	_tag_lbl = tag
 
-	var close_btn := Button.new()
-	close_btn.custom_minimum_size = Vector2(36, 36)
-	close_btn.text = "✕"
-	close_btn.focus_mode = Control.FOCUS_NONE
-	var c_style := StyleBoxFlat.new()
-	c_style.bg_color = Color(0.12, 0.16, 0.22, 0.6)
-	c_style.set_corner_radius_all(18)
-	close_btn.add_theme_stylebox_override("normal", c_style)
-	close_btn.add_theme_stylebox_override("hover", c_style)
-	close_btn.add_theme_stylebox_override("pressed", c_style)
-	close_btn.add_theme_color_override("font_color", Color(0.85, 0.9, 0.95))
-	close_btn.pressed.connect(close)
+	var close_btn := ModalTemplate.make_close_button(close, ModalTemplate.ThemeKind.ARCHIVE)
 	header.add_child(close_btn)
 
 	# --- Note Title ---

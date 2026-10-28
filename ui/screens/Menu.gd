@@ -257,14 +257,14 @@ func _on_credits_pressed() -> void:
 
 func _build_modal_shell() -> void:
 	_modal_root = Control.new()
-	_modal_root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ModalTemplate.apply_full_rect(_modal_root)
 	_modal_root.visible = false
 	_modal_root.modulate.a = 0.0
 	add_child(_modal_root)
 
 	_modal_dimmer = ColorRect.new()
-	_modal_dimmer.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_modal_dimmer.color = Color(0.0, 0.02, 0.05, 0.74)
+	ModalTemplate.apply_full_rect(_modal_dimmer)
+	_modal_dimmer.color = ModalTemplate.DIMMER_COLOR
 	_modal_dimmer.gui_input.connect(func(ev: InputEvent):
 		if (ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT) or (ev is InputEventScreenTouch and ev.pressed):
 			_close_modal()
@@ -272,24 +272,13 @@ func _build_modal_shell() -> void:
 	_modal_root.add_child(_modal_dimmer)
 
 	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ModalTemplate.apply_full_rect(center)
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_modal_root.add_child(center)
 
 	_modal_panel = PanelContainer.new()
-	_modal_panel.custom_minimum_size = Vector2(440, 0)
-	var card_style := StyleBoxFlat.new()
-	card_style.content_margin_left = 26.0
-	card_style.content_margin_top = 22.0
-	card_style.content_margin_right = 26.0
-	card_style.content_margin_bottom = 24.0
-	card_style.bg_color = Color(0.04, 0.11, 0.2, 0.95)
-	card_style.set_border_width_all(2)
-	card_style.border_color = Color(0.28, 0.6, 0.88, 0.85)
-	card_style.set_corner_radius_all(18)
-	card_style.shadow_color = Color(0.08, 0.38, 0.72, 0.35)
-	card_style.shadow_size = 14
-	_modal_panel.add_theme_stylebox_override("panel", card_style)
+	_modal_panel.custom_minimum_size = Vector2(ModalTemplate.CARD_WIDTH, 0)
+	_modal_panel.add_theme_stylebox_override("panel", ModalTemplate.make_card_style(ModalTemplate.ThemeKind.SONAR))
 	center.add_child(_modal_panel)
 
 	var outer_vbox := VBoxContainer.new()
@@ -314,25 +303,7 @@ func _build_modal_shell() -> void:
 	_modal_subtitle.add_theme_font_size_override("font_size", 11)
 	title_box.add_child(_modal_subtitle)
 
-	var close_btn := Button.new()
-	close_btn.custom_minimum_size = Vector2(38, 38)
-	close_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	close_btn.focus_mode = Control.FOCUS_NONE
-	close_btn.text = "✕"
-	var close_normal := StyleBoxFlat.new()
-	close_normal.bg_color = Color(0.05, 0.14, 0.24, 0.45)
-	close_normal.set_corner_radius_all(19)
-	var close_hover := StyleBoxFlat.new()
-	close_hover.bg_color = Color(0.14, 0.32, 0.50, 0.7)
-	close_hover.set_corner_radius_all(19)
-	close_btn.add_theme_stylebox_override("normal", close_normal)
-	close_btn.add_theme_stylebox_override("hover", close_hover)
-	close_btn.add_theme_stylebox_override("pressed", close_hover)
-	close_btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-	close_btn.add_theme_color_override("font_color", Color(0.70, 0.85, 0.98, 0.85))
-	close_btn.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 1.0, 1.0))
-	close_btn.add_theme_color_override("font_pressed_color", Color(0.4, 0.95, 1.0, 1.0))
-	close_btn.pressed.connect(_close_modal)
+	var close_btn := ModalTemplate.make_close_button(_close_modal, ModalTemplate.ThemeKind.SONAR)
 	header.add_child(close_btn)
 
 	var top_div := ColorRect.new()
@@ -357,7 +328,7 @@ func _open_modal(title_text: String, subtitle_text: String) -> void:
 	var tw := create_tween().set_parallel(true)
 	tw.tween_property(_modal_root, "modulate:a", 1.0, 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	_modal_panel.scale = Vector2(0.93, 0.93)
-	_modal_panel.pivot_offset = Vector2(220.0, 200.0)
+	_modal_panel.pivot_offset = Vector2(ModalTemplate.CARD_WIDTH * 0.5, 200.0)
 	tw.tween_property(_modal_panel, "scale", Vector2.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 

@@ -13,31 +13,21 @@ static func show_modal(
 	wire_juice_cb: Callable
 ) -> Control:
 	var modal := Control.new()
-	modal.set_anchors_preset(Control.PRESET_FULL_RECT)
+	modal.z_index = 110
+	ModalTemplate.apply_full_rect(modal)
 
 	var dimmer := ColorRect.new()
-	dimmer.set_anchors_preset(Control.PRESET_FULL_RECT)
-	dimmer.color = Color(0.0, 0.02, 0.05, 0.85)
+	dimmer.color = ModalTemplate.DIMMER_COLOR
+	ModalTemplate.apply_full_rect(dimmer)
 	modal.add_child(dimmer)
 
 	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ModalTemplate.apply_full_rect(center)
 	modal.add_child(center)
 
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(480, 0)
-	var card_style := StyleBoxFlat.new()
-	card_style.content_margin_left = 26.0
-	card_style.content_margin_top = 24.0
-	card_style.content_margin_right = 26.0
-	card_style.content_margin_bottom = 26.0
-	card_style.bg_color = Color(0.09, 0.02, 0.04, 0.98)
-	card_style.set_border_width_all(2)
-	card_style.border_color = Color(0.95, 0.28, 0.35, 0.95)
-	card_style.set_corner_radius_all(14)
-	card_style.shadow_color = Color(0.8, 0.1, 0.2, 0.25)
-	card_style.shadow_size = 16
-	panel.add_theme_stylebox_override("panel", card_style)
+	panel.custom_minimum_size = Vector2(ModalTemplate.CARD_WIDTH, 0)
+	panel.add_theme_stylebox_override("panel", ModalTemplate.make_card_style(ModalTemplate.ThemeKind.CRIMSON))
 	center.add_child(panel)
 
 	var vbox := VBoxContainer.new()
