@@ -4,7 +4,6 @@ class_name StoryOverlay
 ## Immerses the screen in atmospheric pure darkness, displaying poetic
 ## typewriter narration with acoustic ripples, procedural audio, and glowing diamond prompt.
 
-const Icons = preload("res://ui/icons/Icons.gd")
 const MIX_RATE := 22050
 
 signal sequence_finished

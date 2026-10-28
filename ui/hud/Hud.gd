@@ -445,6 +445,9 @@ func play_wake_up_sequence(player_node: Node2D, sfx_mgr: SfxManager, on_complete
 
 
 func show_death_screen(killer_type: int = -1) -> void:
+	var main := get_tree().current_scene
+	if main != null and is_instance_valid(main) and main.get("_changing") == true:
+		return
 	if has_node("SettingsModal") and $SettingsModal.visible:
 		$SettingsModal.visible = false
 	set_gameplay_buttons_visible(false)
@@ -483,6 +486,8 @@ func _get_or_create_debrief() -> Control:
 
 
 func show_debrief(data: Dictionary, on_next: Callable, on_retry: Callable, on_select: Callable) -> void:
+	if has_node("DeathScreen") and $DeathScreen.visible:
+		$DeathScreen.visible = false
 	if has_node("SettingsModal") and $SettingsModal.visible:
 		$SettingsModal.visible = false
 	set_gameplay_buttons_visible(false)
@@ -603,6 +608,8 @@ func show_challenge_clear_banner(sector_name: String, clear_time: float, on_fini
 func show_victory_screen() -> void:
 	if has_node("SettingsModal") and $SettingsModal.visible:
 		$SettingsModal.visible = false
+	if _debrief_modal != null and is_instance_valid(_debrief_modal):
+		_debrief_modal.visible = false
 	set_gameplay_buttons_visible(false)
 
 	var sfx_mgr := get_node_or_null("../SfxManager") as SfxManager
@@ -1051,7 +1058,19 @@ func _unhandled_input(event: InputEvent) -> void:
 		if _joystick_active:
 			_deactivate_joystick()
 		return
-	if has_node("SoundBtn") and not $SoundBtn.visible:
+	if story_overlay != null and story_overlay.is_active():
+		if _joystick_active:
+			_deactivate_joystick()
+		return
+	if has_node("SettingsModal") and $SettingsModal.visible:
+		if _joystick_active:
+			_deactivate_joystick()
+		return
+	if (has_node("DebriefModal") and $DebriefModal.visible) or (_debrief_modal != null and is_instance_valid(_debrief_modal) and _debrief_modal.visible):
+		if _joystick_active:
+			_deactivate_joystick()
+		return
+	if has_node("DeathScreen") and $DeathScreen.visible:
 		if _joystick_active:
 			_deactivate_joystick()
 		return
@@ -1101,15 +1120,15 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _update_joystick_drag(pointer_pos: Vector2) -> void:
-	var offset: Vector2 = pointer_pos - _joystick_center
-	var dist: float = offset.length()
+	var drag_offset: Vector2 = pointer_pos - _joystick_center
+	var dist: float = drag_offset.length()
 	if dist > JOYSTICK_MAX_RADIUS:
-		_joystick_current = _joystick_center + offset.normalized() * JOYSTICK_MAX_RADIUS
+		_joystick_current = _joystick_center + drag_offset.normalized() * JOYSTICK_MAX_RADIUS
 	else:
 		_joystick_current = pointer_pos
 
 	if dist > JOYSTICK_DEADZONE:
-		var dir := offset.normalized()
+		var dir := drag_offset.normalized()
 		if player != null and is_instance_valid(player) and player.has_method("set_joystick_direction"):
 			player.set_joystick_direction(dir)
 	else:
@@ -1153,8 +1172,8 @@ func _draw_virtual_joystick() -> void:
 		_joystick_canvas.draw_line(p_in, p_out, Color(0.35, 0.85, 1.0, 0.35 * a), 1.8)
 
 	# 4. Elastic connecting tether line between base center and stick knob
-	var offset := _joystick_current - _joystick_center
-	if offset.length() > 4.0:
+	var tether_offset := _joystick_current - _joystick_center
+	if tether_offset.length() > 4.0:
 		_joystick_canvas.draw_line(_joystick_center, _joystick_current, Color(0.25, 0.80, 1.0, 0.30 * a), 2.5)
 
 	# 5. Thumb Stick Knob

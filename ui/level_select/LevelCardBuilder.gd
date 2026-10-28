@@ -4,8 +4,6 @@ extends RefCounted
 ## Constructs high-contrast glassmorphic level cards, star indicators,
 ## telemetry subtitles, procedural radar scanlines, and tactile haptic feedback.
 
-const Icons = preload("res://ui/icons/Icons.gd")
-
 
 static func make_button_style(
 	bg_color: Color,

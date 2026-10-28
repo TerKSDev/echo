@@ -390,7 +390,7 @@ func _trigger_scream() -> void:
 # map-wide pulse that pulls every monster to it and speeds them up.
 # Count never decays automatically until triggered.
 
-func _handle_listener_sound(is_voice: bool) -> void:
+func _handle_listener_sound(_is_voice: bool) -> void:
 	if state == State.ALARM or listener_cooldown > 0.0:
 		return
 
@@ -880,6 +880,9 @@ func _move_toward(dest: Vector2, speed: float, delta: float) -> bool:
 
 
 func _on_catch(body: Node) -> void:
+	var main := get_tree().current_scene
+	if main != null and is_instance_valid(main) and main.get("_changing") == true:
+		return
 	if is_wall_occluded:
 		return
 	if body.is_in_group("player") and body.has_method("die"):

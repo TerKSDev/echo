@@ -1,6 +1,5 @@
 extends Control
 
-const Icons = preload("res://ui/icons/Icons.gd")
 const MIX_RATE := 22050
 
 const LINES: Array[String] = [

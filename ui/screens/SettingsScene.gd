@@ -1,10 +1,5 @@
 extends Control
 
-const Icons = preload("res://ui/icons/Icons.gd")
-const SettingsUIFactory = preload("res://ui/settings/SettingsUIFactory.gd")
-const SettingsPanels = preload("res://ui/settings/SettingsPanels.gd")
-const ResetConfirmModal = preload("res://ui/settings/ResetConfirmModal.gd")
-
 @onready var back_button: Button = $TopBar/BackButton
 @onready var reset_defaults_btn: Button = get_node_or_null("TopBar/ResetDefaultsButton")
 @onready var sonar_backdrop: Control = $SonarBackdrop

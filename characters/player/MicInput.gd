@@ -139,9 +139,20 @@ func is_input_allowed() -> bool:
 			return false
 		if main.has_node("Hud"):
 			var hud = main.get_node("Hud")
-			if hud != null and hud.has_node("StoryOverlay"):
-				var so = hud.get_node("StoryOverlay")
-				if so != null and (so.visible or (so.has_method("is_active") and so.is_active()) or so.get("_is_active") == true):
+			if hud != null:
+				if hud.has_node("StoryOverlay"):
+					var so = hud.get_node("StoryOverlay")
+					if so != null and (so.visible or (so.has_method("is_active") and so.is_active()) or so.get("_is_active") == true):
+						return false
+				if hud.has_node("DebriefModal") and hud.get_node("DebriefModal").visible:
+					return false
+				if hud.get("_debrief_modal") != null and is_instance_valid(hud.get("_debrief_modal")) and hud.get("_debrief_modal").visible:
+					return false
+				if hud.has_node("DeathScreen") and hud.get_node("DeathScreen").visible:
+					return false
+				if hud.has_node("VictoryScreen") and hud.get_node("VictoryScreen").visible:
+					return false
+				if hud.has_node("NoteReadModal") and hud.get_node("NoteReadModal").visible:
 					return false
 	return true
 
@@ -149,6 +160,12 @@ func is_input_allowed() -> bool:
 func _process(delta: float) -> void:
 	if suppress_timer > 0.0:
 		suppress_timer = maxf(0.0, suppress_timer - delta)
+		if _capture != null:
+			_capture.clear_buffer()
+		level_db = -80.0
+		if _state != State.CALIBRATING:
+			_state = State.IDLE
+		return
 
 	if not enabled:
 		if _capture != null:
@@ -205,13 +222,17 @@ func _process(delta: float) -> void:
 				_state = State.IDLE
 				return
 			_peak_db = maxf(_peak_db, level_db)
+			# Discard brief transient clicks/spikes (chassis taps, speaker pop) that do not sustain
+			if level_db < trigger_db - 4.0:
+				_state = State.IDLE
+				return
 			if _timer >= ATTACK_WINDOW:
 				var lowest: float = trigger_db
 				var highest: float = maxf(minf(lowest + MAX_MARGIN_DB, -1.0), lowest + 1.0)
 				var k: float = clampf(inverse_lerp(lowest, highest, _peak_db), 0.0, 1.0)
 
 				voice_detected.emit(k)
-				suppress(1.10) # Self-acoustic ducking: blocks echo ping and cavern reverb feedback loop!
+				suppress(1.20) # Self-acoustic ducking: blocks echo ping and cavern reverb feedback loop!
 				_state = State.COOLDOWN
 				_timer = 0.0
 

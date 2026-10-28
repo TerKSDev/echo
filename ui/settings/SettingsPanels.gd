@@ -3,8 +3,6 @@ extends RefCounted
 ## Tab Panel Construction for ECHO Settings System.
 ## Modularly builds General, Controls, Display, and Advanced options.
 
-const SettingsUIFactory = preload("res://ui/settings/SettingsUIFactory.gd")
-
 
 static func update_fps_btn_text(btn: Button) -> void:
 	match GameState.max_fps:

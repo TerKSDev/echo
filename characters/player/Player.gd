@@ -684,9 +684,20 @@ func make_voice_sound(k: float):
 			return
 		if main.has_node("Hud"):
 			var hud = main.get_node("Hud")
-			if hud != null and hud.has_node("StoryOverlay"):
-				var so = hud.get_node("StoryOverlay")
-				if so != null and (so.visible or (so.has_method("is_active") and so.is_active()) or so.get("_is_active") == true):
+			if hud != null:
+				if hud.has_node("StoryOverlay"):
+					var so = hud.get_node("StoryOverlay")
+					if so != null and (so.visible or (so.has_method("is_active") and so.is_active()) or so.get("_is_active") == true):
+						return
+				if hud.has_node("DebriefModal") and hud.get_node("DebriefModal").visible:
+					return
+				if hud.get("_debrief_modal") != null and is_instance_valid(hud.get("_debrief_modal")) and hud.get("_debrief_modal").visible:
+					return
+				if hud.has_node("DeathScreen") and hud.get_node("DeathScreen").visible:
+					return
+				if hud.has_node("VictoryScreen") and hud.get_node("VictoryScreen").visible:
+					return
+				if hud.has_node("NoteReadModal") and hud.get_node("NoteReadModal").visible:
 					return
 	make_sound(lerpf(MIN_LOUDNESS, MAX_LOUDNESS, k), true)
 
@@ -819,6 +830,9 @@ func _update_trail() -> void:
 func die(killer_type: int = -1) -> void:
 	# Ignore death if the player is already dead
 	if not alive:
+		return
+	var main := get_tree().current_scene
+	if main != null and is_instance_valid(main) and main.get("_changing") == true:
 		return
 	if has_meta("tutorial_invulnerable") and get_meta("tutorial_invulnerable") == true:
 		# Cinematic protection during tutorial chase: knock player backward without killing

@@ -1,6 +1,5 @@
 extends Control
 
-const Monsters = preload("res://ui/icons/Monsters.gd")
 ## Survival Intel & Acoustic Bestiary Modal for ECHO.
 ## Displays Threat Archives (Sleeper, Patroller, Chaser, Screamer, Listener),
 ## interactive acoustic provocation preview, Core Non-Violence Ethos,
@@ -379,7 +378,7 @@ func _populate_lore_notes() -> void:
 
 
 func _add_lore_note_card(note_data: Dictionary) -> void:
-	var nid: String = str(note_data.get("id", ""))
+	var _nid: String = str(note_data.get("id", ""))
 	var is_collected: bool = (note_data.get("collected", false) == true)
 	var lvl_num: int = int(note_data.get("level", 1))
 	var depth_str: String = str(note_data.get("depth", ""))

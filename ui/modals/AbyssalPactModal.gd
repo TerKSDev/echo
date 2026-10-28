@@ -5,8 +5,6 @@ extends RefCounted
 ## Presents 1 Curse (Debuff) + 1 Boon (Buff), granting 1 Reroll chance (either curse OR boon).
 ## Adheres strictly to ModalTemplate standard CARD_WIDTH (592px) and Singularity theme.
 
-const ModalTemplate = preload("res://ui/modals/ModalTemplate.gd")
-
 
 static func _get_sfx(node: Node) -> SfxManager:
 	if node == null or not is_instance_valid(node):
@@ -30,9 +28,11 @@ static func open_pact(parent: Node, milestone_lvl: int, on_accepted: Callable) -
 		sfx.play_pact_reveal()
 
 	var candidates: Dictionary = ChallengeModifiers.generate_pact_candidates(milestone_lvl)
-	var cur_curse: Dictionary = candidates["curse"]
-	var cur_boon: Dictionary = candidates["boon"]
-	var reroll_used: bool = ChallengeModifiers.reroll_used_milestones.get(milestone_lvl, false)
+	var pact_state := {
+		"curse": candidates["curse"],
+		"boon": candidates["boon"],
+		"reroll_used": ChallengeModifiers.reroll_used_milestones.get(milestone_lvl, false)
+	}
 
 	var milestone_idx := 1
 	var m_idx_find := ChallengeModifiers.MILESTONES.find(milestone_lvl)
@@ -197,7 +197,7 @@ static func open_pact(parent: Node, milestone_lvl: int, on_accepted: Callable) -
 
 	# Title
 	var c_title := Label.new()
-	c_title.text = String(cur_curse.get("title_en", "CURSE"))
+	c_title.text = String(pact_state.curse.get("title_en", "CURSE"))
 	c_title.add_theme_font_size_override("font_size", 14)
 	c_title.add_theme_color_override("font_color", Color(1.0, 0.92, 0.95))
 	c_title.add_theme_color_override("font_shadow_color", Color(0.70, 0.08, 0.18, 0.90))
@@ -226,7 +226,7 @@ static func open_pact(parent: Node, milestone_lvl: int, on_accepted: Callable) -
 	c_vbox.add_child(c_effect_panel)
 
 	var c_desc := Label.new()
-	c_desc.text = "• " + String(cur_curse.get("desc_en", cur_curse.get("description", "")))
+	c_desc.text = "• " + String(pact_state.curse.get("desc_en", pact_state.curse.get("description", "")))
 	c_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	c_desc.add_theme_font_size_override("font_size", 11)
 	c_desc.add_theme_color_override("font_color", Color(1.0, 0.55, 0.65))
@@ -235,7 +235,7 @@ static func open_pact(parent: Node, milestone_lvl: int, on_accepted: Callable) -
 
 	# Lore flavor text
 	var c_flavor := Label.new()
-	c_flavor.text = String(cur_curse.get("flavor_en", cur_curse.get("flavor", "")))
+	c_flavor.text = String(pact_state.curse.get("flavor_en", pact_state.curse.get("flavor", "")))
 	c_flavor.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	c_flavor.add_theme_font_size_override("font_size", 10)
 	c_flavor.add_theme_color_override("font_color", Color(0.80, 0.65, 0.72, 0.70))
@@ -246,8 +246,8 @@ static func open_pact(parent: Node, milestone_lvl: int, on_accepted: Callable) -
 	# Reroll button
 	var c_reroll_btn := Button.new()
 	c_reroll_btn.custom_minimum_size = Vector2(0, 32)
-	c_reroll_btn.text = "REROLL CURSE" if not reroll_used else "LOCKED"
-	c_reroll_btn.disabled = reroll_used
+	c_reroll_btn.text = "REROLL CURSE" if not pact_state.reroll_used else "LOCKED"
+	c_reroll_btn.disabled = pact_state.reroll_used
 	c_reroll_btn.focus_mode = Control.FOCUS_NONE
 	c_vbox.add_child(c_reroll_btn)
 	curse_card_ref["btn"] = c_reroll_btn
@@ -308,7 +308,7 @@ static func open_pact(parent: Node, milestone_lvl: int, on_accepted: Callable) -
 
 	# Title
 	var b_title := Label.new()
-	b_title.text = String(cur_boon.get("title_en", "BOON"))
+	b_title.text = String(pact_state.boon.get("title_en", "BOON"))
 	b_title.add_theme_font_size_override("font_size", 14)
 	b_title.add_theme_color_override("font_color", Color(0.92, 0.98, 1.0))
 	b_title.add_theme_color_override("font_shadow_color", Color(0.05, 0.35, 0.55, 0.90))
@@ -337,7 +337,7 @@ static func open_pact(parent: Node, milestone_lvl: int, on_accepted: Callable) -
 	b_vbox.add_child(b_effect_panel)
 
 	var b_desc := Label.new()
-	b_desc.text = "• " + String(cur_boon.get("desc_en", cur_boon.get("description", "")))
+	b_desc.text = "• " + String(pact_state.boon.get("desc_en", pact_state.boon.get("description", "")))
 	b_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	b_desc.add_theme_font_size_override("font_size", 11)
 	b_desc.add_theme_color_override("font_color", Color(0.40, 0.95, 0.85))
@@ -346,7 +346,7 @@ static func open_pact(parent: Node, milestone_lvl: int, on_accepted: Callable) -
 
 	# Lore flavor text
 	var b_flavor := Label.new()
-	b_flavor.text = String(cur_boon.get("flavor_en", cur_boon.get("flavor", "")))
+	b_flavor.text = String(pact_state.boon.get("flavor_en", pact_state.boon.get("flavor", "")))
 	b_flavor.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	b_flavor.add_theme_font_size_override("font_size", 10)
 	b_flavor.add_theme_color_override("font_color", Color(0.68, 0.85, 0.92, 0.70))
@@ -357,8 +357,8 @@ static func open_pact(parent: Node, milestone_lvl: int, on_accepted: Callable) -
 	# Reroll button
 	var b_reroll_btn := Button.new()
 	b_reroll_btn.custom_minimum_size = Vector2(0, 32)
-	b_reroll_btn.text = "REROLL BOON" if not reroll_used else "LOCKED"
-	b_reroll_btn.disabled = reroll_used
+	b_reroll_btn.text = "REROLL BOON" if not pact_state.reroll_used else "LOCKED"
+	b_reroll_btn.disabled = pact_state.reroll_used
 	b_reroll_btn.focus_mode = Control.FOCUS_NONE
 	b_vbox.add_child(b_reroll_btn)
 	boon_card_ref["btn"] = b_reroll_btn
@@ -428,7 +428,7 @@ static func open_pact(parent: Node, milestone_lvl: int, on_accepted: Callable) -
 	reroll_panel.add_child(reroll_info_lbl)
 
 	var update_reroll_info := func():
-		if reroll_used:
+		if pact_state.reroll_used:
 			reroll_sb.bg_color = Color(0.08, 0.08, 0.10, 0.60)
 			reroll_sb.border_color = Color(0.45, 0.45, 0.50, 0.50)
 			reroll_info_lbl.text = "◈  REROLL SPENT FOR THIS TIER (0 / 1)  ◈"
@@ -499,16 +499,16 @@ static func open_pact(parent: Node, milestone_lvl: int, on_accepted: Callable) -
 
 	# Connect Reroll logic
 	c_reroll_btn.pressed.connect(func():
-		if reroll_used:
+		if pact_state.reroll_used:
 			return
-		reroll_used = true
+		pact_state.reroll_used = true
 		ChallengeModifiers.reroll_used_milestones[milestone_lvl] = true
 		if sfx != null:
 			sfx.play_pact_reroll()
-		cur_curse = ChallengeModifiers.reroll_single_item(true, cur_curse.id)
-		c_title.text = String(cur_curse.get("title_en", "CURSE"))
-		c_desc.text = "• " + String(cur_curse.get("desc_en", cur_curse.get("description", "")))
-		c_flavor.text = String(cur_curse.get("flavor_en", cur_curse.get("flavor", "")))
+		pact_state.curse = ChallengeModifiers.reroll_single_item(true, pact_state.curse.id)
+		c_title.text = String(pact_state.curse.get("title_en", "CURSE"))
+		c_desc.text = "• " + String(pact_state.curse.get("desc_en", pact_state.curse.get("description", "")))
+		c_flavor.text = String(pact_state.curse.get("flavor_en", pact_state.curse.get("flavor", "")))
 		c_reroll_btn.text = "REROLLED"
 		c_reroll_btn.disabled = true
 		b_reroll_btn.text = "LOCKED"
@@ -523,16 +523,16 @@ static func open_pact(parent: Node, milestone_lvl: int, on_accepted: Callable) -
 	)
 
 	b_reroll_btn.pressed.connect(func():
-		if reroll_used:
+		if pact_state.reroll_used:
 			return
-		reroll_used = true
+		pact_state.reroll_used = true
 		ChallengeModifiers.reroll_used_milestones[milestone_lvl] = true
 		if sfx != null:
 			sfx.play_pact_reroll()
-		cur_boon = ChallengeModifiers.reroll_single_item(false, cur_boon.id)
-		b_title.text = String(cur_boon.get("title_en", "BOON"))
-		b_desc.text = "• " + String(cur_boon.get("desc_en", cur_boon.get("description", "")))
-		b_flavor.text = String(cur_boon.get("flavor_en", cur_boon.get("flavor", "")))
+		pact_state.boon = ChallengeModifiers.reroll_single_item(false, pact_state.boon.id)
+		b_title.text = String(pact_state.boon.get("title_en", "BOON"))
+		b_desc.text = "• " + String(pact_state.boon.get("desc_en", pact_state.boon.get("description", "")))
+		b_flavor.text = String(pact_state.boon.get("flavor_en", pact_state.boon.get("flavor", "")))
 		b_reroll_btn.text = "REROLLED"
 		b_reroll_btn.disabled = true
 		c_reroll_btn.text = "LOCKED"
@@ -583,7 +583,7 @@ static func open_pact(parent: Node, milestone_lvl: int, on_accepted: Callable) -
 		confirm_btn.disabled = true
 		c_reroll_btn.disabled = true
 		b_reroll_btn.disabled = true
-		ChallengeModifiers.claim_pact(milestone_lvl, cur_curse.id, cur_boon.id)
+		ChallengeModifiers.claim_pact(milestone_lvl, pact_state.curse.id, pact_state.boon.id)
 		if sfx != null:
 			sfx.play_pact_seal()
 

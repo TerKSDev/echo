@@ -224,30 +224,43 @@ func _get_mic() -> MicInput:
 	return null
 
 
-func _unhandled_input(event: InputEvent) -> void:
+func is_pause_allowed() -> bool:
 	if _player == null or not is_instance_valid(_player):
 		_player = get_tree().get_first_node_in_group("player")
-	if _player != null and is_instance_valid(_player) and not _player.get("alive"):
-		return
+	if _player != null and is_instance_valid(_player) and "alive" in _player and not _player.alive:
+		return false
+	var main := get_tree().current_scene
+	if main != null and is_instance_valid(main) and main.get("_changing") == true:
+		return false
 	var hud := get_parent()
-	if hud != null and ((hud.has_node("DeathScreen") and hud.get_node("DeathScreen").visible) or (hud.has_node("NoteReadModal") and hud.get_node("NoteReadModal").visible)):
-		return
-	if get_tree().paused and not _is_open:
-		return
+	if hud != null:
+		if hud.has_node("DeathScreen") and hud.get_node("DeathScreen").visible:
+			return false
+		if hud.has_node("NoteReadModal") and hud.get_node("NoteReadModal").visible:
+			return false
+		if hud.has_node("DebriefModal") and hud.get_node("DebriefModal").visible:
+			return false
+		if hud.get("_debrief_modal") != null and is_instance_valid(hud.get("_debrief_modal")) and hud.get("_debrief_modal").visible:
+			return false
+		if hud.has_node("VictoryScreen") and hud.get_node("VictoryScreen").visible:
+			return false
+		if hud.get("story_overlay") != null and hud.story_overlay.has_method("is_active") and hud.story_overlay.is_active():
+			return false
+	return true
+
+
+func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel") or (event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE):
 		if _is_open:
 			close()
-		else:
+			get_viewport().set_input_as_handled()
+		elif not get_tree().paused and is_pause_allowed():
 			open()
-		get_viewport().set_input_as_handled()
+			get_viewport().set_input_as_handled()
 
 
 func open() -> void:
-	if _is_open:
-		return
-	if _player == null or not is_instance_valid(_player):
-		_player = get_tree().get_first_node_in_group("player")
-	if _player != null and is_instance_valid(_player) and not _player.get("alive"):
+	if _is_open or not is_pause_allowed():
 		return
 	_is_open = true
 	visible = true

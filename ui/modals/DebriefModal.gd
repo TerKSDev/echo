@@ -138,47 +138,11 @@ class VictoryBackdropFx extends Control:
 			draw_circle(p["pos"], 2.2, Color(col.r, col.g, col.b, a))
 
 
-# --- Holographic Glass Specular & Corner Cyber-Reticles ----------------------
-class CardDecoOverlay extends Control:
-	var corner_col := Color(0.35, 0.88, 1.0, 0.85)
-
-	func _ready() -> void:
-		set_anchors_preset(Control.PRESET_FULL_RECT)
-		mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-	func _draw() -> void:
-		var w := size.x
-		var h := size.y
-		if w <= 10.0 or h <= 10.0:
-			return
-
-		# 1. Top Specular curved highlight line (gives realistic curved glass refraction)
-		draw_line(Vector2(24.0, 1.5), Vector2(w - 24.0, 1.5), Color(1.0, 1.0, 1.0, 0.22), 1.5, true)
-
-		# 2. Four Corner Cyber Reticles (L-brackets)
-		var clen := 14.0
-		var ccol := corner_col
-		var inset := 4.0
-		# Top-Left
-		draw_line(Vector2(inset, inset), Vector2(inset + clen, inset), ccol, 2.0, true)
-		draw_line(Vector2(inset, inset), Vector2(inset, inset + clen), ccol, 2.0, true)
-		# Top-Right
-		draw_line(Vector2(w - inset, inset), Vector2(w - inset - clen, inset), ccol, 2.0, true)
-		draw_line(Vector2(w - inset, inset), Vector2(w - inset, inset + clen), ccol, 2.0, true)
-		# Bottom-Left
-		draw_line(Vector2(inset, h - inset), Vector2(inset + clen, h - inset), ccol, 2.0, true)
-		draw_line(Vector2(inset, h - inset), Vector2(inset, h - inset - clen), ccol, 2.0, true)
-		# Bottom-Right
-		draw_line(Vector2(w - inset, h - inset), Vector2(w - inset - clen, h - inset), ccol, 2.0, true)
-		draw_line(Vector2(w - inset, h - inset), Vector2(w - inset, h - inset - clen), ccol, 2.0, true)
-
-
 # --- Node References & State -------------------------------------------------
 var _dimmer: ColorRect
 var _backdrop_fx: VictoryBackdropFx
 var _center: CenterContainer
 var _card: PanelContainer
-var _card_deco: CardDecoOverlay
 var _title_lbl: Label
 var _subtitle_lbl: Label
 var _rank_panel: PanelContainer
@@ -207,7 +171,6 @@ var _is_open := false
 var _data: Dictionary = {}
 var _sfx_mgr: SfxManager
 var _cur_lvl_num: int = 1
-var _hero_pulse_tween: Tween = null
 
 
 func _ready() -> void:
@@ -234,7 +197,7 @@ func _sync_viewport_size() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not _is_open:
+	if not _is_open or _is_actioned:
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_SPACE or event.keycode == KEY_ENTER:
@@ -248,13 +211,34 @@ func _unhandled_input(event: InputEvent) -> void:
 			_on_select()
 
 
+func _wire_btn_anim(btn: Button) -> void:
+	if btn == null:
+		return
+	btn.mouse_entered.connect(func():
+		btn.pivot_offset = btn.size * 0.5
+		create_tween().tween_property(btn, "scale", Vector2(1.02, 1.02), 0.08)
+	)
+	btn.mouse_exited.connect(func():
+		btn.pivot_offset = btn.size * 0.5
+		create_tween().tween_property(btn, "scale", Vector2.ONE, 0.1)
+	)
+	btn.button_down.connect(func():
+		btn.pivot_offset = btn.size * 0.5
+		create_tween().tween_property(btn, "scale", Vector2(0.96, 0.96), 0.05)
+	)
+	btn.button_up.connect(func():
+		btn.pivot_offset = btn.size * 0.5
+		create_tween().tween_property(btn, "scale", Vector2(1.02, 1.02), 0.1)
+	)
+
+
 func _build_ui() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 
 	# 1. Fullscreen Dimmer with deep atmospheric tint
 	_dimmer = ColorRect.new()
 	_dimmer.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_dimmer.color = Color(0.008, 0.018, 0.035, 0.84)
+	_dimmer.color = ModalTemplate.DIMMER_COLOR
 	_dimmer.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(_dimmer)
 
@@ -265,105 +249,82 @@ func _build_ui() -> void:
 	# 2. Center Alignment Container
 	_center = CenterContainer.new()
 	_center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_center.anchor_right = 1.0
-	_center.anchor_bottom = 1.0
 	add_child(_center)
 
-	# 3. Main Glassmorphic Holographic Card
+	# 3. Main Glass Card matching Pause Modal
 	_card = PanelContainer.new()
-	var init_challenge: bool = (GameState.current_mode == GameState.GameMode.CHALLENGE)
-	_card.custom_minimum_size = Vector2(ModalTemplate.CARD_WIDTH, 545.0 if init_challenge else 495.0)
-	_card.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	_card.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-
-	# Advanced glass style with dual-layer border and deep shadow
-	var card_style := StyleBoxFlat.new()
-	card_style.bg_color = Color(0.012, 0.032, 0.062, 0.94)
-	card_style.border_color = Color(0.20, 0.52, 0.82, 0.75)
-	card_style.set_border_width_all(2)
-	card_style.set_corner_radius_all(ModalTemplate.CORNER_RADIUS)
-	card_style.shadow_color = Color(0.0, 0.16, 0.36, 0.55)
-	card_style.shadow_size = 28
-	card_style.content_margin_left = 22.0
-	card_style.content_margin_right = 22.0
-	card_style.content_margin_top = 20.0
-	card_style.content_margin_bottom = 20.0
-	_card.add_theme_stylebox_override("panel", card_style)
+	_card.custom_minimum_size = Vector2(ModalTemplate.CARD_WIDTH, 0.0)
+	_card.add_theme_stylebox_override("panel", ModalTemplate.make_card_style(ModalTemplate.ThemeKind.SONAR))
 	_center.add_child(_card)
 
-	# Cyber reticle & specular overlay on card
-	_card_deco = CardDecoOverlay.new()
-	_card.add_child(_card_deco)
-
 	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 14)
-	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	vbox.add_theme_constant_override("separation", 16)
 	_card.add_child(vbox)
 
-	# --- Header: Kicker + Title + Philosophical Subtitle ---
-	var header_vbox := VBoxContainer.new()
-	header_vbox.add_theme_constant_override("separation", 3)
-	header_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	vbox.add_child(header_vbox)
+	# --- Header Row (Matching Pause Modal Header) ---
+	var header_hbox := HBoxContainer.new()
+	header_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	vbox.add_child(header_hbox)
 
-	var kicker := Label.new()
-	kicker.text = "◈   S E C T O R   C L E A R E D   ◈"
-	kicker.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	kicker.add_theme_font_size_override("font_size", 11)
-	kicker.add_theme_color_override("font_color", Color(0.35, 0.95, 0.78, 0.95))
-	header_vbox.add_child(kicker)
+	var titles_vbox := VBoxContainer.new()
+	titles_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	titles_vbox.add_theme_constant_override("separation", 2)
+	header_hbox.add_child(titles_vbox)
 
 	_title_lbl = Label.new()
-	_title_lbl.text = "SHALLOW RING"
-	_title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_title_lbl.add_theme_font_size_override("font_size", 25)
-	_title_lbl.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0))
-	_title_lbl.add_theme_color_override("font_shadow_color", Color(0.08, 0.55, 0.95, 0.85))
-	_title_lbl.add_theme_constant_override("shadow_offset_y", 2)
-	header_vbox.add_child(_title_lbl)
+	_title_lbl.text = "SECTOR CLEARED"
+	_title_lbl.add_theme_font_size_override("font_size", 20)
+	_title_lbl.add_theme_color_override("font_color", Color.WHITE)
+	titles_vbox.add_child(_title_lbl)
 
 	_subtitle_lbl = Label.new()
-	_subtitle_lbl.text = "“In the deepest dark, silence is not emptiness—it is your canvas.”"
-	_subtitle_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_subtitle_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_subtitle_lbl.text = "SHALLOW RING   •   DEPTH ~4,200 M"
 	_subtitle_lbl.add_theme_font_size_override("font_size", 12)
-	_subtitle_lbl.add_theme_color_override("font_color", Color(0.68, 0.85, 0.98, 0.88))
-	header_vbox.add_child(_subtitle_lbl)
+	_subtitle_lbl.add_theme_color_override("font_color", Color(0.48, 0.72, 0.92, 0.80))
+	titles_vbox.add_child(_subtitle_lbl)
 
-	# --- Rank Pill Capsule Container ---
-	var rank_container := HBoxContainer.new()
-	rank_container.alignment = BoxContainer.ALIGNMENT_CENTER
-	vbox.add_child(rank_container)
-
+	# Right-side Rank Pill (Matching toggle switch pill in Pause Modal)
 	_rank_panel = PanelContainer.new()
+	_rank_panel.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	var r_style := StyleBoxFlat.new()
 	r_style.set_corner_radius_all(14)
-	r_style.content_margin_left = 22.0
-	r_style.content_margin_right = 22.0
-	r_style.content_margin_top = 5.0
-	r_style.content_margin_bottom = 5.0
-	r_style.bg_color = Color(0.04, 0.14, 0.24, 0.88)
-	r_style.border_color = Color(0.35, 0.85, 1.0, 0.80)
-	r_style.set_border_width_all(1)
+	r_style.content_margin_left = 16.0
+	r_style.content_margin_right = 16.0
+	r_style.content_margin_top = 4.0
+	r_style.content_margin_bottom = 4.0
+	r_style.bg_color = Color(0.04, 0.14, 0.26, 0.88)
+	r_style.border_color = Color(0.35, 0.88, 1.0, 0.95)
+	r_style.set_border_width_all(2)
 	_rank_panel.add_theme_stylebox_override("panel", r_style)
-	rank_container.add_child(_rank_panel)
+	header_hbox.add_child(_rank_panel)
 
 	_rank_badge = Label.new()
-	_rank_badge.text = "★ ★ ★   RANK: S   •   ABYSSAL PHANTOM"
-	_rank_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_rank_badge.text = "★ ★ ★   RANK S"
 	_rank_badge.add_theme_font_size_override("font_size", 12)
 	_rank_badge.add_theme_color_override("font_color", Color(0.40, 0.92, 1.0))
 	_rank_panel.add_child(_rank_badge)
 
-	# --- Three Star / Badge Cards with Vector Stars ---
+	# --- Divider Line ---
+	var div1 := ColorRect.new()
+	div1.custom_minimum_size = Vector2(0, 1)
+	div1.color = Color(0.20, 0.45, 0.70, 0.35)
+	vbox.add_child(div1)
+
+	# --- Section 1: Objectives & Recognition (Story Mode only) ---
+	var obj_hdr := Label.new()
+	obj_hdr.text = "SECTOR OBJECTIVES & RECOGNITION"
+	obj_hdr.add_theme_color_override("font_color", Color(0.35, 0.78, 1.0, 0.95))
+	obj_hdr.add_theme_font_size_override("font_size", 11)
+	vbox.add_child(obj_hdr)
+
 	var stars_hbox := HBoxContainer.new()
-	stars_hbox.add_theme_constant_override("separation", 12)
+	stars_hbox.add_theme_constant_override("separation", 10)
 	stars_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	vbox.add_child(stars_hbox)
 	_stars_row = stars_hbox
 
 	var star_specs: Array[Dictionary] = [
-		{"name": "SURVIVOR", "cond": "SURVIVE & ESCAPE", "type": 0},
+		{"name": "SURVIVOR", "cond": "SURVIVED", "type": 0},
 		{"name": "GHOST", "cond": "ZERO ALERTS", "type": 1},
 		{"name": "SWIFT ECHO", "cond": "BEAT PAR TIME", "type": 2}
 	]
@@ -376,13 +337,13 @@ func _build_ui() -> void:
 	for i in 3:
 		var spec: Dictionary = star_specs[i]
 		var sc := PanelContainer.new()
-		sc.custom_minimum_size = Vector2(164, 122)
+		sc.custom_minimum_size = Vector2(0, 102)
 		sc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 		var sc_style := StyleBoxFlat.new()
-		sc_style.bg_color = Color(0.016, 0.038, 0.068, 0.88)
+		sc_style.bg_color = Color(0.015, 0.04, 0.075, 0.85)
 		sc_style.set_border_width_all(1)
-		sc_style.border_color = Color(0.18, 0.32, 0.45, 0.70)
+		sc_style.border_color = Color(0.18, 0.35, 0.52, 0.50)
 		sc_style.set_corner_radius_all(12)
 		sc_style.content_margin_left = 6
 		sc_style.content_margin_right = 6
@@ -397,7 +358,7 @@ func _build_ui() -> void:
 
 		# Vector Star Badge Canvas
 		var star_canvas := StarBadgeCanvas.new()
-		star_canvas.custom_minimum_size = Vector2(64, 52)
+		star_canvas.custom_minimum_size = Vector2(50, 44)
 		star_canvas.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		star_canvas.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		svbox.add_child(star_canvas)
@@ -405,7 +366,7 @@ func _build_ui() -> void:
 		var sname := Label.new()
 		sname.text = spec["name"]
 		sname.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		sname.add_theme_font_size_override("font_size", 12)
+		sname.add_theme_font_size_override("font_size", 11)
 		sname.add_theme_color_override("font_color", Color(0.92, 0.96, 1.0))
 		svbox.add_child(sname)
 
@@ -422,29 +383,32 @@ func _build_ui() -> void:
 		_star_titles.append(sname)
 		_star_subs.append(ssub)
 
-	# --- Telemetry Statistics Pods ---
+	# --- Section 2: Telemetry Data ---
+	var telem_hdr := Label.new()
+	telem_hdr.text = "EXPEDITION TELEMETRY"
+	telem_hdr.add_theme_color_override("font_color", Color(0.35, 0.78, 1.0, 0.95))
+	telem_hdr.add_theme_font_size_override("font_size", 11)
+	vbox.add_child(telem_hdr)
+
 	var stat_pods_hbox := HBoxContainer.new()
 	stat_pods_hbox.add_theme_constant_override("separation", 10)
 	stat_pods_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	vbox.add_child(stat_pods_hbox)
 
-	# Column 1: Time
-	var t_pod := _build_stat_pod("⏱  ESCAPE TIME", "--:--")
-	_stat_time_val = t_pod.find_child("Val") as Label
-	_stat_time_sub = t_pod.find_child("Sub") as Label
-	stat_pods_hbox.add_child(t_pod)
+	var t_pod := _build_stat_pod("ESCAPE TIME", "--:--")
+	_stat_time_val = t_pod["val"]
+	_stat_time_sub = t_pod["sub"]
+	stat_pods_hbox.add_child(t_pod["container"])
 
-	# Column 2: Pings
-	var p_pod := _build_stat_pod("◎  SONAR PINGS", "0")
-	_stat_pings_val = p_pod.find_child("Val") as Label
-	_stat_pings_sub = p_pod.find_child("Sub") as Label
-	stat_pods_hbox.add_child(p_pod)
+	var p_pod := _build_stat_pod("SONAR PINGS", "0")
+	_stat_pings_val = p_pod["val"]
+	_stat_pings_sub = p_pod["sub"]
+	stat_pods_hbox.add_child(p_pod["container"])
 
-	# Column 3: Alerts
-	var a_pod := _build_stat_pod("⚠  MONSTER ALERTS", "0")
-	_stat_alerts_val = a_pod.find_child("Val") as Label
-	_stat_alerts_sub = a_pod.find_child("Sub") as Label
-	stat_pods_hbox.add_child(a_pod)
+	var a_pod := _build_stat_pod("MONSTER ALERTS", "0")
+	_stat_alerts_val = a_pod["val"]
+	_stat_alerts_sub = a_pod["sub"]
+	stat_pods_hbox.add_child(a_pod["container"])
 
 	# --- Huawei Leaderboard / HMS Sync Bar (Challenge Mode exclusive) ---
 	_hms_row = HBoxContainer.new()
@@ -454,64 +418,85 @@ func _build_ui() -> void:
 
 	_hms_sync_btn = Button.new()
 	_hms_sync_btn.focus_mode = Control.FOCUS_NONE
-	_hms_sync_btn.custom_minimum_size = Vector2(420, 34)
+	_hms_sync_btn.custom_minimum_size = Vector2(0, 36)
+	_hms_sync_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_hms_sync_btn.pressed.connect(_on_hms_button_pressed)
-	_style_hms_button(_hms_sync_btn)
-	_update_hms_button_state()
+	ModalTemplate.style_button(_hms_sync_btn, false, ModalTemplate.ThemeKind.CRIMSON)
+	_wire_btn_anim(_hms_sync_btn)
 	_hms_row.add_child(_hms_sync_btn)
 
-	# --- Action Buttons ---
-	var btn_hbox := HBoxContainer.new()
-	btn_hbox.add_theme_constant_override("separation", 12)
-	btn_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	vbox.add_child(btn_hbox)
+	# --- Divider Line ---
+	var div2 := ColorRect.new()
+	div2.custom_minimum_size = Vector2(0, 1)
+	div2.color = Color(0.20, 0.45, 0.70, 0.35)
+	vbox.add_child(div2)
 
-	_btn_retry = _build_action_button("RETRY", false)
+	# --- Action Buttons: RETRY | MAP | NEXT LEVEL ---
+	var nav_hbox := HBoxContainer.new()
+	nav_hbox.add_theme_constant_override("separation", 12)
+	vbox.add_child(nav_hbox)
+
+	_btn_retry = Button.new()
+	_btn_retry.text = "RETRY"
+	_btn_retry.custom_minimum_size = Vector2(0, 42)
+	_btn_retry.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ModalTemplate.style_danger_button(_btn_retry, false, false)
 	_btn_retry.pressed.connect(_on_retry)
-	btn_hbox.add_child(_btn_retry)
+	_wire_btn_anim(_btn_retry)
+	nav_hbox.add_child(_btn_retry)
 
-	_btn_select = _build_action_button("LEVEL SELECT", false)
+	_btn_select = Button.new()
+	_btn_select.text = "MAP"
+	_btn_select.custom_minimum_size = Vector2(0, 42)
+	_btn_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ModalTemplate.style_button(_btn_select, false, ModalTemplate.ThemeKind.SONAR)
 	_btn_select.pressed.connect(_on_select)
-	btn_hbox.add_child(_btn_select)
+	_wire_btn_anim(_btn_select)
+	nav_hbox.add_child(_btn_select)
 
-	_btn_next = _build_action_button("NEXT SECTOR >", true)
+	_btn_next = Button.new()
+	_btn_next.text = "NEXT LEVEL"
+	_btn_next.custom_minimum_size = Vector2(0, 42)
+	_btn_next.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ModalTemplate.style_button(_btn_next, true, ModalTemplate.ThemeKind.SONAR)
 	_btn_next.pressed.connect(_on_next)
-	btn_hbox.add_child(_btn_next)
+	_wire_btn_anim(_btn_next)
+	nav_hbox.add_child(_btn_next)
 
 
-func _build_stat_pod(header_title: String, default_val: String) -> PanelContainer:
+func _build_stat_pod(header_title: String, default_val: String) -> Dictionary:
 	var pod := PanelContainer.new()
 	pod.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	pod.custom_minimum_size = Vector2(160, 64)
+	pod.custom_minimum_size = Vector2(0, 62)
 
 	var p_style := StyleBoxFlat.new()
-	p_style.bg_color = Color(0.014, 0.034, 0.058, 0.90)
-	p_style.border_color = Color(0.16, 0.32, 0.48, 0.70)
+	p_style.bg_color = Color(0.012, 0.035, 0.065, 0.85)
+	p_style.border_color = Color(0.18, 0.35, 0.52, 0.50)
 	p_style.set_border_width_all(1)
 	p_style.set_corner_radius_all(10)
-	p_style.content_margin_left = 10.0
-	p_style.content_margin_right = 10.0
-	p_style.content_margin_top = 7.0
-	p_style.content_margin_bottom = 7.0
+	p_style.content_margin_left = 8.0
+	p_style.content_margin_right = 8.0
+	p_style.content_margin_top = 8.0
+	p_style.content_margin_bottom = 8.0
 	pod.add_theme_stylebox_override("panel", p_style)
 
 	var c := VBoxContainer.new()
 	c.alignment = BoxContainer.ALIGNMENT_CENTER
-	c.add_theme_constant_override("separation", 2)
+	c.add_theme_constant_override("separation", 3)
 	pod.add_child(c)
 
 	var lbl := Label.new()
 	lbl.text = header_title
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl.add_theme_font_size_override("font_size", 10)
-	lbl.add_theme_color_override("font_color", Color(0.52, 0.72, 0.90, 0.90))
+	lbl.add_theme_color_override("font_color", Color(0.50, 0.70, 0.88, 0.85))
 	c.add_child(lbl)
 
 	var val := Label.new()
 	val.name = "Val"
 	val.text = default_val
 	val.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	val.add_theme_font_size_override("font_size", 17)
+	val.add_theme_font_size_override("font_size", 16)
 	val.add_theme_color_override("font_color", Color(0.95, 0.98, 1.0))
 	c.add_child(val)
 
@@ -523,78 +508,29 @@ func _build_stat_pod(header_title: String, default_val: String) -> PanelContaine
 	sub.add_theme_color_override("font_color", Color(0.35, 0.95, 0.70, 0.90))
 	c.add_child(sub)
 
-	return pod
-
-
-func _build_action_button(text: String, is_primary: bool) -> Button:
-	var b := Button.new()
-	b.text = text
-	b.custom_minimum_size = Vector2(164, 46)
-	b.focus_mode = Control.FOCUS_NONE
-
-	var norm := StyleBoxFlat.new()
-	var hov := StyleBoxFlat.new()
-	var prs := StyleBoxFlat.new()
-
-	for sb: StyleBoxFlat in [norm, hov, prs]:
-		sb.set_corner_radius_all(10)
-		sb.content_margin_left = 14.0
-		sb.content_margin_right = 14.0
-		sb.content_margin_top = 8.0
-		sb.content_margin_bottom = 8.0
-
-	if is_primary:
-		norm.bg_color = Color(0.06, 0.35, 0.58, 0.95)
-		norm.set_border_width_all(2)
-		norm.border_color = Color(0.40, 0.92, 1.0, 0.95)
-		norm.shadow_color = Color(0.0, 0.35, 0.65, 0.40)
-		norm.shadow_size = 8
-
-		hov.bg_color = Color(0.09, 0.45, 0.72, 0.98)
-		hov.set_border_width_all(2)
-		hov.border_color = Color(0.70, 0.98, 1.0, 1.0)
-		hov.shadow_color = Color(0.0, 0.45, 0.85, 0.60)
-		hov.shadow_size = 12
-
-		prs.bg_color = Color(0.12, 0.55, 0.85, 1.0)
-		prs.set_border_width_all(2)
-		prs.border_color = Color(0.90, 1.0, 1.0, 1.0)
-	else:
-		norm.bg_color = Color(0.024, 0.065, 0.12, 0.90)
-		norm.set_border_width_all(1)
-		norm.border_color = Color(0.20, 0.42, 0.62, 0.75)
-
-		hov.bg_color = Color(0.04, 0.12, 0.22, 0.95)
-		hov.set_border_width_all(1)
-		hov.border_color = Color(0.38, 0.70, 0.95, 0.95)
-
-		prs.bg_color = Color(0.06, 0.16, 0.30, 1.0)
-		prs.set_border_width_all(1)
-		prs.border_color = Color(0.55, 0.85, 1.0, 1.0)
-
-	b.add_theme_stylebox_override("normal", norm)
-	b.add_theme_stylebox_override("hover", hov)
-	b.add_theme_stylebox_override("pressed", prs)
-	b.add_theme_stylebox_override("focus", norm)
-	b.add_theme_font_size_override("font_size", 13)
-	b.add_theme_color_override("font_color", Color(0.95, 0.98, 1.0))
-
-	b.mouse_entered.connect(func():
-		b.pivot_offset = b.size * 0.5
-		create_tween().tween_property(b, "scale", Vector2(1.035, 1.035), 0.08)
-	)
-	b.mouse_exited.connect(func():
-		b.pivot_offset = b.size * 0.5
-		create_tween().tween_property(b, "scale", Vector2.ONE, 0.1)
-	)
-	return b
+	return {
+		"container": pod,
+		"val": val,
+		"sub": sub
+	}
 
 
 # Open debrief modal with animated star reveals
 func show_debrief(data: Dictionary, sfx: SfxManager = null) -> void:
+	if _center == null:
+		_build_ui()
 	_data = data
 	_sfx_mgr = sfx
 	_is_open = true
+	_is_actioned = false
+	if _btn_next != null:
+		_btn_next.disabled = false
+	if _btn_retry != null:
+		_btn_retry.disabled = false
+	if _btn_select != null:
+		_btn_select.disabled = false
+	if _card != null:
+		_card.modulate.a = 1.0
 	visible = true
 	get_tree().paused = true
 	_sync_viewport_size()
@@ -621,21 +557,25 @@ func show_debrief(data: Dictionary, sfx: SfxManager = null) -> void:
 		_update_hms_button_state()
 
 	if _card != null:
-		_card.custom_minimum_size = Vector2(ModalTemplate.CARD_WIDTH, 545.0 if is_challenge else 495.0)
+		_card.custom_minimum_size = Vector2(ModalTemplate.CARD_WIDTH, 0.0)
 
 	HMSService.check_sector_clear_achievement(lvl_num, pings, alerts, is_swift)
 
 	# Format level title with sector name and subtitle narrative
-	if GameState.current_mode == GameState.GameMode.STORY and GameState.current_level == 0:
-		_title_lbl.text = "PROLOGUE CLEARED"
-		_subtitle_lbl.text = "“Step by step, you begin the ascent.”"
-	else:
-		_title_lbl.text = "%s CLEARED" % GameState.get_level_name(GameState.current_level)
-		if GameState.current_mode == GameState.GameMode.STORY:
-			var quote: String = GameState.get_sector_log(GameState.current_level)
-			_subtitle_lbl.text = "“%s”" % quote
+	var cur_lvl := GameState.current_level
+	var sec_name := GameState.get_level_name(cur_lvl)
+	var depth_str := GameState.get_level_depth_str(cur_lvl)
+
+	if _title_lbl != null:
+		if is_challenge:
+			_title_lbl.text = "EXPEDITION EXTRACTED"
+		elif cur_lvl == 0:
+			_title_lbl.text = "PROLOGUE CLEARED"
 		else:
-			_subtitle_lbl.text = "ABYSS EXPEDITION EXTRACTION SUCCESSFUL"
+			_title_lbl.text = "%s CLEARED" % sec_name.to_upper()
+
+	if _subtitle_lbl != null:
+		_subtitle_lbl.text = "%s   •   DEPTH %s" % [sec_name, depth_str]
 
 	# Update telemetry stats
 	var mins := floori(clear_time / 60.0)
@@ -643,41 +583,54 @@ func show_debrief(data: Dictionary, sfx: SfxManager = null) -> void:
 	var ms := int((clear_time - int(clear_time)) * 10.0)
 	var time_str := "%02d:%02d.%d" % [mins, secs, ms]
 
-	_stat_time_val.text = time_str
-	if is_swift:
-		_stat_time_val.add_theme_color_override("font_color", Color(0.35, 0.95, 0.70))
-		_stat_time_sub.text = "✓ BEAT PAR (≤ %0.0fs)" % par_time
-		_stat_time_sub.add_theme_color_override("font_color", Color(0.35, 0.95, 0.70))
-	else:
-		_stat_time_val.add_theme_color_override("font_color", Color(0.85, 0.92, 0.98))
-		_stat_time_sub.text = "PAR ≤ %0.0fs" % par_time
-		_stat_time_sub.add_theme_color_override("font_color", Color(0.55, 0.70, 0.85))
+	if _stat_time_val != null:
+		_stat_time_val.text = time_str
+		if is_swift:
+			_stat_time_val.add_theme_color_override("font_color", Color(0.35, 0.95, 0.70))
+			if _stat_time_sub != null:
+				_stat_time_sub.text = "PAR MET (<= %0.0fs)" % par_time
+				_stat_time_sub.add_theme_color_override("font_color", Color(0.35, 0.95, 0.70))
+		else:
+			_stat_time_val.add_theme_color_override("font_color", Color(0.85, 0.92, 0.98))
+			if _stat_time_sub != null:
+				_stat_time_sub.text = "PAR: %0.0fs" % par_time
+				_stat_time_sub.add_theme_color_override("font_color", Color(0.55, 0.70, 0.85))
 
-	_stat_pings_val.text = "%d" % pings
-	if pings <= par_pings:
-		_stat_pings_val.add_theme_color_override("font_color", Color(0.35, 0.95, 0.70))
-		_stat_pings_sub.text = "✓ STEALTH (≤ %d)" % par_pings
-		_stat_pings_sub.add_theme_color_override("font_color", Color(0.35, 0.95, 0.70))
-	else:
-		_stat_pings_val.add_theme_color_override("font_color", Color(0.85, 0.92, 0.98))
-		_stat_pings_sub.text = "PAR ≤ %d" % par_pings
-		_stat_pings_sub.add_theme_color_override("font_color", Color(0.55, 0.70, 0.85))
+	if _stat_pings_val != null:
+		_stat_pings_val.text = "%d" % pings
+		if pings <= par_pings:
+			_stat_pings_val.add_theme_color_override("font_color", Color(0.35, 0.95, 0.70))
+			if _stat_pings_sub != null:
+				_stat_pings_sub.text = "STEALTH (<= %d)" % par_pings
+				_stat_pings_sub.add_theme_color_override("font_color", Color(0.35, 0.95, 0.70))
+		else:
+			_stat_pings_val.add_theme_color_override("font_color", Color(0.85, 0.92, 0.98))
+			if _stat_pings_sub != null:
+				_stat_pings_sub.text = "PAR: %d" % par_pings
+				_stat_pings_sub.add_theme_color_override("font_color", Color(0.55, 0.70, 0.85))
 
-	if alerts == 0:
-		_stat_alerts_val.text = "0"
-		_stat_alerts_val.add_theme_color_override("font_color", Color(0.35, 0.95, 0.65))
-		_stat_alerts_sub.text = "✓ PERFECT GHOST"
-		_stat_alerts_sub.add_theme_color_override("font_color", Color(0.35, 0.95, 0.65))
-	else:
-		_stat_alerts_val.text = "%d" % alerts
-		_stat_alerts_val.add_theme_color_override("font_color", Color(1.0, 0.45, 0.45))
-		_stat_alerts_sub.text = "DETECTIONS"
-		_stat_alerts_sub.add_theme_color_override("font_color", Color(1.0, 0.55, 0.55))
+	if _stat_alerts_val != null:
+		if alerts == 0:
+			_stat_alerts_val.text = "0"
+			_stat_alerts_val.add_theme_color_override("font_color", Color(0.35, 0.95, 0.65))
+			if _stat_alerts_sub != null:
+				_stat_alerts_sub.text = "PERFECT GHOST"
+				_stat_alerts_sub.add_theme_color_override("font_color", Color(0.35, 0.95, 0.65))
+		else:
+			_stat_alerts_val.text = "%d" % alerts
+			_stat_alerts_val.add_theme_color_override("font_color", Color(1.0, 0.45, 0.45))
+			if _stat_alerts_sub != null:
+				_stat_alerts_sub.text = "%d DETECTIONS" % alerts
+				_stat_alerts_sub.add_theme_color_override("font_color", Color(1.0, 0.55, 0.55))
 
 	# Update condition subtitles
-	_star_subs[0].text = "SURVIVED"
-	_star_subs[1].text = "0 ALERTS (%d)" % alerts
-	_star_subs[2].text = "≤ %0.0fs (%s)" % [par_time, time_str]
+	if _star_subs.size() >= 3:
+		if _star_subs[0] != null:
+			_star_subs[0].text = "SURVIVED"
+		if _star_subs[1] != null:
+			_star_subs[1].text = "0 ALERTS (%d)" % alerts
+		if _star_subs[2] != null:
+			_star_subs[2].text = "<= %0.0fs (%s)" % [par_time, time_str]
 
 	# Overall Rank Banner & Stars Visibility
 	var r_style := _rank_panel.get_theme_stylebox("panel") as StyleBoxFlat
@@ -689,53 +642,42 @@ func show_debrief(data: Dictionary, sfx: SfxManager = null) -> void:
 		if r_style != null:
 			r_style.bg_color = Color(0.18, 0.05, 0.16, 0.88)
 			r_style.border_color = Color(1.0, 0.45, 0.85, 0.85)
-		if _card != null:
-			_card.custom_minimum_size = Vector2(ModalTemplate.CARD_WIDTH, 440.0)
 	else:
 		if _stars_row != null:
 			_stars_row.visible = true
 		match run_stars:
 			3:
-				_rank_badge.text = "★ ★ ★   RANK: S   •   ABYSSAL PHANTOM"
+				_rank_badge.text = "★ ★ ★   RANK S"
 				_rank_badge.add_theme_color_override("font_color", Color(1.0, 0.92, 0.62))
 				if r_style != null:
 					r_style.bg_color = Color(0.24, 0.15, 0.03, 0.94)
 					r_style.border_color = Color(1.0, 0.84, 0.30, 0.95)
 					r_style.set_border_width_all(2)
 				_backdrop_fx.is_rank_s = true
-				if _card_deco != null:
-					_card_deco.corner_col = Color(1.0, 0.84, 0.30, 0.95)
-					_card_deco.queue_redraw()
 			2:
-				_rank_badge.text = "★ ★ ☆   RANK: A   •   SILENT SHADOW"
+				_rank_badge.text = "★ ★ ☆   RANK A"
 				_rank_badge.add_theme_color_override("font_color", Color(0.55, 1.0, 0.85))
 				if r_style != null:
 					r_style.bg_color = Color(0.04, 0.18, 0.12, 0.90)
 					r_style.border_color = Color(0.30, 0.94, 0.68, 0.85)
 					r_style.set_border_width_all(1)
 				_backdrop_fx.is_rank_s = false
-				if _card_deco != null:
-					_card_deco.corner_col = Color(0.30, 0.94, 0.68, 0.85)
-					_card_deco.queue_redraw()
 			_:
-				_rank_badge.text = "★ ☆ ☆   RANK: B   •   CAVERN SURVIVOR"
+				_rank_badge.text = "★ ☆ ☆   RANK B"
 				_rank_badge.add_theme_color_override("font_color", Color(0.80, 0.92, 1.0))
 				if r_style != null:
 					r_style.bg_color = Color(0.04, 0.12, 0.20, 0.88)
 					r_style.border_color = Color(0.35, 0.75, 1.0, 0.75)
 					r_style.set_border_width_all(1)
 				_backdrop_fx.is_rank_s = false
-				if _card_deco != null:
-					_card_deco.corner_col = Color(0.35, 0.75, 1.0, 0.75)
-					_card_deco.queue_redraw()
 
 	# Next button label for final depth
 	if not GameState.has_next_level():
-		_btn_next.text = "FINALE VICTORY >"
+		_btn_next.text = "VICTORY"
 	elif is_challenge:
-		_btn_next.text = "ABYSS MAP >"
+		_btn_next.text = "ABYSS MAP"
 	else:
-		_btn_next.text = "NEXT SECTOR >"
+		_btn_next.text = "NEXT LEVEL"
 
 	# Reset star visuals before animation (Story Mode only)
 	if not is_challenge:
@@ -777,27 +719,7 @@ func show_debrief(data: Dictionary, sfx: SfxManager = null) -> void:
 					_animate_star_earn(i, star_colors[i])
 			).set_delay(delay if i == 0 else 0.26)
 
-	_start_hero_pulse()
-
-
-func _start_hero_pulse() -> void:
-	if _hero_pulse_tween != null and _hero_pulse_tween.is_valid():
-		_hero_pulse_tween.kill()
-	if _btn_next == null or not is_instance_valid(_btn_next):
-		return
-	_btn_next.pivot_offset = _btn_next.size * 0.5
-	_hero_pulse_tween = create_tween().set_loops()
-	_hero_pulse_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-	_hero_pulse_tween.tween_property(_btn_next, "scale", Vector2(1.028, 1.028), 0.70).set_trans(Tween.TRANS_SINE)
-	_hero_pulse_tween.tween_property(_btn_next, "scale", Vector2.ONE, 0.70).set_trans(Tween.TRANS_SINE)
-
-
-func _stop_hero_pulse() -> void:
-	if _hero_pulse_tween != null and _hero_pulse_tween.is_valid():
-		_hero_pulse_tween.kill()
-		_hero_pulse_tween = null
-	if _btn_next != null and is_instance_valid(_btn_next):
-		_btn_next.scale = Vector2.ONE
+	# Stars reveal complete
 
 
 func _animate_star_earn(idx: int, star_color: Color) -> void:
@@ -841,27 +763,42 @@ func _animate_star_earn(idx: int, star_color: Color) -> void:
 	c_tw.tween_property(card, "scale", Vector2.ONE, 0.20).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 
 
+var _is_actioned := false
+
+
+func _disable_action_buttons() -> void:
+	if _btn_next != null:
+		_btn_next.disabled = true
+	if _btn_retry != null:
+		_btn_retry.disabled = true
+	if _btn_select != null:
+		_btn_select.disabled = true
+
+
 func _on_next() -> void:
-	_stop_hero_pulse()
-	_is_open = false
-	visible = false
-	get_tree().paused = false
+	if _is_actioned:
+		return
+	_is_actioned = true
+	_disable_action_buttons()
+	if not GameState.has_next_level():
+		_is_open = false
+		visible = false
 	next_pressed.emit()
 
 
 func _on_retry() -> void:
-	_stop_hero_pulse()
-	_is_open = false
-	visible = false
-	get_tree().paused = false
+	if _is_actioned:
+		return
+	_is_actioned = true
+	_disable_action_buttons()
 	retry_pressed.emit()
 
 
 func _on_select() -> void:
-	_stop_hero_pulse()
-	_is_open = false
-	visible = false
-	get_tree().paused = false
+	if _is_actioned:
+		return
+	_is_actioned = true
+	_disable_action_buttons()
 	select_pressed.emit()
 
 

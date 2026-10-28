@@ -641,14 +641,19 @@ func _level_0_cinematic_exit() -> void:
 	GameState.mark_story_tutorial_completed()
 	GameState.complete_level(1)
 
-	if hud != null and hud.story_overlay != null:
-		hud.story_overlay.play_sequence([
-			"Stone stairs wind upward into the dark.",
-			"Step by step, you begin the ascent.",
-			"Hoping this path leads out of the abyss..."
-		], func():
-			GameState.go_to_level_select()
-		, true, "", "", 0.95)
+	if not GameState.has_seen_act_milestone(0):
+		GameState.mark_act_milestone_seen(0)
+		if hud != null and hud.story_overlay != null:
+			hud.story_overlay.play_sequence([
+				"Stone stairs wind upward into the dark.",
+				"Step by step, you begin the ascent.",
+				"Hoping this path leads out of the abyss..."
+			], func():
+				GameState.go_to_level_select()
+			, true, "", "", 0.95)
+			return
+
+	GameState.go_to_level_select()
 
 
 func _level_0_physics_process(_delta: float) -> void:
@@ -880,10 +885,23 @@ func _play_level_clear_sequence() -> void:
 		player.can_sneak = false
 		player.can_pebble = false
 		player.velocity = Vector2.ZERO
+		player.set_deferred("collision_layer", 0)
+		player.set_deferred("collision_mask", 0)
+		if player.has_node("CollisionShape2D"):
+			var col := player.get_node("CollisionShape2D") as CollisionShape2D
+			if col != null:
+				col.set_deferred("disabled", true)
 		if player.has_node("MicInput"):
 			var mic = player.get_node("MicInput")
 			if mic != null and mic.has_method("suppress"):
 				mic.suppress(9999.0)
+
+	# 1b. Immediately pacify/disable all enemies so they cease chasing or attacking
+	for node in get_tree().get_nodes_in_group("enemy"):
+		var e := node as Enemy
+		if e != null and is_instance_valid(e):
+			e.velocity = Vector2.ZERO
+			e.set_deferred("process_mode", Node.PROCESS_MODE_DISABLED)
 
 	# 2. Play ascension / level exit chime
 	if sfx != null:
@@ -936,11 +954,13 @@ func _play_story_clear_sequence(cur_sector: int, debrief_data: Dictionary) -> vo
 	var is_final_level: bool = not GameState.has_next_level()
 	var story_lines: Array = []
 	if is_final_level:
-		story_lines = GameState.get_campaign_ending_lines()
-		GameState.mark_campaign_ending_seen()
+		if not GameState.has_seen_campaign_ending("story"):
+			story_lines = GameState.get_campaign_ending_lines()
+			GameState.mark_campaign_ending_seen("story")
 	else:
-		story_lines = GameState.get_sector_story_lines(cur_sector)
-		GameState.mark_act_milestone_seen(cur_sector)
+		if not GameState.has_seen_act_milestone(cur_sector):
+			story_lines = GameState.get_sector_story_lines(cur_sector)
+			GameState.mark_act_milestone_seen(cur_sector)
 
 	if story_lines.size() > 0 and hud != null and hud.story_overlay != null:
 		var theme_mode := "daylight" if is_final_level else ""
@@ -956,13 +976,12 @@ func _show_story_debrief_modal(debrief_data: Dictionary, is_final_level: bool) -
 		return
 	var on_next := func():
 		if is_final_level:
-			hud.show_victory_screen()
+			if hud != null and hud.has_method("show_victory_screen"):
+				hud.show_victory_screen()
 		else:
-			hud.play_level_exit_transition(func():
-				GameState.next_level()
-			)
+			GameState.next_level()
 	var on_retry := func():
-		GameState.restart_level()
+		GameState.restart_level(0.24, 0.28)
 	var on_select := func():
 		GameState.go_to_level_select()
 
@@ -974,16 +993,21 @@ func _on_challenge_clear_next(cur_sector: int) -> void:
 	if ChallengeModifiers.is_milestone_sector(level_num) and not ChallengeModifiers.is_milestone_claimed(level_num):
 		var on_pact_done := func():
 			_proceed_challenge_after_pact(cur_sector)
-		AbyssalPactModal.open_pact(hud if hud != null else self, level_num, on_pact_done)
+		var pact_parent: Node = hud
+		if pact_parent == null:
+			pact_parent = self
+		AbyssalPactModal.open_pact(pact_parent, level_num, on_pact_done)
 		return
 	_proceed_challenge_after_pact(cur_sector)
 
 
-func _proceed_challenge_after_pact(cur_sector: int) -> void:
+func _proceed_challenge_after_pact(_cur_sector: int) -> void:
 	if not GameState.has_next_level():
-		var ending_lines: Array = GameState.get_campaign_ending_lines()
+		var ending_lines: Array = []
+		if not GameState.has_seen_campaign_ending("challenge"):
+			ending_lines = GameState.get_campaign_ending_lines()
+			GameState.mark_campaign_ending_seen("challenge")
 		if ending_lines.size() > 0 and hud != null and hud.story_overlay != null:
-			GameState.mark_campaign_ending_seen()
 			var end_hdr: String = "◈   K I N G   S E C T O R   •   D E P T H   - 9 , 9 9 9   M   ◈"
 			var end_theme: String = "singularity"
 			var on_chal_victory := func():
@@ -1017,7 +1041,8 @@ func _press_switch(cell: Vector2i) -> void:
 	for body in door_nodes.get(id, []):
 		if is_instance_valid(body) and not body.has_meta("open"):
 			body.set_meta("open", true)
-			body.get_child(0).set_deferred("disabled", true)
+			if body.get_child_count() > 0:
+				body.get_child(0).set_deferred("disabled", true)
 			if sfx != null:
 				sfx.play_door_open(body.global_position)
 	if sfx != null:
@@ -1059,7 +1084,9 @@ func _trigger_read_note(cell: Vector2i) -> void:
 		player.velocity = Vector2.ZERO
 
 	var script: GDScript = load("res://ui/modals/NoteReadModal.gd") as GDScript
-	var modal_parent: Node = hud if (hud != null and is_instance_valid(hud)) else self
+	var modal_parent: Node = hud
+	if modal_parent == null or not is_instance_valid(modal_parent):
+		modal_parent = self
 	if script != null:
 		if hud != null and is_instance_valid(hud):
 			hud.set_gameplay_buttons_visible(false)
@@ -1137,14 +1164,21 @@ func cell_to_world(cell: Vector2i) -> Vector2:
 
 
 func _on_player_died() -> void:
-	sfx.play_player_death()
-	hud.flash_death()
+	if _changing:
+		return
+	if sfx != null:
+		sfx.play_player_death()
+	if hud != null:
+		hud.flash_death()
 	if _is_tutorial_level and _tutorial_checkpoint > 0:
 		_handle_tutorial_checkpoint_respawn()
 		return
 	await get_tree().create_timer(0.55).timeout
-	var killer_type: int = int(player.get("killed_by_type")) if "killed_by_type" in player else -1
-	hud.show_death_screen(killer_type)
+	if _changing:
+		return
+	var killer_type: int = int(player.get("killed_by_type")) if (player != null and is_instance_valid(player) and "killed_by_type" in player) else -1
+	if hud != null:
+		hud.show_death_screen(killer_type)
 
 
 func _handle_tutorial_checkpoint_respawn() -> void:

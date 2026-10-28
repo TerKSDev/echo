@@ -3,7 +3,6 @@ extends RefCounted
 ## Irreversible Data Reset Confirmation Modal Dialog.
 ## Warns user before wiping cavern sector progress, records, and stars.
 
-const SettingsUIFactory = preload("res://ui/settings/SettingsUIFactory.gd")
 
 static func show_modal(
 	parent: Control,
@@ -35,10 +34,10 @@ static func show_modal(
 	panel.add_child(vbox)
 
 	var close_func := func():
-		var tw := modal.create_tween().set_parallel(true)
-		tw.tween_property(modal, "modulate:a", 0.0, 0.15).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-		tw.tween_property(panel, "scale", Vector2(0.92, 0.92), 0.15).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-		tw.chain().tween_callback(func():
+		var close_tw := modal.create_tween().set_parallel(true)
+		close_tw.tween_property(modal, "modulate:a", 0.0, 0.15).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		close_tw.tween_property(panel, "scale", Vector2(0.92, 0.92), 0.15).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		close_tw.chain().tween_callback(func():
 			modal.queue_free()
 			if on_cancelled.is_valid():
 				on_cancelled.call()

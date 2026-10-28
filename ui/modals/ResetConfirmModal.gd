@@ -3,8 +3,6 @@ extends RefCounted
 ## Confirmation Modal for Abandoning / Resetting a Roguelite Challenge Run in ECHO.
 ## Enforces anti-misclick protection before wiping active boons, curses, and progress.
 
-const ModalTemplate = preload("res://ui/modals/ModalTemplate.gd")
-
 
 static func open(parent: Node, on_confirmed: Callable) -> Control:
 	if parent == null or not is_instance_valid(parent):
@@ -56,10 +54,10 @@ static func open(parent: Node, on_confirmed: Callable) -> Control:
 	header.add_child(title_lbl)
 
 	var close_func := func():
-		var tw := root.create_tween().set_parallel(true)
-		tw.tween_property(root, "modulate:a", 0.0, 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-		tw.tween_property(frame, "scale", Vector2(0.94, 0.94), 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-		tw.chain().tween_callback(func():
+		var close_tw := root.create_tween().set_parallel(true)
+		close_tw.tween_property(root, "modulate:a", 0.0, 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		close_tw.tween_property(frame, "scale", Vector2(0.94, 0.94), 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		close_tw.chain().tween_callback(func():
 			canvas.queue_free()
 		)
 

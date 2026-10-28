@@ -1,10 +1,5 @@
 extends Control
 
-const Icons = preload("res://ui/icons/Icons.gd")
-const LevelPathRenderer = preload("res://ui/level_select/LevelPathRenderer.gd")
-const DepthGaugeRenderer = preload("res://ui/level_select/DepthGaugeRenderer.gd")
-const LevelCardBuilder = preload("res://ui/level_select/LevelCardBuilder.gd")
-
 @onready var scroll_container: ScrollContainer = $MainArea/ScrollContainer
 @onready var level_grid: GridContainer = $MainArea/ScrollContainer/GridMargin/LevelGrid
 @onready var depth_gauge: Control = $DepthGauge
@@ -608,6 +603,7 @@ func _transition_mode(to_challenge: bool) -> void:
 
 	var main_node := get_node_or_null("MainArea") as Control
 	var header_node := get_node_or_null("HeaderBox") as Control
+	var top_bar := get_node_or_null("TopBar") as Control
 	var orig_main_y: float = main_node.position.y if main_node != null else 192.0
 	var orig_hdr_y: float = header_node.position.y if header_node != null else 95.0
 
@@ -641,10 +637,12 @@ func _transition_mode(to_challenge: bool) -> void:
 			"alpha": randf_range(0.4, 0.9)
 		})
 
-	var dark_alpha := 0.0
-	var streak_fade := 0.0
-	var ring_radius := 0.0
-	var ring_alpha := 0.0
+	var vfx_state := {
+		"dark_alpha": 0.0,
+		"streak_fade": 0.0,
+		"ring_radius": 0.0,
+		"ring_alpha": 0.0
+	}
 	var start_ms := Time.get_ticks_msec()
 
 	# Custom draw function for continuous, buttery-smooth 60+ FPS motion
@@ -654,21 +652,13 @@ func _transition_mode(to_challenge: bool) -> void:
 		# 1. Background dark veil
 		var bg_col: Color
 		if to_challenge:
-			bg_col = Color(0.02, 0.006, 0.022, dark_alpha)
+			bg_col = Color(0.02, 0.006, 0.022, float(vfx_state["dark_alpha"]))
 		else:
-			bg_col = Color(0.006, 0.018, 0.032, dark_alpha)
+			bg_col = Color(0.006, 0.018, 0.032, float(vfx_state["dark_alpha"]))
 		vfx.draw_rect(Rect2(0.0, 0.0, vp_w, vp_h), bg_col, true)
 
-		# 2. Atmospheric glow at boundary (bottom for plunge, top for ascent)
-		if dark_alpha > 0.05:
-			var glow_col: Color = Color(0.85, 0.15, 0.65, dark_alpha * 0.28) if to_challenge else Color(0.20, 0.65, 0.95, dark_alpha * 0.28)
-			if to_challenge:
-				vfx.draw_rect(Rect2(0.0, vp_h - 180.0, vp_w, 180.0), glow_col, true)
-			else:
-				vfx.draw_rect(Rect2(0.0, 0.0, vp_w, 180.0), glow_col, true)
-
-		# 3. Flowing speed streaks
-		if streak_fade > 0.01:
+		# 2. Flowing speed streaks
+		if float(vfx_state["streak_fade"]) > 0.01:
 			var base_col: Color = Color(1.0, 0.40, 0.88) if to_challenge else Color(0.38, 0.88, 1.0)
 			for s: Dictionary in streaks:
 				var cur_y: float
@@ -677,7 +667,7 @@ func _transition_mode(to_challenge: bool) -> void:
 				var l_len: float = float(s["len"])
 				var spd: float = float(s["speed"])
 				var w: float = float(s["width"])
-				var a: float = float(s["alpha"]) * streak_fade
+				var a: float = float(s["alpha"]) * float(vfx_state["streak_fade"])
 
 				if to_challenge:
 					# Plunging: streaks fly UPWARD
@@ -695,14 +685,14 @@ func _transition_mode(to_challenge: bool) -> void:
 				var col := Color(base_col.r, base_col.g, base_col.b, a)
 				vfx.draw_line(p1, p2, col, w)
 
-		# 4. Acoustic Arrival Sonar Ring (expands outwards from center)
-		if ring_alpha > 0.01 and ring_radius > 1.0:
+		# 3. Acoustic Arrival Sonar Ring (expands outwards from center)
+		if float(vfx_state["ring_alpha"]) > 0.01 and float(vfx_state["ring_radius"]) > 1.0:
 			var center := Vector2(vp_w * 0.5, vp_h * 0.5)
-			var ring_col: Color = Color(1.0, 0.40, 0.88, ring_alpha) if to_challenge else Color(0.38, 0.88, 1.0, ring_alpha)
-			vfx.draw_arc(center, ring_radius, 0.0, TAU, 36, ring_col, 2.5)
-			if ring_radius > 30.0:
-				var echo_col := Color(ring_col.r, ring_col.g, ring_col.b, ring_alpha * 0.45)
-				vfx.draw_arc(center, ring_radius * 0.65, 0.0, TAU, 28, echo_col, 1.5)
+			var ring_col: Color = Color(1.0, 0.40, 0.88, float(vfx_state["ring_alpha"])) if to_challenge else Color(0.38, 0.88, 1.0, float(vfx_state["ring_alpha"]))
+			vfx.draw_arc(center, float(vfx_state["ring_radius"]), 0.0, TAU, 36, ring_col, 2.5)
+			if float(vfx_state["ring_radius"]) > 30.0:
+				var echo_col := Color(ring_col.r, ring_col.g, ring_col.b, float(vfx_state["ring_alpha"]) * 0.45)
+				vfx.draw_arc(center, float(vfx_state["ring_radius"]) * 0.65, 0.0, TAU, 28, echo_col, 1.5)
 	)
 
 	# Animation sequence
@@ -711,6 +701,8 @@ func _transition_mode(to_challenge: bool) -> void:
 	# --- PHASE 1: Departure & Dissolve (0.26s) ---
 	var drift_dist := 75.0
 	var out_dir := -1.0 if to_challenge else 1.0
+	if top_bar != null:
+		tw.parallel().tween_property(top_bar, "modulate:a", 0.0, 0.22).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	if main_node != null:
 		tw.parallel().tween_property(main_node, "position:y", orig_main_y + out_dir * drift_dist, 0.26).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 		tw.parallel().tween_property(main_node, "modulate:a", 0.0, 0.24).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
@@ -719,8 +711,8 @@ func _transition_mode(to_challenge: bool) -> void:
 		tw.parallel().tween_property(header_node, "modulate:a", 0.0, 0.24).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 
 	tw.parallel().tween_method(func(v: float):
-		dark_alpha = v
-		streak_fade = v
+		vfx_state["dark_alpha"] = v
+		vfx_state["streak_fade"] = v
 		vfx.queue_redraw()
 	, 0.0, 1.0, 0.26).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 
@@ -746,6 +738,8 @@ func _transition_mode(to_challenge: bool) -> void:
 
 		# Set up arrival entry positions (glide into place from opposite direction)
 		var in_dir := 1.0 if to_challenge else -1.0
+		if top_bar != null:
+			top_bar.modulate.a = 0.0
 		if main_node != null:
 			main_node.position.y = orig_main_y + in_dir * 55.0
 			main_node.modulate.a = 0.0
@@ -758,6 +752,8 @@ func _transition_mode(to_challenge: bool) -> void:
 	tw.tween_interval(0.03)
 
 	# --- PHASE 3: Arrival Emergence & Sonar Echo (0.34s) ---
+	if top_bar != null:
+		tw.parallel().tween_property(top_bar, "modulate:a", 1.0, 0.30).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	if main_node != null:
 		tw.tween_property(main_node, "position:y", orig_main_y, 0.34).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 		tw.parallel().tween_property(main_node, "modulate:a", 1.0, 0.30).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
@@ -768,24 +764,26 @@ func _transition_mode(to_challenge: bool) -> void:
 		tw.parallel().tween_property(header_node, "modulate:a", 1.0, 0.30).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 	tw.parallel().tween_method(func(v: float):
-		dark_alpha = v
-		streak_fade = v * 0.5
+		vfx_state["dark_alpha"] = v
+		vfx_state["streak_fade"] = v * 0.5
 		vfx.queue_redraw()
 	, 1.0, 0.0, 0.34).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 	# Expanding acoustic arrival ripple
 	tw.parallel().tween_method(func(r: float):
-		ring_radius = r
+		vfx_state["ring_radius"] = r
 		vfx.queue_redraw()
 	, 0.0, 420.0, 0.34).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
 	tw.parallel().tween_method(func(a: float):
-		ring_alpha = a
+		vfx_state["ring_alpha"] = a
 		vfx.queue_redraw()
 	, 0.85, 0.0, 0.34).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 	# --- FINISH ---
 	tw.tween_callback(func():
+		if top_bar != null:
+			top_bar.modulate.a = 1.0
 		if main_node != null:
 			main_node.position.y = orig_main_y
 			main_node.modulate.a = 1.0

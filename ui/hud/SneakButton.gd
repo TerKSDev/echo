@@ -1,7 +1,5 @@
 extends Button
 
-const Icons = preload("res://ui/icons/Icons.gd")
-
 var _player: Node = null
 var _press_scale := 1.0
 var _timer := 0.0

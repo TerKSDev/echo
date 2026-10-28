@@ -863,10 +863,10 @@ func apply_audio_settings() -> void:
 # Effective dB threshold required to trigger a voice echo
 func get_mic_trigger_db() -> float:
 	var sens := clampf(mic_sensitivity, 0.0, 1.0)
-	var margin: float = lerpf(42.0, 10.0, sens)
+	var margin: float = lerpf(46.0, 10.0, sens)
 	var target_db: float = mic_noise_floor_db + margin
-	var min_allowed_db: float = lerpf(-7.0, -32.0, sens)
-	return clampf(maxf(target_db, min_allowed_db), -34.0, -6.0)
+	var min_allowed_db: float = lerpf(-4.0, -32.0, sens)
+	return clampf(maxf(target_db, min_allowed_db), -34.0, -4.0)
 
 
 func apply_display_settings() -> void:
@@ -1369,21 +1369,21 @@ func record_level_clear(level_number: int, clear_time: float, pings: int, alerts
 			"best_time": 999.0,
 			"best_pings": 999
 		})
-		var prior_best_time: float = float(prior_rec.get("best_time", 999.0))
-		var new_best_time: float = minf(prior_best_time, clear_time)
-		var new_best_pings: int = mini(int(prior_rec.get("best_pings", 999)), pings)
+		var chal_prior_best_time: float = float(prior_rec.get("best_time", 999.0))
+		var chal_new_best_time: float = minf(chal_prior_best_time, clear_time)
+		var chal_new_best_pings: int = mini(int(prior_rec.get("best_pings", 999)), pings)
 		challenge_records[level_number] = {
-			"best_time": new_best_time,
-			"best_pings": new_best_pings
+			"best_time": chal_new_best_time,
+			"best_pings": chal_new_best_pings
 		}
 
-		var cfg := ConfigFile.new()
-		cfg.load(PROGRESS_PATH)
-		cfg.set_value("progress", "challenge_highest_unlocked", challenge_highest_unlocked)
-		var sec := "challenge_%02d" % level_number
-		cfg.set_value(sec, "best_time", new_best_time)
-		cfg.set_value(sec, "best_pings", new_best_pings)
-		cfg.save(PROGRESS_PATH)
+		var chal_cfg := ConfigFile.new()
+		chal_cfg.load(PROGRESS_PATH)
+		chal_cfg.set_value("progress", "challenge_highest_unlocked", challenge_highest_unlocked)
+		var chal_sec := "challenge_%02d" % level_number
+		chal_cfg.set_value(chal_sec, "best_time", chal_new_best_time)
+		chal_cfg.set_value(chal_sec, "best_pings", chal_new_best_pings)
+		chal_cfg.save(PROGRESS_PATH)
 
 		return {
 			"level_number": level_number,
@@ -1397,7 +1397,7 @@ func record_level_clear(level_number: int, clear_time: float, pings: int, alerts
 			"is_swift": is_swift,
 			"run_stars": 0,
 			"total_stars": 0,
-			"is_new_best_time": (clear_time < prior_best_time),
+			"is_new_best_time": (clear_time < chal_prior_best_time),
 			"is_challenge": true
 		}
 

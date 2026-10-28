@@ -133,6 +133,7 @@ func play_step_sneak() -> void:
 
 
 func play_step_water(is_sneak: bool) -> void:
+	_suppress_mic(0.20)
 	if _wav_steps_water.is_empty():
 		return
 	var idx := randi() % _wav_steps_water.size()
@@ -150,8 +151,8 @@ func play_sleeper_snore(pos: Vector2, occluded: bool = false) -> void:
 
 
 func play_echo_ping(loudness: float) -> void:
-	_suppress_mic(1.15)
-	var vol_db: float = lerpf(-10.0, 2.0, clampf(loudness, 0.0, 1.0))
+	_suppress_mic(1.20)
+	var vol_db: float = lerpf(-10.0, 0.0, clampf(loudness, 0.0, 1.0))
 	var pitch: float = lerpf(1.12, 0.88, clampf(loudness, 0.0, 1.0))
 	_play_non_spatial(_wav_echo_ping, vol_db, pitch)
 
@@ -237,6 +238,7 @@ func play_pact_reroll() -> void:
 
 # Visually Impaired (Blind) Echolocation & Navigation Audio API:
 func play_exit_beacon(pos: Vector2, is_near: bool = false, dist: float = 200.0, max_dist: float = 380.0) -> void:
+	_suppress_mic(0.18)
 	var ratio: float = clampf(dist / maxf(max_dist, 1.0), 0.0, 1.0)
 	var vol_db: float = lerpf(0.5, -11.0, ratio)
 	var pitch: float = 1.06 if is_near else 1.0
@@ -244,6 +246,7 @@ func play_exit_beacon(pos: Vector2, is_near: bool = false, dist: float = 200.0, 
 
 
 func play_wall_echo(pos: Vector2, dist: float, max_range: float) -> void:
+	_suppress_mic(0.18)
 	var ratio: float = clampf(dist / maxf(max_range, 1.0), 0.0, 1.0)
 	var vol_db: float = lerpf(-4.0, -18.0, ratio)
 	var pitch: float = lerpf(1.35, 0.85, ratio)
@@ -251,11 +254,13 @@ func play_wall_echo(pos: Vector2, dist: float, max_range: float) -> void:
 
 
 func play_cane_tap(dist: float) -> void:
+	_suppress_mic(0.18)
 	var pitch: float = lerpf(1.35, 0.92, clampf(dist / 50.0, 0.0, 1.0))
 	_play_non_spatial(_wav_cane_tap, -6.5, pitch)
 
 
 func play_wall_bump() -> void:
+	_suppress_mic(0.25)
 	_play_non_spatial(_wav_wall_bump, -3.5, randf_range(0.95, 1.05))
 
 
