@@ -232,6 +232,10 @@ func get_level_depth_str(lvl: int) -> String:
 		return "~" + raw.replace("-", "").strip_edges()
 	return "~0 M"
 
+
+func get_level_depth(lvl: int) -> String:
+	return get_level_depth_str(lvl)
+
 # Evocative philosophical explorer recovery logs (convey positive psychological resilience & mindfulness)
 const SECTOR_LOGS: Dictionary = {
 	1: "In the deepest dark, silence is not emptiness—it is your canvas.",
@@ -779,7 +783,11 @@ var sonar_palette := "cyan"        # "cyan", "emerald", "amber", "white"
 
 # Navigation tracking
 const SETTINGS_SCENE := "res://ui/screens/settings_scene.tscn"
+const INTEL_SCENE := "res://ui/screens/intel_scene.tscn"
+const LEADERBOARD_SCENE := "res://ui/screens/leaderboard_scene.tscn"
 var previous_scene_path: String = LEVEL_SELECT_SCENE
+var intel_default_tab: int = 0
+var leaderboard_default_sector: int = 1
 
 # Global Procedural Subterranean Menu & UI BGM System
 const BGM_SCALE: Array[float] = [0.75, 1.0, 1.125, 1.2, 1.333, 1.5, 1.6, 1.8, 2.0]
@@ -1128,6 +1136,28 @@ func go_to_settings(from_scene: String = "") -> void:
 		if cur != null and cur.scene_file_path != "":
 			previous_scene_path = cur.scene_file_path
 	transition_to_scene(SETTINGS_SCENE, 0.22, 0.28)
+
+
+func go_to_intel(from_scene: String = "", default_tab: int = 0) -> void:
+	if from_scene != "":
+		previous_scene_path = from_scene
+	else:
+		var cur := get_tree().current_scene
+		if cur != null and cur.scene_file_path != "":
+			previous_scene_path = cur.scene_file_path
+	intel_default_tab = default_tab
+	transition_to_scene(INTEL_SCENE, 0.22, 0.28)
+
+
+func go_to_leaderboard(from_scene: String = "", default_sector: int = 1) -> void:
+	if from_scene != "":
+		previous_scene_path = from_scene
+	else:
+		var cur := get_tree().current_scene
+		if cur != null and cur.scene_file_path != "":
+			previous_scene_path = cur.scene_file_path
+	leaderboard_default_sector = default_sector
+	transition_to_scene(LEADERBOARD_SCENE, 0.22, 0.28)
 
 
 func return_from_settings() -> void:

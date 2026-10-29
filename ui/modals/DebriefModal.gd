@@ -850,6 +850,7 @@ func _update_hms_button_state() -> void:
 
 
 func _on_hms_button_pressed() -> void:
-	var modal_script: GDScript = load("res://ui/modals/LeaderboardModal.gd") as GDScript
-	if modal_script != null:
-		modal_script.open_leaderboard(self, _cur_lvl_num, func(): pass)
+	var from_path := GameState.current_level_path
+	if from_path == "":
+		from_path = "res://ui/screens/level_select.tscn"
+	GameState.go_to_leaderboard(from_path, _cur_lvl_num)

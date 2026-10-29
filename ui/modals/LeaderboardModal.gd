@@ -31,16 +31,17 @@ func _ready() -> void:
 
 
 static func open_modal(parent: Node, default_sector: int = 1) -> Control:
-	var existing = parent.get_node_or_null("LeaderboardModal")
-	if existing != null:
-		existing.open(default_sector)
-		return existing
-	var script: GDScript = load("res://ui/modals/LeaderboardModal.gd") as GDScript
-	var modal := script.new() as Control
-	modal.name = "LeaderboardModal"
-	parent.add_child(modal)
-	modal.open(default_sector)
-	return modal
+	var from_path := ""
+	if parent != null and parent.is_inside_tree():
+		var cur := parent.get_tree().current_scene
+		if cur != null:
+			from_path = cur.scene_file_path
+	GameState.go_to_leaderboard(from_path, default_sector)
+	return null
+
+
+static func open_leaderboard(parent: Node, default_sector: int = 1, _on_close: Callable = Callable()) -> Control:
+	return open_modal(parent, default_sector)
 
 
 func _notification(what: int) -> void:

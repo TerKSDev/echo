@@ -356,16 +356,12 @@ func _on_confirm_reset_run() -> void:
 
 func _on_leaderboard_pressed() -> void:
 	_play_ui_sound(_wav_click, -5.0, 1.0)
-	var modal_script: GDScript = load("res://ui/modals/LeaderboardModal.gd") as GDScript
-	if modal_script != null:
-		modal_script.open_modal(self)
+	GameState.go_to_leaderboard("res://ui/screens/level_select.tscn", clampi(GameState.current_level, 1, GameState.LEVELS.size()))
 
 
 func _on_intel_pressed() -> void:
 	_play_ui_sound(_wav_click, -5.0, 1.0)
-	var script: GDScript = load("res://ui/modals/IntelModal.gd") as GDScript
-	if script != null:
-		script.open_modal(self)
+	GameState.go_to_intel("res://ui/screens/level_select.tscn", 0)
 
 
 func _on_settings_pressed() -> void:

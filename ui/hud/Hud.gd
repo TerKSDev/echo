@@ -952,6 +952,15 @@ func _setup_virtual_joystick() -> void:
 
 
 func update_controls_layout() -> void:
+	_reset_action_buttons_to_native()
+
+	if not GameState.virtual_joystick_enabled and _joystick_active:
+		_deactivate_joystick()
+
+	apply_custom_hud_layout()
+
+
+func _reset_action_buttons_to_native() -> void:
 	if not has_node("SneakBtn") or not has_node("SoundBtn"):
 		return
 
@@ -962,6 +971,8 @@ func update_controls_layout() -> void:
 			# Left-handed layout: Action buttons on Left, Right thumb drives joystick
 			$SoundBtn.anchor_left = 0.0
 			$SoundBtn.anchor_right = 0.0
+			$SoundBtn.anchor_top = 1.0
+			$SoundBtn.anchor_bottom = 1.0
 			$SoundBtn.offset_left = 40.0
 			$SoundBtn.offset_top = -186.0
 			$SoundBtn.offset_right = 150.0
@@ -969,6 +980,8 @@ func update_controls_layout() -> void:
 
 			$SneakBtn.anchor_left = 0.0
 			$SneakBtn.anchor_right = 0.0
+			$SneakBtn.anchor_top = 1.0
+			$SneakBtn.anchor_bottom = 1.0
 			$SneakBtn.offset_left = 158.0
 			$SneakBtn.offset_top = -186.0
 			$SneakBtn.offset_right = 268.0
@@ -977,6 +990,8 @@ func update_controls_layout() -> void:
 			if has_node("PebbleBtn"):
 				$PebbleBtn.anchor_left = 0.0
 				$PebbleBtn.anchor_right = 0.0
+				$PebbleBtn.anchor_top = 1.0
+				$PebbleBtn.anchor_bottom = 1.0
 				$PebbleBtn.offset_left = 51.0
 				$PebbleBtn.offset_top = -310.0
 				$PebbleBtn.offset_right = 139.0
@@ -985,6 +1000,8 @@ func update_controls_layout() -> void:
 			# Standard layout: Action buttons on Right, Left thumb drives joystick
 			$SoundBtn.anchor_left = 1.0
 			$SoundBtn.anchor_right = 1.0
+			$SoundBtn.anchor_top = 1.0
+			$SoundBtn.anchor_bottom = 1.0
 			$SoundBtn.offset_left = -150.0
 			$SoundBtn.offset_top = -186.0
 			$SoundBtn.offset_right = -40.0
@@ -992,6 +1009,8 @@ func update_controls_layout() -> void:
 
 			$SneakBtn.anchor_left = 1.0
 			$SneakBtn.anchor_right = 1.0
+			$SneakBtn.anchor_top = 1.0
+			$SneakBtn.anchor_bottom = 1.0
 			$SneakBtn.offset_left = -268.0
 			$SneakBtn.offset_top = -186.0
 			$SneakBtn.offset_right = -158.0
@@ -1000,6 +1019,8 @@ func update_controls_layout() -> void:
 			if has_node("PebbleBtn"):
 				$PebbleBtn.anchor_left = 1.0
 				$PebbleBtn.anchor_right = 1.0
+				$PebbleBtn.anchor_top = 1.0
+				$PebbleBtn.anchor_bottom = 1.0
 				$PebbleBtn.offset_left = -139.0
 				$PebbleBtn.offset_top = -310.0
 				$PebbleBtn.offset_right = -51.0
@@ -1009,6 +1030,8 @@ func update_controls_layout() -> void:
 		if is_left_handed:
 			$SoundBtn.anchor_left = 0.0
 			$SoundBtn.anchor_right = 0.0
+			$SoundBtn.anchor_top = 1.0
+			$SoundBtn.anchor_bottom = 1.0
 			$SoundBtn.offset_left = 40.0
 			$SoundBtn.offset_top = -186.0
 			$SoundBtn.offset_right = 150.0
@@ -1016,6 +1039,8 @@ func update_controls_layout() -> void:
 
 			$SneakBtn.anchor_left = 1.0
 			$SneakBtn.anchor_right = 1.0
+			$SneakBtn.anchor_top = 1.0
+			$SneakBtn.anchor_bottom = 1.0
 			$SneakBtn.offset_left = -150.0
 			$SneakBtn.offset_top = -186.0
 			$SneakBtn.offset_right = -40.0
@@ -1024,6 +1049,8 @@ func update_controls_layout() -> void:
 			if has_node("PebbleBtn"):
 				$PebbleBtn.anchor_left = 0.0
 				$PebbleBtn.anchor_right = 0.0
+				$PebbleBtn.anchor_top = 1.0
+				$PebbleBtn.anchor_bottom = 1.0
 				$PebbleBtn.offset_left = 51.0
 				$PebbleBtn.offset_top = -310.0
 				$PebbleBtn.offset_right = 139.0
@@ -1031,6 +1058,8 @@ func update_controls_layout() -> void:
 		else:
 			$SoundBtn.anchor_left = 1.0
 			$SoundBtn.anchor_right = 1.0
+			$SoundBtn.anchor_top = 1.0
+			$SoundBtn.anchor_bottom = 1.0
 			$SoundBtn.offset_left = -150.0
 			$SoundBtn.offset_top = -186.0
 			$SoundBtn.offset_right = -40.0
@@ -1038,6 +1067,8 @@ func update_controls_layout() -> void:
 
 			$SneakBtn.anchor_left = 0.0
 			$SneakBtn.anchor_right = 0.0
+			$SneakBtn.anchor_top = 1.0
+			$SneakBtn.anchor_bottom = 1.0
 			$SneakBtn.offset_left = 40.0
 			$SneakBtn.offset_top = -186.0
 			$SneakBtn.offset_right = 150.0
@@ -1046,15 +1077,17 @@ func update_controls_layout() -> void:
 			if has_node("PebbleBtn"):
 				$PebbleBtn.anchor_left = 1.0
 				$PebbleBtn.anchor_right = 1.0
+				$PebbleBtn.anchor_top = 1.0
+				$PebbleBtn.anchor_bottom = 1.0
 				$PebbleBtn.offset_left = -139.0
 				$PebbleBtn.offset_top = -310.0
 				$PebbleBtn.offset_right = -51.0
 				$PebbleBtn.offset_bottom = -206.0
 
-	if not GameState.virtual_joystick_enabled and _joystick_active:
-		_deactivate_joystick()
-
-	apply_custom_hud_layout()
+	$SoundBtn.set("base_scale", 1.0)
+	$SneakBtn.set("base_scale", 1.0)
+	if has_node("PebbleBtn"):
+		$PebbleBtn.set("base_scale", 1.0)
 
 
 func apply_custom_hud_layout() -> void:
@@ -1070,13 +1103,9 @@ func apply_custom_hud_layout() -> void:
 	if vp_size.x <= 10.0:
 		vp_size = Vector2(720, 1280)
 
-	# Reset scales and native baselines for untouched buttons
-	if not layout.has("SoundBtn") and has_node("SoundBtn"):
-		$SoundBtn.set("base_scale", 1.0)
-	if not layout.has("SneakBtn") and has_node("SneakBtn"):
-		$SneakBtn.set("base_scale", 1.0)
-	if not layout.has("PebbleBtn") and has_node("PebbleBtn"):
-		$PebbleBtn.set("base_scale", 1.0)
+	# 1. Reset any buttons NOT in custom layout back to their native position & scale!
+	if not layout.has("SoundBtn") or not layout.has("SneakBtn") or not layout.has("PebbleBtn"):
+		_reset_action_buttons_to_native()
 
 	if not layout.has("PauseBtn") and has_node("PauseBtn"):
 		var p: Button = $PauseBtn

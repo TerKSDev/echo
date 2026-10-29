@@ -104,45 +104,33 @@ func _build_streamlined_ui() -> void:
 	menu_btn.custom_minimum_size = Vector2(0, 36)
 	ModalTemplate.style_button(menu_btn, false, ModalTemplate.ThemeKind.SONAR)
 
-	# 2. Reorganize VBox hierarchy:
-	# Index 0: Header (Title, Subtitle, Close)
-	# Index 1: Divider1
-	# Index 2: Primary Actions (Resume, Restart)
+	# 2. Extract MenuBtn from Actions and prepare containers
 	var actions_box := $CenterContainer/Panel/VBox/Actions
-	actions_box.remove_child(menu_btn)
-	vbox.move_child(actions_box, 2)
+	if menu_btn.get_parent() == actions_box:
+		actions_box.remove_child(menu_btn)
 
-	# Index 3: Divider2 (Quick Settings Separator)
 	var div2 := $CenterContainer/Panel/VBox/Divider2
-	vbox.move_child(div2, 3)
 
-	# Index 4: Quick Settings Category Header
+	# Quick Settings Category Header
 	var quick_lbl := Label.new()
 	quick_lbl.text = "QUICK SYSTEM & CONTROLS"
 	quick_lbl.add_theme_color_override("font_color", Color(0.35, 0.78, 1.0, 0.95))
 	quick_lbl.add_theme_font_size_override("font_size", 11)
-	vbox.add_child(quick_lbl)
-	vbox.move_child(quick_lbl, 4)
 
-	# Index 5: Master Volume Header (Title + %)
+	# Volume Header & Slider
 	var vol_hdr := $CenterContainer/Panel/VBox/VolumeHeader
-	vbox.move_child(vol_hdr, 5)
-
-	# Index 6: Volume Slider Row
 	var vol_row := $CenterContainer/Panel/VBox/VolumeRow
-	vbox.move_child(vol_row, 6)
 	ModalTemplate.style_slider(volume_slider, ModalTemplate.ThemeKind.SONAR)
 
-	# Index 7: Microphone Row
+	# Microphone Row
 	var mic_row := $CenterContainer/Panel/VBox/MicRow
 	var mic_lbl := mic_row.get_node_or_null("MicLabel") as Label
 	if mic_lbl != null:
 		mic_lbl.text = "ACOUSTIC SENSOR"
 	mic_toggle.custom_minimum_size = Vector2(130, 32)
 	mic_toggle.theme = close_btn.theme
-	vbox.move_child(mic_row, 7)
 
-	# Index 8: Movement Scheme Row (Joystick vs Drag & Tap)
+	# Movement Scheme Row (Joystick vs Drag & Tap)
 	var scheme_row := HBoxContainer.new()
 	var scheme_lbl := Label.new()
 	scheme_lbl.text = "MOVEMENT SCHEME"
@@ -166,10 +154,8 @@ func _build_streamlined_ui() -> void:
 			hud.update_controls_layout()
 	)
 	scheme_row.add_child(_scheme_btn)
-	vbox.add_child(scheme_row)
-	vbox.move_child(scheme_row, 8)
 
-	# Index 9: Action Buttons Position (Right vs Left handedness)
+	# Action Buttons Position (Right vs Left handedness)
 	var layout_row := HBoxContainer.new()
 	var layout_lbl := Label.new()
 	layout_lbl.text = "ACTION BUTTONS SIDE"
@@ -193,10 +179,8 @@ func _build_streamlined_ui() -> void:
 			hud.update_controls_layout()
 	)
 	layout_row.add_child(_layout_btn)
-	vbox.add_child(layout_row)
-	vbox.move_child(layout_row, 9)
 
-	# Custom HUD Layout Row
+	# Custom HUD Layout Row (In the settings block, strictly ABOVE Level Select!)
 	var custom_row := HBoxContainer.new()
 	var custom_lbl := Label.new()
 	custom_lbl.text = "HUD LAYOUT & BUTTONS"
@@ -212,32 +196,55 @@ func _build_streamlined_ui() -> void:
 	custom_btn.theme = close_btn.theme
 	custom_btn.add_theme_font_size_override("font_size", 12)
 	ModalTemplate.style_button(custom_btn, false, ModalTemplate.ThemeKind.SONAR)
-	custom_btn.pressed.connect(func():
-		close()
-		HudLayoutCustomizer.open(get_tree().root)
-	)
+	custom_btn.pressed.connect(_open_customizer)
 	custom_row.add_child(custom_btn)
-	vbox.add_child(custom_row)
-	vbox.move_child(custom_row, 10)
 
-	# Index 11: Divider3
+	# Divider 3 (Separates settings block from the Abandon / Level Select button)
 	var div3 := ColorRect.new()
 	div3.custom_minimum_size = Vector2(0, 1)
 	div3.color = Color(0.2, 0.45, 0.7, 0.35)
-	vbox.add_child(div3)
-	vbox.move_child(div3, 10)
 
-	# Index 11: Abandon / Level Select
-	vbox.add_child(menu_btn)
-	vbox.move_child(menu_btn, 11)
-
-	# Index 12: Footer hint
+	# Footer hint
 	var hint := Label.new()
 	hint.text = "FULL AUDIO & CALIBRATION SETTINGS IN MAIN MENU"
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint.add_theme_color_override("font_color", Color(0.35, 0.55, 0.75, 0.55))
 	hint.add_theme_font_size_override("font_size", 10)
-	vbox.add_child(hint)
+
+	# Explicitly organize children in exact sequential order:
+	var ordered_children: Array[Node] = [
+		$CenterContainer/Panel/VBox/Header,
+		$CenterContainer/Panel/VBox/Divider1,
+		actions_box,
+		div2,
+		quick_lbl,
+		vol_hdr,
+		vol_row,
+		mic_row,
+		scheme_row,
+		layout_row,
+		custom_row,
+		div3,
+		menu_btn,
+		hint
+	]
+
+	for i in range(ordered_children.size()):
+		var child: Node = ordered_children[i]
+		if child.get_parent() != vbox:
+			vbox.add_child(child)
+		vbox.move_child(child, i)
+
+
+func _open_customizer() -> void:
+	# Hide SettingsModal while keeping the level paused!
+	visible = false
+	_is_open = false
+	var customizer := HudLayoutCustomizer.open(get_tree().root)
+	customizer.closed.connect(func():
+		# When returning from Customizer, re-open pause menu (still paused!)
+		open()
+	)
 
 
 func _get_mic() -> MicInput:

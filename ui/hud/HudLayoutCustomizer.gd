@@ -53,6 +53,10 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	mouse_filter = Control.MOUSE_FILTER_STOP
 
+	# Ensure gameplay level remains paused during customization
+	if get_tree().get_first_node_in_group("player") != null:
+		get_tree().paused = true
+
 	# 1. Fully opaque dark blueprint backdrop (100% covers settings & game scenes)
 	var dimmer := ColorRect.new()
 	dimmer.color = Color(0.012, 0.022, 0.040, 1.0)

@@ -75,16 +75,13 @@ func _process(delta: float) -> void:
 
 
 static func open_modal(parent: Node) -> Control:
-	var existing = parent.get_node_or_null("IntelModal")
-	if existing != null:
-		existing.open()
-		return existing
-	var script: GDScript = load("res://ui/modals/IntelModal.gd") as GDScript
-	var modal := script.new() as Control
-	modal.name = "IntelModal"
-	parent.add_child(modal)
-	modal.open()
-	return modal
+	var from_path := ""
+	if parent != null and parent.is_inside_tree():
+		var cur := parent.get_tree().current_scene
+		if cur != null:
+			from_path = cur.scene_file_path
+	GameState.go_to_intel(from_path, 0)
+	return null
 
 
 func open() -> void:
