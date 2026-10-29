@@ -149,6 +149,8 @@ var has_seen_intro := false
 var story_tutorial_completed := false
 var force_level_0_story := false
 var challenge_sp_revealed := false
+var pending_challenge_unlock_modal := false
+var pending_sp_king_sector_cinematic := false
 var seen_act_milestones: Dictionary = {}
 var seen_campaign_endings: Dictionary = {}
 
@@ -762,11 +764,13 @@ var bgm_volume := 0.8
 var sfx_volume := 1.0
 
 # Microphone Settings
+const ANDROID_RECORD_AUDIO_PERMISSION := "android.permission.RECORD_AUDIO"
 var mic_enabled := true
 var mic_sensitivity := 0.5        # 0.0 (low/strict) .. 1.0 (high/sensitive)
 var mic_noise_floor_db := -48.0   # Calibrated ambient floor in dB
 var mic_calibrated := false
 var mic_push_to_talk := false
+var mic_permission_prompted := false
 
 # Gameplay & Controls Settings
 var sneak_hold_mode := false      # false = Toggle Sneak, true = Hold to Sneak
@@ -894,6 +898,57 @@ func get_mic_trigger_db() -> float:
 	return clampf(maxf(target_db, min_allowed_db), -34.0, -4.0)
 
 
+func is_mic_permission_granted() -> bool:
+	if OS.get_name() != "Android":
+		return true
+	return ANDROID_RECORD_AUDIO_PERMISSION in OS.get_granted_permissions()
+
+
+func request_mic_permission(on_complete: Callable = Callable()) -> void:
+	if OS.get_name() != "Android":
+		mic_enabled = true
+		save_settings()
+		if on_complete.is_valid():
+			on_complete.call(true)
+		return
+
+	if is_mic_permission_granted():
+		mic_enabled = true
+		save_settings()
+		if on_complete.is_valid():
+			on_complete.call(true)
+		return
+
+	mic_permission_prompted = true
+	var on_res: Callable
+	on_res = func(permission: String, granted: bool) -> void:
+		if permission != ANDROID_RECORD_AUDIO_PERMISSION:
+			return
+		if get_tree().on_request_permissions_result.is_connected(on_res):
+			get_tree().on_request_permissions_result.disconnect(on_res)
+		mic_enabled = granted
+		save_settings()
+		if on_complete.is_valid():
+			on_complete.call(granted)
+
+	if not get_tree().on_request_permissions_result.is_connected(on_res):
+		get_tree().on_request_permissions_result.connect(on_res)
+
+	OS.request_permissions()
+
+	# Safety fallback in case OS permission dialog is dismissed without signal
+	var safety_timer := get_tree().create_timer(10.0)
+	safety_timer.timeout.connect(func():
+		if get_tree().on_request_permissions_result.is_connected(on_res):
+			get_tree().on_request_permissions_result.disconnect(on_res)
+			var currently_granted: bool = is_mic_permission_granted()
+			mic_enabled = currently_granted
+			save_settings()
+			if on_complete.is_valid():
+				on_complete.call(currently_granted)
+	)
+
+
 func apply_display_settings() -> void:
 	if fullscreen_enabled:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN)
@@ -928,6 +983,7 @@ func save_settings() -> void:
 	cfg.set_value("mic", "noise_floor_db", mic_noise_floor_db)
 	cfg.set_value("mic", "calibrated", mic_calibrated)
 	cfg.set_value("mic", "push_to_talk", mic_push_to_talk)
+	cfg.set_value("mic", "permission_prompted", mic_permission_prompted)
 
 	cfg.set_value("controls", "sneak_hold_mode", sneak_hold_mode)
 	cfg.set_value("controls", "fast_pulse_mode", fast_pulse_mode)
@@ -965,6 +1021,10 @@ func load_settings() -> void:
 	mic_noise_floor_db = clampf(float(cfg.get_value("mic", "noise_floor_db", -48.0)), -54.0, -34.0)
 	mic_calibrated = (cfg.get_value("mic", "calibrated", false) == true)
 	mic_push_to_talk = (cfg.get_value("mic", "push_to_talk", false) == true)
+	mic_permission_prompted = (cfg.get_value("mic", "permission_prompted", false) == true)
+
+	if OS.get_name() == "Android" and not is_mic_permission_granted():
+		mic_enabled = false
 
 	sneak_hold_mode = (cfg.get_value("controls", "sneak_hold_mode", false) == true)
 	fast_pulse_mode = (cfg.get_value("controls", "fast_pulse_mode", false) == true)
@@ -1190,7 +1250,7 @@ func reset_to_defaults() -> void:
 	master_volume = 1.0
 	bgm_volume = 0.8
 	sfx_volume = 1.0
-	mic_enabled = true
+	mic_enabled = is_mic_permission_granted() if OS.get_name() == "Android" else true
 	mic_sensitivity = 0.5
 	mic_push_to_talk = false
 	sneak_hold_mode = false
@@ -1326,6 +1386,14 @@ func mark_challenge_sp_revealed() -> void:
 		cfg.save(PROGRESS_PATH)
 
 
+func set_pending_challenge_unlock_modal(val: bool) -> void:
+	pending_challenge_unlock_modal = val
+	var cfg := ConfigFile.new()
+	if cfg.load(PROGRESS_PATH) == OK:
+		cfg.set_value("progress", "pending_challenge_unlock_modal", val)
+		cfg.save(PROGRESS_PATH)
+
+
 func restart_challenge_from_first_sector() -> void:
 	reset_challenge_run()
 	start_game(0)
@@ -1395,6 +1463,7 @@ func load_progress() -> void:
 	has_seen_intro = (cfg.get_value("progress", "has_seen_intro", false) == true)
 	story_tutorial_completed = (cfg.get_value("progress", "story_tutorial_completed", story_highest_unlocked > 1) == true)
 	challenge_sp_revealed = (cfg.get_value("progress", "challenge_sp_revealed", false) == true)
+	pending_challenge_unlock_modal = (cfg.get_value("progress", "pending_challenge_unlock_modal", false) == true)
 
 	var max_entries := maxi(STORY_LEVELS.size(), CHALLENGE_LEVELS.size()) + 2
 	for i in range(1, max_entries + 1):

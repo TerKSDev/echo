@@ -195,7 +195,8 @@ func _ready() -> void:
 	listener.make_current()
 
 	mic.voice_detected.connect(make_voice_sound)
-	mic.start()
+	if GameState.mic_enabled and GameState.is_mic_permission_granted():
+		mic.start()
 	reset_for_level()
 
 
@@ -380,10 +381,18 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	# Quick Mic Mute hotkey [M]
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_M:
-		GameState.mic_enabled = not GameState.mic_enabled
-		GameState.save_settings()
-		if mic != null:
-			mic.enabled = GameState.mic_enabled
+		if not GameState.mic_enabled:
+			if GameState.is_mic_permission_granted():
+				GameState.mic_enabled = true
+				GameState.save_settings()
+				if mic != null:
+					mic.enabled = true
+					mic.start()
+		else:
+			GameState.mic_enabled = false
+			GameState.save_settings()
+			if mic != null:
+				mic.enabled = false
 
 	# Hotkey [B]: Toggle Blind Assist Mode on the fly with audio chime confirmation
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_B:

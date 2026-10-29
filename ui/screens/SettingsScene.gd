@@ -302,25 +302,29 @@ func _defer_init_menu_mic() -> void:
 	await get_tree().create_timer(0.32).timeout
 	if not is_inside_tree():
 		return
-	if GameState.mic_enabled:
+	if GameState.mic_enabled and GameState.is_mic_permission_granted():
 		ensure_menu_mic()
 
 
 func ensure_menu_mic() -> MicInput:
+	if not GameState.mic_enabled or not GameState.is_mic_permission_granted():
+		return null
 	if _menu_mic == null:
 		_init_menu_mic()
-	elif GameState.mic_enabled and not _menu_mic.enabled:
+	elif not _menu_mic.enabled:
 		_menu_mic.enabled = true
 		_menu_mic.start()
 	return _menu_mic
 
 
 func _init_menu_mic() -> void:
+	if not GameState.mic_enabled or not GameState.is_mic_permission_granted():
+		return
 	if _menu_mic == null:
 		_menu_mic = MicInput.new()
 		add_child(_menu_mic)
 		_menu_mic.calibration_finished.connect(_on_mic_calibration_finished)
-	if GameState.mic_enabled and not _menu_mic.enabled:
+	if not _menu_mic.enabled:
 		_menu_mic.start()
 
 
@@ -345,13 +349,14 @@ func _process(delta: float) -> void:
 	# Process active mic visualizer meter in General Tab
 	if _current_tab == 0 and _meter_canvas != null and is_instance_valid(_meter_canvas):
 		_meter_canvas.queue_redraw()
-		if _calib_btn != null and is_instance_valid(_calib_btn) and _menu_mic != null and is_instance_valid(_menu_mic):
-			if _menu_mic.is_calibrating():
+		if _calib_btn != null and is_instance_valid(_calib_btn):
+			var mic_active: bool = GameState.mic_enabled and GameState.is_mic_permission_granted()
+			if _menu_mic != null and is_instance_valid(_menu_mic) and _menu_mic.is_calibrating():
 				_calib_btn.text = "SAMPLING..."
 				_calib_btn.disabled = true
 			else:
 				_calib_btn.text = "CALIBRATE ROOM"
-				_calib_btn.disabled = not GameState.mic_enabled
+				_calib_btn.disabled = not mic_active
 
 	# Ambient sonar ripples
 	_ambient_wave_timer -= delta
@@ -426,7 +431,7 @@ func _draw_menu_mic_meter(canvas: Control) -> void:
 	canvas.draw_rect(Rect2(0, 0, w, h), Color(0.18, 0.38, 0.58, 0.65), false, 1.0)
 
 	var cur_db := -60.0
-	if _menu_mic != null and GameState.mic_enabled:
+	if _menu_mic != null and GameState.mic_enabled and GameState.is_mic_permission_granted():
 		if _menu_mic.has_method("get_current_db"):
 			cur_db = _menu_mic.get_current_db()
 		elif "level_db" in _menu_mic:

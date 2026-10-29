@@ -1500,6 +1500,59 @@ static func get_challenge_bgm_pad() -> AudioStreamWAV:
 	return wav
 
 
+# Seamless 8-second intense, suspenseful abyssal tension ostinato for King Sector reveal.
+# Features a visceral rhythmic subterranean heartbeat, sinister Phrygian contrabass ostinato,
+# tritone tremolo shimmer, and low-frequency abyss pressure swells.
+static func get_king_sector_tension_bgm() -> AudioStreamWAV:
+	if _cache.has("king_sector_tension_bgm"):
+		return _cache["king_sector_tension_bgm"]
+	var dur := 8.0
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+
+	# 4-note sinister contrabass progression (2.0s per bar): D1 -> Eb1 -> Ab1 -> A1
+	var bass_notes: Array[float] = [36.71, 38.89, 51.91, 55.00]
+
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+
+		# 1. Visceral subterranean double heartbeat ("lub-dub" at 60 BPM, 8 cycles in 8s)
+		var beat_cycle: float = fmod(t, 1.0)
+		var heartbeat := 0.0
+		# Beat 1 (lub)
+		if beat_cycle < 0.20:
+			var dt1: float = beat_cycle
+			var env1: float = minf(dt1 / 0.015, 1.0) * exp(-dt1 * 22.0)
+			var f1: float = lerpf(58.0, 32.0, dt1 / 0.20)
+			heartbeat += sin(TAU * f1 * dt1) * env1 * 0.72
+		# Beat 2 (dub)
+		if beat_cycle >= 0.22 and beat_cycle < 0.44:
+			var dt2: float = beat_cycle - 0.22
+			var env2: float = minf(dt2 / 0.018, 1.0) * exp(-dt2 * 20.0)
+			var f2: float = lerpf(52.0, 28.0, dt2 / 0.22)
+			heartbeat += sin(TAU * f2 * dt2) * env2 * 0.58
+
+		# 2. Heavy sinister contrabass ostinato
+		var bar_idx: int = clampi(int(t / 2.0), 0, 3)
+		var bass_f: float = bass_notes[bar_idx]
+		var bass_drone: float = (sin(TAU * bass_f * t) + 0.35 * sin(TAU * bass_f * 2.0 * t)) * 0.34
+
+		# 3. Chilling tritone tremolo (F4 = 349.2 Hz + B4 = 493.9 Hz, 10 Hz anxiety tremolo)
+		var tremolo: float = 0.5 + 0.5 * sin(TAU * 10.0 * t)
+		var tritone: float = (sin(TAU * 349.23 * t) * 0.04 + sin(TAU * 493.88 * t) * 0.035) * tremolo
+
+		# 4. Abyssal tectonic breath swell
+		var breath: float = (0.5 + 0.5 * sin(TAU * 0.25 * t - PI * 0.5)) * sin(TAU * 24.5 * t) * 0.22
+
+		# Combine and soft-clip with tanh saturation
+		out[i] = tanh((heartbeat + bass_drone + tritone + breath) * 1.35) * 0.82
+
+	var wav: AudioStreamWAV = _make_wav(out, true)
+	_cache["king_sector_tension_bgm"] = wav
+	return wav
+
+
 # Procedural turbine vortex surge sound for Challenge Mode reset (progressive slow-to-fast spin-up).
 static func get_abyss_vortex_sfx() -> AudioStreamWAV:
 	if _cache.has("abyss_vortex_sfx"):
@@ -1588,4 +1641,190 @@ func _synth_pact_reroll() -> AudioStreamWAV:
 		out[i] = clampf((sweep + tick) * env * 0.85, -1.0, 1.0)
 	var wav := _make_wav(out)
 	_cache["pact_reroll"] = wav
+	return wav
+
+
+# --- Surface Dawn & Sunlight Ending Audio -----------------------------------
+
+# Seamless 24-second warm, uplifted major chord progression with lyrical acoustic melody
+# for Surface Dawn and End Credits. Features lush Cmaj9 -> G -> Am9 -> Fmaj7 progression
+# with crystalline piano/celesta morning melody and zero ocean wave noise.
+static func get_surface_dawn_bgm_pad() -> AudioStreamWAV:
+	if _cache.has("surface_dawn_bgm_pad_v2"):
+		return _cache["surface_dawn_bgm_pad_v2"]
+	var dur := 24.0
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+
+	# 1. Chords & Bass Progression (8 bars, 3.0s each)
+	var chords: Array[Array] = [
+		[[65.41, 0.28], [130.81, 0.16], [196.00, 0.14], [329.63, 0.12], [493.88, 0.08]],
+		[[98.00, 0.26], [146.83, 0.15], [246.94, 0.13], [293.66, 0.12], [392.00, 0.08]],
+		[[55.00, 0.28], [110.00, 0.16], [164.81, 0.14], [261.63, 0.12], [392.00, 0.08]],
+		[[43.65, 0.28], [87.31,  0.16], [130.81, 0.14], [220.00, 0.12], [329.63, 0.08]],
+		[[65.41, 0.28], [130.81, 0.16], [164.81, 0.14], [196.00, 0.12], [293.66, 0.08]],
+		[[82.41, 0.26], [123.47, 0.15], [196.00, 0.13], [293.66, 0.12], [392.00, 0.08]],
+		[[87.31, 0.28], [130.81, 0.16], [196.00, 0.14], [220.00, 0.12], [261.63, 0.08]],
+		[[98.00, 0.26], [146.83, 0.15], [246.94, 0.14], [293.66, 0.12], [392.00, 0.08]]
+	]
+
+	# Render smooth crossfaded pad chords
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var bar_f: float = (t / 3.0)
+		var bar_idx: int = int(bar_f) % 8
+		var next_bar: int = (bar_idx + 1) % 8
+		var frac: float = bar_f - float(int(bar_f))
+		# Raised cosine crossfade between chords
+		var w_curr: float = 0.5 + 0.5 * cos(frac * PI)
+		var w_next: float = 1.0 - w_curr
+
+		var pad_val := 0.0
+		# Current chord
+		for pair in chords[bar_idx]:
+			var freq: float = pair[0]
+			var gain: float = pair[1]
+			# Slight binaural detune for lush analog chorus
+			pad_val += (sin(TAU * freq * t) + 0.35 * sin(TAU * (freq + 0.15) * t)) * gain * w_curr
+
+		# Next chord crossfade
+		for pair in chords[next_bar]:
+			var freq: float = pair[0]
+			var gain: float = pair[1]
+			pad_val += (sin(TAU * freq * t) + 0.35 * sin(TAU * (freq + 0.15) * t)) * gain * w_next
+
+		out[i] = pad_val * 0.42
+
+	# 2. Singing Lyrical Celesta / Acoustic Piano Melody
+	# [start_time_sec, note_freq, gain]
+	var melody_notes: Array[Array] = [
+		# Bar 0 (Cmaj9)
+		[0.35, 392.00, 0.85], # G4
+		[1.15, 523.25, 0.95], # C5
+		[1.95, 587.33, 0.90], # D5
+		# Bar 1 (G)
+		[3.35, 659.25, 1.00], # E5 (soaring sunrise apex)
+		[4.35, 587.33, 0.85], # D5
+		[5.15, 493.88, 0.80], # B4
+		# Bar 2 (Am9)
+		[6.35, 523.25, 0.90], # C5
+		[7.35, 440.00, 0.85], # A4
+		[8.15, 392.00, 0.80], # G4
+		# Bar 3 (Fmaj7)
+		[9.35, 440.00, 0.85], # A4
+		[10.15, 523.25, 0.90], # C5
+		[10.95, 659.25, 0.95], # E5
+		# Bar 4 (C)
+		[12.35, 783.99, 1.05], # G5 (apex celebration of daylight!)
+		[13.35, 659.25, 0.85], # E5
+		[14.15, 587.33, 0.80], # D5
+		# Bar 5 (Em7)
+		[15.35, 493.88, 0.85], # B4
+		[16.35, 392.00, 0.80], # G4
+		[17.15, 440.00, 0.85], # A4
+		# Bar 6 (Fadd9)
+		[18.35, 523.25, 0.90], # C5
+		[19.15, 587.33, 0.90], # D5
+		[20.15, 659.25, 0.95], # E5
+		# Bar 7 (Gsus4 -> G -> C)
+		[21.35, 587.33, 0.90], # D5
+		[22.15, 493.88, 0.80], # B4
+		[22.95, 523.25, 1.00]  # C5 (tender resolution looping back)
+	]
+
+	# Render each melody note with acoustic bell/piano harmonics and 2-tap delay
+	var note_dur := 2.6
+	var note_samples := int(note_dur * MIX_RATE)
+	var delays: Array[float] = [0.0, 0.32, 0.64]
+	var delay_gains: Array[float] = [1.0, 0.28, 0.10]
+
+	for note in melody_notes:
+		var start_t: float = note[0]
+		var f: float = note[1]
+		var base_gain: float = note[2]
+		var start_idx := int(start_t * MIX_RATE)
+
+		for tap in 3:
+			var tap_offset := int(delays[tap] * MIX_RATE)
+			var tap_gain: float = base_gain * delay_gains[tap]
+			for s in note_samples:
+				var t_rel: float = float(s) / MIX_RATE
+				var att: float = minf(t_rel / 0.012, 1.0)
+				var env: float = att * exp(-t_rel * 2.2)
+				# Harmonics: fundamental + bell sparkle (octave + 12th)
+				var body: float = sin(TAU * f * t_rel)
+				var oct: float = sin(TAU * (f * 2.0) * t_rel) * 0.30 * exp(-t_rel * 4.0)
+				var bell: float = sin(TAU * (f * 3.0) * t_rel) * 0.12 * exp(-t_rel * 6.5)
+				var val: float = (body + oct + bell) * env * tap_gain * 0.18
+
+				var target_idx: int = (start_idx + tap_offset + s) % count
+				out[target_idx] += val
+
+	# Smooth analog warmth compression
+	for i in count:
+		out[i] = tanh(out[i] * 1.35) * 0.82
+
+	var wav: AudioStreamWAV = _make_wav(out, true)
+	_cache["surface_dawn_bgm_pad_v2"] = wav
+	return wav
+
+
+# Natural procedural morning birdsong with organic pitch sweeps and musical trills.
+static func get_birdsong_sfx() -> AudioStreamWAV:
+	if _cache.has("birdsong_sfx"):
+		return _cache["birdsong_sfx"]
+	var dur := 0.85
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var s := 0.0
+		# Chirp 1 (0.00 ~ 0.20s): swift soaring chirp
+		if t < 0.20:
+			var p: float = t / 0.20
+			var env: float = sin(p * PI) * exp(-p * 1.5)
+			var f: float = lerpf(2800.0, 3950.0, pow(p, 0.75)) + sin(TAU * 55.0 * t) * 80.0
+			s += sin(TAU * f * t) * env * 0.45
+		# Chirp 2 (0.26 ~ 0.48s): double warble
+		elif t >= 0.26 and t < 0.48:
+			var dt: float = t - 0.26
+			var p: float = dt / 0.22
+			var env: float = sin(p * PI)
+			var f: float = 3600.0 + sin(TAU * 26.0 * dt) * 580.0
+			s += (sin(TAU * f * dt) + 0.25 * sin(TAU * f * 2.0 * dt)) * env * 0.48
+		# Chirp 3 (0.54 ~ 0.82s): delicate melodic descent
+		elif t >= 0.54 and t < 0.82:
+			var dt: float = t - 0.54
+			var p: float = dt / 0.28
+			var env: float = sin(p * PI) * exp(-p * 1.2)
+			var f: float = lerpf(4200.0, 3100.0, p) + sin(TAU * 40.0 * dt) * 60.0
+			s += sin(TAU * f * dt) * env * 0.40
+		out[i] = clampf(s * 0.88, -1.0, 1.0)
+	var wav: AudioStreamWAV = _make_wav(out)
+	_cache["birdsong_sfx"] = wav
+	return wav
+
+
+# Soft tranquil surface breeze / gentle wind whisper loop
+static func get_surface_breeze_sfx() -> AudioStreamWAV:
+	if _cache.has("surface_breeze_sfx"):
+		return _cache["surface_breeze_sfx"]
+	var dur := 4.0
+	var count := int(dur * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	var lp := 0.0
+	var lp2 := 0.0
+	for i in count:
+		var t: float = float(i) / MIX_RATE
+		var lfo_wind: float = 0.55 + 0.45 * sin(TAU * 0.25 * t)
+		var raw_n: float = randf_range(-1.0, 1.0)
+		lp = lerpf(lp, raw_n, 0.035 * lfo_wind)
+		lp2 = lerpf(lp2, lp, 0.025)
+		var air: float = (lp - lp2) * 2.8 * lfo_wind
+		out[i] = clampf(air * 0.22, -1.0, 1.0)
+	var wav: AudioStreamWAV = _make_wav(out, true)
+	_cache["surface_breeze_sfx"] = wav
 	return wav

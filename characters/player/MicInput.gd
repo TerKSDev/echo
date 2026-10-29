@@ -40,24 +40,15 @@ func _ready() -> void:
 
 
 func start() -> void:
+	if not GameState.mic_enabled:
+		enabled = false
+		return
+	if OS.get_name() == "Android" and not GameState.is_mic_permission_granted():
+		enabled = false
+		return
 	if enabled:
 		return
-	if OS.get_name() == "Android" and not PERMISSION in OS.get_granted_permissions():
-		if not get_tree().on_request_permissions_result.is_connected(_on_permission_result):
-			get_tree().on_request_permissions_result.connect(_on_permission_result)
-		OS.request_permissions()
-	else:
-		_setup()
-
-
-func _on_permission_result(permission: String, granted: bool) -> void:
-	if permission != PERMISSION:
-		return
-	get_tree().on_request_permissions_result.disconnect(_on_permission_result)
-	if granted:
-		_setup()
-	else:
-		print("Microphone permission denied. Only button press detection will work.")
+	_setup()
 
 
 func _setup() -> void:

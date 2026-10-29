@@ -30,6 +30,7 @@ var _wav_start: AudioStreamWAV
 
 
 func _ready() -> void:
+	_setup_main_background()
 	_build_ui_audio()
 	GameState.start_menu_bgm()
 	_init_spores()
@@ -42,6 +43,23 @@ func _ready() -> void:
 		touch_area.pressed.connect(_on_touch_area_pressed)
 
 	_build_modal_shell()
+
+
+func _setup_main_background() -> void:
+	var bg_node := get_node_or_null("Background") as TextureRect
+	if bg_node != null:
+		var tex: Texture2D = null
+		if ResourceLoader.exists("res://assets/bg_cave_abyss.jpg"):
+			tex = load("res://assets/bg_cave_abyss.jpg")
+		if tex == null:
+			var global_path := ProjectSettings.globalize_path("res://assets/bg_cave_abyss.jpg")
+			var img := Image.new()
+			if img.load(global_path) == OK:
+				tex = ImageTexture.create_from_image(img)
+		if tex != null:
+			bg_node.texture = tex
+			bg_node.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			bg_node.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 
 
 func _process(delta: float) -> void:
@@ -231,26 +249,28 @@ func _on_start_pressed() -> void:
 
 
 func _on_credits_pressed() -> void:
-	_open_modal("CREDITS & ETHOS", "ECHO: STAY SILENT")
+	if _is_modal_open or _descending:
+		return
+	_play_ui_sound(_wav_click, -4.0, 1.0)
 
-	var desc := Label.new()
-	desc.text = "An atmospheric acoustic stealth survival experience.\nNavigate the abyss using only sound waves—where every echo illuminates the path, yet beckons what lurks in the dark."
-	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	desc.add_theme_color_override("font_color", Color(0.72, 0.86, 0.98, 0.9))
-	desc.add_theme_font_size_override("font_size", 13)
-	_modal_body.add_child(desc)
+	# Smoothly dim the main menu into pure darkness before rolling credits
+	var curtain := ColorRect.new()
+	curtain.set_anchors_preset(Control.PRESET_FULL_RECT)
+	curtain.color = Color(0.01, 0.015, 0.025, 0.0)
+	curtain.mouse_filter = Control.MOUSE_FILTER_STOP
+	curtain.z_index = 350
+	add_child(curtain)
 
-	_add_divider()
-	_add_guide_row(Color(0.35, 0.95, 0.75), "CORE ETHOS", "Zero weapons, zero violence. A journey of overcoming inner panic and finding clarity in darkness.")
-	_add_guide_row(Color(0.35, 0.95, 0.75), "BLIND ACCESSIBILITY", "3D spatial exit beacons, acoustic wall reflection echoes, and obstacle proximity feelers enable full gameplay without sight.")
-	_add_guide_row(Color(1.0, 0.78, 0.28), "DEAF ACCESSIBILITY", "Visualized acoustic waves enable full competitive play for hearing-impaired players in pure silence.")
-
-	_add_divider()
-	_add_guide_row(Color(0.38, 0.88, 1.0), "GAME DESIGN", "Team ECHO")
-	_add_guide_row(Color(0.38, 0.88, 1.0), "SYSTEMS & AI", "Team ECHO")
-	_add_guide_row(Color(0.38, 0.88, 1.0), "LEVEL DESIGN", "20 Cavern Sectors + SP by Team")
-	_add_guide_row(Color(0.38, 0.88, 1.0), "AUDIO ENGINE", "Procedural Acoustic Synthesizer")
+	var tw := create_tween()
+	tw.tween_property(curtain, "color:a", 1.0, 0.6).set_trans(Tween.TRANS_SINE)
+	tw.tween_callback(func():
+		var on_credits_done := func():
+			# Fade back into menu smoothly
+			var in_tw := create_tween()
+			in_tw.tween_property(curtain, "color:a", 0.0, 0.8).set_trans(Tween.TRANS_SINE)
+			in_tw.tween_callback(curtain.queue_free)
+		EndCreditsRoll.show_credits(self, on_credits_done, false)
+	)
 
 
 # --- Reusable Frosted-Glass Modal System -------------------------------------

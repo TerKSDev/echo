@@ -952,23 +952,33 @@ func _play_level_clear_sequence() -> void:
 
 func _play_story_clear_sequence(cur_sector: int, debrief_data: Dictionary) -> void:
 	var is_final_level: bool = not GameState.has_next_level()
-	var story_lines: Array = []
 	if is_final_level:
+		# Only play the grand first-person ending cutscene on the FIRST completion (or after a reset).
+		# Subsequent clears of Level 20 display the debrief evaluation screen normally like other levels.
 		if not GameState.has_seen_campaign_ending("story"):
-			story_lines = GameState.get_campaign_ending_lines()
+			GameState.complete_level(cur_sector + 1)
+			GameState.set_pending_challenge_unlock_modal(true)
 			GameState.mark_campaign_ending_seen("story")
-	else:
-		if not GameState.has_seen_act_milestone(cur_sector):
-			story_lines = GameState.get_sector_story_lines(cur_sector)
-			GameState.mark_act_milestone_seen(cur_sector)
+			var cutscene_parent: Node = hud
+			if cutscene_parent == null:
+				cutscene_parent = self
+			EndingCutscene.start_ending(cutscene_parent)
+			return
+		else:
+			_show_story_debrief_modal(debrief_data, true)
+			return
+
+	var story_lines: Array = []
+	if not GameState.has_seen_act_milestone(cur_sector):
+		story_lines = GameState.get_sector_story_lines(cur_sector)
+		GameState.mark_act_milestone_seen(cur_sector)
 
 	if story_lines.size() > 0 and hud != null and hud.story_overlay != null:
-		var theme_mode := "daylight" if is_final_level else ""
 		var on_story_finished := func():
-			_show_story_debrief_modal(debrief_data, is_final_level)
-		hud.story_overlay.play_sequence(story_lines, on_story_finished, true, "", theme_mode, 0.95)
+			_show_story_debrief_modal(debrief_data, false)
+		hud.story_overlay.play_sequence(story_lines, on_story_finished, true, "", "", 0.95)
 	else:
-		_show_story_debrief_modal(debrief_data, is_final_level)
+		_show_story_debrief_modal(debrief_data, false)
 
 
 func _show_story_debrief_modal(debrief_data: Dictionary, is_final_level: bool) -> void:
@@ -1001,7 +1011,7 @@ func _on_challenge_clear_next(cur_sector: int) -> void:
 	_proceed_challenge_after_pact(cur_sector)
 
 
-func _proceed_challenge_after_pact(_cur_sector: int) -> void:
+func _proceed_challenge_after_pact(cur_sector: int) -> void:
 	if not GameState.has_next_level():
 		var total_t: float = GameState.get_total_challenge_time()
 		if total_t > 0.0:
@@ -1018,6 +1028,26 @@ func _proceed_challenge_after_pact(_cur_sector: int) -> void:
 			hud.story_overlay.play_sequence(ending_lines, on_chal_victory, true, end_hdr, end_theme, 0.8)
 		else:
 			hud.show_victory_screen()
+	elif cur_sector == 19:
+		# Player cleared Sector 20 and sealed pact: trigger King Sector entrance cinematic
+		GameState.challenge_highest_unlocked = maxi(GameState.challenge_highest_unlocked, 21)
+		GameState.current_mode = GameState.GameMode.CHALLENGE
+		GameState.pending_sp_king_sector_cinematic = true
+		var cfg := ConfigFile.new()
+		if cfg.load(GameState.PROGRESS_PATH) == OK:
+			cfg.set_value("progress", "challenge_highest_unlocked", GameState.challenge_highest_unlocked)
+			cfg.save(GameState.PROGRESS_PATH)
+
+		var curtain := _create_blackout_curtain()
+		curtain.modulate.a = 0.0
+		curtain.mouse_filter = Control.MOUSE_FILTER_STOP
+		var tw := create_tween()
+		tw.set_parallel(true)
+		tw.tween_property(curtain, "modulate:a", 1.0, 1.4).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		GameState.stop_menu_bgm(1.2)
+		tw.chain().tween_callback(func():
+			GameState.transition_to_scene(GameState.LEVEL_SELECT_SCENE, 0.05, 0.05)
+		)
 	else:
 		if hud != null:
 			var on_exit_done := func():

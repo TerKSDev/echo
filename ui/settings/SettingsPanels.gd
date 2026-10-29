@@ -153,7 +153,7 @@ static func build_general_panel(scene: Control) -> VBoxContainer:
 	calib_container.add_child(hint_lbl)
 
 	var update_mic_deps := func() -> void:
-		var mic_active: bool = GameState.mic_enabled
+		var mic_active: bool = GameState.mic_enabled and GameState.is_mic_permission_granted()
 		SettingsUIFactory.set_slider_row_enabled(mic_sens_row, mic_active)
 		if calib_btn != null and is_instance_valid(calib_btn):
 			calib_btn.disabled = not mic_active
@@ -167,11 +167,47 @@ static func build_general_panel(scene: Control) -> VBoxContainer:
 
 	mic_btn.pressed.connect(func():
 		scene.call("play_click")
-		GameState.mic_enabled = not GameState.mic_enabled
-		GameState.save_settings()
-		var mic: Node = scene.call("ensure_menu_mic") if scene.has_method("ensure_menu_mic") else scene.get("_menu_mic")
-		if mic != null:
-			mic.set("enabled", GameState.mic_enabled)
+		if not GameState.mic_enabled:
+			# Player intends to enable Microphone Sensor
+			if OS.get_name() == "Android" and not GameState.is_mic_permission_granted():
+				mic_btn.disabled = true
+				mic_btn.text = "REQUESTING..."
+				GameState.request_mic_permission(func(granted: bool):
+					mic_btn.disabled = false
+					if granted:
+						GameState.mic_enabled = true
+						GameState.save_settings()
+						var mic: Node = scene.call("ensure_menu_mic") if scene.has_method("ensure_menu_mic") else scene.get("_menu_mic")
+						if mic != null:
+							mic.set("enabled", true)
+							if mic.has_method("start"):
+								mic.call("start")
+					else:
+						GameState.mic_enabled = false
+						GameState.save_settings()
+					SettingsUIFactory.refresh_toggle_btn(mic_btn, GameState.mic_enabled, "ENABLED", "MUTED")
+					var hud = scene.get_tree().get_first_node_in_group("hud")
+					if hud != null and hud.has_node("MicIndicator"):
+						hud.get_node("MicIndicator").visible = GameState.mic_enabled
+					update_mic_deps.call()
+				)
+				return
+
+			GameState.mic_enabled = true
+			GameState.save_settings()
+			var mic: Node = scene.call("ensure_menu_mic") if scene.has_method("ensure_menu_mic") else scene.get("_menu_mic")
+			if mic != null:
+				mic.set("enabled", true)
+				if mic.has_method("start"):
+					mic.call("start")
+		else:
+			# Player intends to mute Microphone Sensor
+			GameState.mic_enabled = false
+			GameState.save_settings()
+			var mic: Node = scene.get("_menu_mic")
+			if mic != null:
+				mic.set("enabled", false)
+
 		SettingsUIFactory.refresh_toggle_btn(mic_btn, GameState.mic_enabled, "ENABLED", "MUTED")
 		var hud = scene.get_tree().get_first_node_in_group("hud")
 		if hud != null and hud.has_node("MicIndicator"):

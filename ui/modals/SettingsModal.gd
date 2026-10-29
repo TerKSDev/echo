@@ -357,11 +357,44 @@ func _update_volume_label(val: float) -> void:
 
 
 func _on_mic_toggle_pressed() -> void:
-	GameState.mic_enabled = not GameState.mic_enabled
-	GameState.save_settings()
-	var mic := _get_mic()
-	if mic != null:
-		mic.enabled = GameState.mic_enabled
+	if not GameState.mic_enabled:
+		if OS.get_name() == "Android" and not GameState.is_mic_permission_granted():
+			mic_toggle.disabled = true
+			mic_toggle.text = "REQUESTING..."
+			GameState.request_mic_permission(func(granted: bool) -> void:
+				mic_toggle.disabled = false
+				if granted:
+					GameState.mic_enabled = true
+					GameState.save_settings()
+					var mic := _get_mic()
+					if mic != null:
+						mic.enabled = true
+						if mic.has_method("start"):
+							mic.start()
+				else:
+					GameState.mic_enabled = false
+					GameState.save_settings()
+				_update_mic_toggle_ui()
+				var hud := get_parent()
+				if hud != null and hud.has_node("MicIndicator"):
+					hud.get_node("MicIndicator").visible = GameState.mic_enabled
+			)
+			return
+
+		GameState.mic_enabled = true
+		GameState.save_settings()
+		var mic := _get_mic()
+		if mic != null:
+			mic.enabled = true
+			if mic.has_method("start"):
+				mic.start()
+	else:
+		GameState.mic_enabled = false
+		GameState.save_settings()
+		var mic := _get_mic()
+		if mic != null:
+			mic.enabled = false
+
 	_update_mic_toggle_ui()
 	var hud := get_parent()
 	if hud != null and hud.has_node("MicIndicator"):
@@ -370,7 +403,7 @@ func _on_mic_toggle_pressed() -> void:
 
 func _update_mic_toggle_ui() -> void:
 	var mic := _get_mic()
-	var enabled: bool = GameState.mic_enabled
+	var enabled: bool = GameState.mic_enabled and GameState.is_mic_permission_granted()
 	if mic != null:
 		mic.enabled = enabled
 	mic_toggle.self_modulate = Color.WHITE

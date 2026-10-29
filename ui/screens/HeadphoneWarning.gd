@@ -4,11 +4,35 @@ extends Control
 @onready var headphone_icon: Control = $Content/IconCenter/HeadphoneIcon
 
 var _transitioning := false
+var _permission_pending := false
+var _warning_started := false
 var _time := 0.0
 
 func _ready() -> void:
 	content.modulate.a = 0.0
 	headphone_icon.draw.connect(_draw_headphone_icon)
+
+	if OS.get_name() == "Android":
+		if GameState.is_mic_permission_granted():
+			GameState.mic_enabled = true
+			_start_headphone_warning()
+		elif not GameState.mic_permission_prompted:
+			_permission_pending = true
+			GameState.request_mic_permission(func(_granted: bool) -> void:
+				_permission_pending = false
+				_start_headphone_warning()
+			)
+		else:
+			# Player previously made their choice; respect it without repeating prompts on boot
+			GameState.mic_enabled = false
+			_start_headphone_warning()
+	else:
+		_start_headphone_warning()
+
+func _start_headphone_warning() -> void:
+	if _warning_started or _transitioning:
+		return
+	_warning_started = true
 
 	var tw := create_tween()
 	# 1. Subtle smooth fade-in (0.6s)
@@ -71,10 +95,14 @@ func _draw_headphone_icon() -> void:
 		headphone_icon.draw_arc(center + Vector2(42.0, 14.0), r, -PI * 0.26, PI * 0.26, 16, Color(0.4, 0.88, 1.0, a), w)
 
 func _gui_input(event: InputEvent) -> void:
+	if _permission_pending or not _warning_started:
+		return
 	if (event is InputEventMouseButton and event.pressed) or (event is InputEventScreenTouch and event.pressed):
 		_go_to_menu()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _permission_pending or not _warning_started:
+		return
 	if event.is_action_pressed("ui_accept") or event.is_action_pressed("ui_cancel") or (event is InputEventKey and event.pressed and not event.echo and (event.keycode == KEY_SPACE or event.keycode == KEY_ENTER or event.keycode == KEY_ESCAPE)):
 		get_viewport().set_input_as_handled()
 		_go_to_menu()

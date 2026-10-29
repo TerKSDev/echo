@@ -29,8 +29,11 @@ var _depth_tag_alpha: float = 0.0
 var _depth_tag_timer: float = 0.0
 var _is_dragging_gauge: bool = false
 var _overscroll_dist: float = 0.0
+var _overscroll_dist_king: float = 0.0
 var _abyss_arrow_canvas: Control = null
+var _king_arrow_canvas: Control = null
 var _is_mode_transitioning: bool = false
+var _king_cinematic_layer: CanvasLayer = null
 
 # Procedural UI Audio
 var _wav_click: AudioStreamWAV
@@ -40,8 +43,10 @@ var _wav_launch: AudioStreamWAV
 
 
 func _ready() -> void:
+	_setup_main_background()
 	_build_ui_audio()
-	GameState.start_menu_bgm()
+	if not GameState.pending_sp_king_sector_cinematic:
+		GameState.start_menu_bgm()
 	_init_spores()
 
 	# Background effects should not block button input.
@@ -84,11 +89,22 @@ func _ready() -> void:
 
 	_create_level_buttons()
 	_update_header_and_mode_ui()
-	GameState.update_bgm_for_mode()
+	if not GameState.pending_sp_king_sector_cinematic:
+		GameState.update_bgm_for_mode()
 
 	# Auto-scroll directly to the highest active level on entry
 	call_deferred("_scroll_to_current_level")
 	_apply_safe_area()
+
+	# Check if coming from Story clear to unlock Challenge Mode
+	if GameState.pending_challenge_unlock_modal:
+		GameState.set_pending_challenge_unlock_modal(false)
+		call_deferred("_show_challenge_unlock_celebration_modal")
+
+	# Check if arriving directly after Level 20 pact selection to trigger King Sector cinematic
+	if GameState.pending_sp_king_sector_cinematic:
+		GameState.pending_sp_king_sector_cinematic = false
+		call_deferred("_play_king_sector_cinematic", true)
 
 
 func _notification(what: int) -> void:
@@ -118,15 +134,30 @@ func _apply_safe_area() -> void:
 			gauge.offset_top = target_top + 76.0
 
 
+func _setup_main_background() -> void:
+	var bg_node := get_node_or_null("Background") as TextureRect
+	if bg_node != null:
+		var tex: Texture2D = null
+		if ResourceLoader.exists("res://assets/bg_cave_abyss.jpg"):
+			tex = load("res://assets/bg_cave_abyss.jpg")
+		if tex == null:
+			var global_path := ProjectSettings.globalize_path("res://assets/bg_cave_abyss.jpg")
+			var img := Image.new()
+			if img.load(global_path) == OK:
+				tex = ImageTexture.create_from_image(img)
+		if tex != null:
+			bg_node.texture = tex
+			bg_node.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			bg_node.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+
+
 # --------------------------------------------------
 # NAVIGATION & LEVEL DATA
 # --------------------------------------------------
 
 func _get_playable_levels() -> Array[String]:
 	if GameState.current_mode == GameState.GameMode.CHALLENGE:
-		if GameState.challenge_highest_unlocked < 21:
-			return GameState.CHALLENGE_LEVELS.slice(0, 20)
-		return GameState.CHALLENGE_LEVELS
+		return GameState.CHALLENGE_LEVELS.slice(0, 20)
 	return GameState.STORY_LEVELS
 
 
@@ -149,7 +180,7 @@ func _on_scroll_container_gui_input(event: InputEvent) -> void:
 			elif scroll_container.scroll_vertical < max_scroll - 25.0:
 				_overscroll_dist = 0.0
 		else:
-			# At top of challenge mode: dragging downwards pulls upwards to ascend
+			# At top of challenge mode: dragging downwards pulls upwards to ascend to story mode
 			if scroll_container.scroll_vertical <= 10.0 and rel_y > 3.0:
 				_overscroll_dist += rel_y
 				if _overscroll_dist >= 45.0:
@@ -157,6 +188,15 @@ func _on_scroll_container_gui_input(event: InputEvent) -> void:
 					_ascend_to_story_mode()
 			elif scroll_container.scroll_vertical > 25.0:
 				_overscroll_dist = 0.0
+
+			# At bottom of challenge mode: dragging upwards pulls downward to enter King Sector (only if Level 20 cleared)
+			if GameState.challenge_highest_unlocked >= 21 and scroll_container.scroll_vertical >= max_scroll - 10.0 and rel_y < -3.0:
+				_overscroll_dist_king += absf(rel_y)
+				if _overscroll_dist_king >= 45.0:
+					_overscroll_dist_king = 0.0
+					_show_king_sector_confirmation_modal()
+			elif scroll_container.scroll_vertical < max_scroll - 25.0:
+				_overscroll_dist_king = 0.0
 
 	elif event is InputEventMouseButton and event.is_pressed():
 		var vbar := scroll_container.get_v_scroll_bar()
@@ -169,6 +209,11 @@ func _on_scroll_container_gui_input(event: InputEvent) -> void:
 				if _overscroll_dist >= 45.0:
 					_overscroll_dist = 0.0
 					_descend_to_challenge_mode()
+			elif GameState.current_mode == GameState.GameMode.CHALLENGE and GameState.challenge_highest_unlocked >= 21 and scroll_container.scroll_vertical >= max_scroll - 10.0:
+				_overscroll_dist_king += 25.0
+				if _overscroll_dist_king >= 45.0:
+					_overscroll_dist_king = 0.0
+					_show_king_sector_confirmation_modal()
 		elif event.button_index == MOUSE_BUTTON_WHEEL_UP:
 			if GameState.current_mode == GameState.GameMode.CHALLENGE and scroll_container.scroll_vertical <= 10.0:
 				_overscroll_dist += 25.0
@@ -396,7 +441,7 @@ func _create_level_buttons() -> void:
 
 	if is_challenge:
 		# Levels in Challenge Mode:
-		# Delving downwards from Level 1 (-4,500M) down to Level 21 (-9,999M King Sector SP)!
+		# Delving downwards from Level 1 (-4,500M) down to Level 20 (-9,250M)!
 		for level_number in range(1, total_levels + 1):
 			var p_idx := level_number - 1
 			var lvl_path: String = playable_levels[p_idx] if (p_idx >= 0 and p_idx < playable_levels.size()) else ""
@@ -411,11 +456,6 @@ func _create_level_buttons() -> void:
 			)
 			_level_buttons[level_number] = button
 
-			if level_number == 21 and not GameState.challenge_sp_revealed:
-				button.modulate.a = 0.0
-				button.scale = Vector2(0.5, 0.5)
-				button.pivot_offset = button.custom_minimum_size * 0.5
-
 			var spacer := Control.new()
 			spacer.custom_minimum_size = Vector2(0, 78)
 			spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -428,6 +468,30 @@ func _create_level_buttons() -> void:
 			else:
 				level_grid.add_child(button)
 				level_grid.add_child(spacer)
+
+		# If player has cleared Sector 20, add King Sector descent prompt below Sector 20
+		if GameState.challenge_highest_unlocked >= 21:
+			var king_prompt := Control.new()
+			king_prompt.name = "KingSectorDescentPrompt"
+			king_prompt.custom_minimum_size = Vector2(290, 110)
+			king_prompt.mouse_filter = Control.MOUSE_FILTER_PASS
+			king_prompt.draw.connect(func(): _draw_king_sector_descent_prompt(king_prompt))
+			king_prompt.gui_input.connect(func(ev: InputEvent):
+				if (ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT) or (ev is InputEventScreenTouch and ev.pressed):
+					_show_king_sector_confirmation_modal()
+			)
+
+			var king_spacer := Control.new()
+			king_spacer.custom_minimum_size = Vector2(290, 110)
+			king_spacer.mouse_filter = Control.MOUSE_FILTER_PASS
+			king_spacer.gui_input.connect(func(ev: InputEvent):
+				if (ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT) or (ev is InputEventScreenTouch and ev.pressed):
+					_show_king_sector_confirmation_modal()
+			)
+
+			level_grid.add_child(king_prompt)
+			level_grid.add_child(king_spacer)
+			_king_arrow_canvas = king_prompt
 
 	else:
 		# Story Mode:
@@ -820,12 +884,7 @@ func _scroll_to_current_level() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 
-	var is_challenge := GameState.current_mode == GameState.GameMode.CHALLENGE
-	if is_challenge and GameState.challenge_highest_unlocked >= 21 and not GameState.challenge_sp_revealed:
-		_play_sp_unsealed_reveal_sequence()
-		return
-
-	var highest: int = GameState.highest_unlocked_level
+	var highest: int = mini(GameState.highest_unlocked_level, 20)
 	var btn: Button = _level_buttons.get(highest)
 	if btn != null and is_instance_valid(btn):
 		var target_y := btn.position.y - 120.0
@@ -843,135 +902,550 @@ func _scroll_to_current_level() -> void:
 		)
 
 
-func _play_sp_unsealed_reveal_sequence() -> void:
-	var sp_btn: Button = _level_buttons.get(21)
-	if sp_btn == null or not is_instance_valid(sp_btn):
+func _draw_king_sector_descent_prompt(canvas: Control) -> void:
+	if canvas == null or not is_instance_valid(canvas):
 		return
+	var grid_w := level_grid.size.x if (level_grid != null and level_grid.size.x > 100.0) else 600.0
+	var cx: float = grid_w * 0.5 - canvas.position.x
+	var bob: float = sin(_time * 3.0) * 5.0
+	var cy: float = 46.0 + bob
 
+	var a: float = 0.45 + 0.15 * sin(_time * 3.0)
+	if _overscroll_dist_king > 0.0:
+		a = clampf(a + (_overscroll_dist_king / 45.0) * 0.55, 0.0, 1.0)
+
+	var chevron_col := Color(1.0, 0.22, 0.35, a)
+	var tip := Vector2(cx, cy + 14.0)
+	var arm_l := Vector2(cx - 28.0, cy - 8.0)
+	var arm_r := Vector2(cx + 28.0, cy - 8.0)
+	canvas.draw_line(arm_l, tip, chevron_col, 2.5)
+	canvas.draw_line(arm_r, tip, chevron_col, 2.5)
+
+	# Secondary faint chevron
+	var tip2 := Vector2(cx, cy + 3.0)
+	var arm2_l := Vector2(cx - 18.0, cy - 14.0)
+	var arm2_r := Vector2(cx + 18.0, cy - 14.0)
+	var echo_col := Color(chevron_col.r, chevron_col.g, chevron_col.b, a * 0.48)
+	canvas.draw_line(arm2_l, tip2, echo_col, 1.6)
+	canvas.draw_line(arm2_r, tip2, echo_col, 1.6)
+
+	# Prompt text
+	var text_col := Color(1.0, 0.65, 0.78, a * 0.85)
+	var font := ThemeDB.fallback_font
+	if font != null:
+		canvas.draw_string(font, Vector2(cx - 130.0, cy + 38.0), "PULL DOWN FOR KING SECTOR", HORIZONTAL_ALIGNMENT_CENTER, 260.0, 11, text_col)
+
+
+func _show_king_sector_confirmation_modal() -> void:
+	if _is_mode_transitioning or _suppress_level_click:
+		return
 	_suppress_level_click = true
+	_play_ui_sound(_wav_click, -2.0, 0.75)
 
-	# Position camera near Level 20 initially
-	var btn_20: Button = _level_buttons.get(20)
-	var vbar := scroll_container.get_v_scroll_bar()
-	var page := vbar.page if vbar.page > 0.0 else scroll_container.size.y
-	var max_scroll := maxf(0.0, vbar.max_value - page)
-	if btn_20 != null and is_instance_valid(btn_20):
-		scroll_container.scroll_vertical = int(clampf(btn_20.position.y - 120.0, 0.0, max_scroll))
-
-	await get_tree().create_timer(0.45).timeout
-
-	# 1. Deep seismic descent camera scroll to SP
-	var target_y := clampf(sp_btn.position.y - 120.0, 0.0, max_scroll)
-	var scroll_tw := create_tween()
-	scroll_tw.tween_property(scroll_container, "scroll_vertical", int(target_y), 1.35).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
-
-	# 2. Subterranean rumble screen shake & deep acoustic vibration
-	_play_ui_sound(_wav_click, 2.5, 0.32)
-	var shake_tw := create_tween()
-	for i in range(16):
-		var dx := randf_range(-4.5, 4.5)
-		var dy := randf_range(-3.5, 3.5)
-		shake_tw.tween_property(level_grid, "position", Vector2(dx, dy), 0.04)
-	shake_tw.tween_property(level_grid, "position", Vector2.ZERO, 0.08)
-
-	await scroll_tw.finished
-
-	# 3. SP King Sector Unsealed scale punch & shockwave
-	_play_ui_sound(_wav_launch if _wav_launch != null else _wav_click, 3.5, 0.72)
-	sp_btn.pivot_offset = sp_btn.size * 0.5
-	var reveal_tw := sp_btn.create_tween()
-	reveal_tw.set_parallel(true)
-	reveal_tw.tween_property(sp_btn, "modulate:a", 1.0, 0.22)
-	reveal_tw.tween_property(sp_btn, "scale", Vector2(1.22, 1.22), 0.28).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	reveal_tw.chain().tween_property(sp_btn, "scale", Vector2.ONE, 0.35).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
-
-	level_grid.queue_redraw()
-	if depth_gauge != null and is_instance_valid(depth_gauge):
-		depth_gauge.queue_redraw()
-
-	# 4. Cinematic Unsealed Announcement Banner Overlay
-	_show_sp_unsealed_banner()
-
-	GameState.mark_challenge_sp_revealed()
-	_suppress_level_click = false
-
-
-func _show_sp_unsealed_banner() -> void:
 	var canvas := CanvasLayer.new()
-	canvas.layer = 200
-	get_tree().root.add_child(canvas)
+	canvas.layer = 160
+	canvas.name = "KingSectorConfirmCanvas"
+	add_child(canvas)
 
-	var overlay := CenterContainer.new()
-	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	canvas.add_child(overlay)
+	var root := Control.new()
+	root.name = "KingSectorConfirmRoot"
+	ModalTemplate.apply_full_rect(root)
+	root.mouse_filter = Control.MOUSE_FILTER_STOP
+	canvas.add_child(root)
 
-	var banner_box := PanelContainer.new()
-	banner_box.custom_minimum_size = Vector2(560, 140)
-	banner_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	banner_box.pivot_offset = Vector2(280, 70)
-	banner_box.scale = Vector2(0.8, 0.8)
-	banner_box.modulate.a = 0.0
+	var dimmer := ColorRect.new()
+	ModalTemplate.apply_full_rect(dimmer)
+	dimmer.color = Color(0.015, 0.005, 0.012, 0.90)
+	dimmer.mouse_filter = Control.MOUSE_FILTER_STOP
+	root.add_child(dimmer)
 
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.12, 0.02, 0.04, 0.94)
-	sb.border_color = Color(1.0, 0.82, 0.35, 0.95)
-	sb.set_border_width_all(2)
-	sb.set_corner_radius_all(14)
-	sb.shadow_color = Color(0.9, 0.15, 0.30, 0.55)
-	sb.shadow_size = 20
-	banner_box.add_theme_stylebox_override("panel", sb)
-	overlay.add_child(banner_box)
+	var center := CenterContainer.new()
+	ModalTemplate.apply_full_rect(center)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(center)
 
-	var margin := MarginContainer.new()
-	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	margin.add_theme_constant_override("margin_left", 24)
-	margin.add_theme_constant_override("margin_right", 24)
-	margin.add_theme_constant_override("margin_top", 18)
-	margin.add_theme_constant_override("margin_bottom", 18)
-	banner_box.add_child(margin)
+	var frame := PanelContainer.new()
+	frame.custom_minimum_size = Vector2(ModalTemplate.CARD_WIDTH, 0)
+	var card_sb := ModalTemplate.make_card_style(ModalTemplate.ThemeKind.CRIMSON)
+	frame.add_theme_stylebox_override("panel", card_sb)
+	center.add_child(frame)
 
 	var vbox := VBoxContainer.new()
-	vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	vbox.add_theme_constant_override("separation", 6)
-	margin.add_child(vbox)
+	vbox.add_theme_constant_override("separation", 16)
+	frame.add_child(vbox)
 
-	var tag_lbl := Label.new()
-	tag_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	tag_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	tag_lbl.text = "◈  KING SECTOR UNSEALED  ◈"
-	tag_lbl.add_theme_font_size_override("font_size", 13)
-	tag_lbl.add_theme_color_override("font_color", Color(1.0, 0.82, 0.35))
-	vbox.add_child(tag_lbl)
+	var header := HBoxContainer.new()
+	vbox.add_child(header)
 
 	var title_lbl := Label.new()
-	title_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title_lbl.text = "THE FINAL ECHO"
-	title_lbl.add_theme_font_size_override("font_size", 24)
-	title_lbl.add_theme_color_override("font_color", Color(1.0, 0.96, 0.92))
-	title_lbl.add_theme_color_override("font_shadow_color", Color(0.9, 0.12, 0.25, 0.95))
-	title_lbl.add_theme_constant_override("shadow_offset_y", 2)
-	vbox.add_child(title_lbl)
+	title_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_lbl.text = "POINT OF NO RETURN"
+	title_lbl.add_theme_font_size_override("font_size", 18)
+	title_lbl.add_theme_color_override("font_color", Color(1.0, 0.35, 0.45))
+	header.add_child(title_lbl)
 
-	var sub_lbl := Label.new()
-	sub_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	sub_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	sub_lbl.text = "DEPTH: -9,999 M  •  ABYSSAL APEX"
-	sub_lbl.add_theme_font_size_override("font_size", 12)
-	sub_lbl.add_theme_color_override("font_color", Color(1.0, 0.55, 0.78, 0.88))
-	vbox.add_child(sub_lbl)
+	var close_func := func():
+		var close_tw := root.create_tween().set_parallel(true)
+		close_tw.tween_property(root, "modulate:a", 0.0, 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		close_tw.tween_property(frame, "scale", Vector2(0.94, 0.94), 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		close_tw.chain().tween_callback(func():
+			_suppress_level_click = false
+			canvas.queue_free()
+		)
 
-	var b_tw := banner_box.create_tween()
-	b_tw.set_parallel(true)
-	b_tw.tween_property(banner_box, "modulate:a", 1.0, 0.28).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	b_tw.tween_property(banner_box, "scale", Vector2.ONE, 0.32).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	b_tw.chain().tween_interval(2.2)
-	b_tw.chain().tween_property(banner_box, "modulate:a", 0.0, 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	b_tw.tween_callback(func():
-		canvas.queue_free()
+	var close_btn := ModalTemplate.make_close_button(close_func, ModalTemplate.ThemeKind.CRIMSON)
+	header.add_child(close_btn)
+
+	var divider := ColorRect.new()
+	divider.custom_minimum_size = Vector2(0, 1)
+	divider.color = Color(0.85, 0.25, 0.35, 0.35)
+	vbox.add_child(divider)
+
+	var msg_lbl := Label.new()
+	msg_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	msg_lbl.add_theme_font_size_override("font_size", 14)
+	msg_lbl.add_theme_color_override("font_color", Color(0.94, 0.84, 0.88, 0.95))
+	msg_lbl.text = "You stand before the deepest threshold of the abyss: -9,999 Meters.\n\nOnce entered, you cannot turn back until the final echo is silenced.\n\nAre you prepared to face the King Sector?"
+	vbox.add_child(msg_lbl)
+
+	var btn_row := HBoxContainer.new()
+	btn_row.add_theme_constant_override("separation", 16)
+	btn_row.alignment = BoxContainer.ALIGNMENT_END
+	vbox.add_child(btn_row)
+
+	var stay_btn := Button.new()
+	stay_btn.text = "STAY"
+	stay_btn.custom_minimum_size = Vector2(100, 42)
+	stay_btn.focus_mode = Control.FOCUS_NONE
+	ModalTemplate.style_button(stay_btn, false, ModalTemplate.ThemeKind.CRIMSON)
+	stay_btn.pressed.connect(close_func)
+	btn_row.add_child(stay_btn)
+
+	var descend_btn := Button.new()
+	descend_btn.text = "DESCEND"
+	descend_btn.custom_minimum_size = Vector2(140, 42)
+	descend_btn.focus_mode = Control.FOCUS_NONE
+	ModalTemplate.style_button(descend_btn, true, ModalTemplate.ThemeKind.CRIMSON)
+	descend_btn.pressed.connect(func():
+		descend_btn.disabled = true
+		stay_btn.disabled = true
+		var close_tw := root.create_tween().set_parallel(true)
+		close_tw.tween_property(root, "modulate:a", 0.0, 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		close_tw.chain().tween_callback(func():
+			canvas.queue_free()
+			_play_king_sector_cinematic(false)
+		)
 	)
+	btn_row.add_child(descend_btn)
+
+
+func _play_king_sector_cinematic(is_from_level_clear: bool = false) -> void:
+	_suppress_level_click = true
+
+	# 1. Hide all standard UI except the settings button
+	if scroll_container != null:
+		scroll_container.visible = false
+	if depth_gauge != null:
+		depth_gauge.visible = false
+	if tracker_label != null:
+		tracker_label.visible = false
+	if title_label != null:
+		title_label.visible = false
+	if subtitle_label != null:
+		subtitle_label.visible = false
+	if mode_toggle != null:
+		mode_toggle.visible = false
+	if leaderboard_button != null:
+		leaderboard_button.visible = false
+	if intel_button != null:
+		intel_button.visible = false
+	if reset_run_button != null and is_instance_valid(reset_run_button):
+		reset_run_button.visible = false
+	if status_pill != null:
+		status_pill.visible = false
+
+	# 2. Setup Cinematic CanvasLayer
+	if _king_cinematic_layer != null and is_instance_valid(_king_cinematic_layer):
+		_king_cinematic_layer.queue_free()
+
+	var canvas := CanvasLayer.new()
+	canvas.layer = 180
+	canvas.name = "KingSectorCinematicLayer"
+	add_child(canvas)
+	_king_cinematic_layer = canvas
+
+	var vp_w: float = size.x if size.x > 100.0 else 720.0
+	var vp_h: float = size.y if size.y > 100.0 else 1280.0
+
+	# Blackout curtain covering screen
+	var curtain := ColorRect.new()
+	ModalTemplate.apply_full_rect(curtain)
+	curtain.color = Color.BLACK
+	curtain.mouse_filter = Control.MOUSE_FILTER_STOP
+	canvas.add_child(curtain)
+
+	# Silence background music completely
+	GameState.stop_menu_bgm(1.2)
+
+	if is_from_level_clear:
+		curtain.modulate.a = 1.0
+	else:
+		curtain.modulate.a = 0.0
+		var tw_curtain := curtain.create_tween()
+		tw_curtain.tween_property(curtain, "modulate:a", 1.0, 1.2).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+	# 3. Dedicated Settings Button at top-right
+	var safe_top: float = 32.0
+	if OS.has_feature("mobile") or OS.get_name() == "Android":
+		var safe := DisplayServer.get_display_safe_area()
+		var screen_sz := DisplayServer.screen_get_size()
+		if screen_sz.y > 0 and safe.position.y > 0:
+			safe_top = maxf((float(safe.position.y) / float(screen_sz.y)) * vp_h + 6.0, 32.0)
+
+	var cin_settings_btn := Button.new()
+	cin_settings_btn.name = "CinematicSettingsButton"
+	cin_settings_btn.custom_minimum_size = Vector2(48, 48)
+	cin_settings_btn.position = Vector2(vp_w - 68, safe_top)
+	cin_settings_btn.flat = true
+	cin_settings_btn.focus_mode = Control.FOCUS_NONE
+	var empty_sb := StyleBoxEmpty.new()
+	cin_settings_btn.add_theme_stylebox_override("normal", empty_sb)
+	cin_settings_btn.add_theme_stylebox_override("hover", empty_sb)
+	cin_settings_btn.add_theme_stylebox_override("pressed", empty_sb)
+	cin_settings_btn.add_theme_stylebox_override("focus", empty_sb)
+
+	var icon_canvas := Control.new()
+	icon_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon_canvas.set_anchors_preset(Control.PRESET_FULL_RECT)
+	icon_canvas.draw.connect(func(): Icons.draw_gear(icon_canvas))
+	cin_settings_btn.add_child(icon_canvas)
+	cin_settings_btn.pressed.connect(func():
+		_play_ui_sound(_wav_click, -4.0, 1.0)
+		_on_settings_pressed()
+	)
+	canvas.add_child(cin_settings_btn)
+
+	# 4. Solitary cavern water droplets in absolute silence
+	var drop_stream := SfxManager.get_menu_bgm_droplet()
+	get_tree().create_timer(0.5).timeout.connect(func():
+		if is_instance_valid(canvas):
+			_play_ui_sound(drop_stream, -14.0, 0.82)
+	)
+	get_tree().create_timer(1.6).timeout.connect(func():
+		if is_instance_valid(canvas):
+			_play_ui_sound(drop_stream, -16.0, 0.94)
+	)
+
+	# 5. At t = 2.4s: Crimson Eye & Abyssal Edge Corruption Awaken, Tense Music Starts
+	var tension_player := AudioStreamPlayer.new()
+	tension_player.stream = SfxManager.get_king_sector_tension_bgm()
+	tension_player.bus = &"BGM"
+	tension_player.volume_db = -32.0
+	canvas.add_child(tension_player)
+
+	var eye_view := CrimsonEyeView.new()
+	eye_view.name = "CrimsonEye"
+	eye_view.custom_minimum_size = Vector2(300, 150)
+	eye_view.position = Vector2(vp_w * 0.5 - 150.0, vp_h * 0.28 - 75.0)
+	eye_view.pivot_offset = Vector2(150.0, 75.0)
+	eye_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	eye_view.eye_open = 0.0
+	canvas.add_child(eye_view)
+
+	var corruption_view := AbyssalCorruptionCanvas.new()
+	corruption_view.name = "AbyssalCorruption"
+	ModalTemplate.apply_full_rect(corruption_view)
+	corruption_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	corruption_view.intensity = 0.0
+	canvas.add_child(corruption_view)
+
+	# Move settings button above eye and corruption
+	canvas.move_child(cin_settings_btn, canvas.get_child_count() - 1)
+
+	get_tree().create_timer(2.4).timeout.connect(func():
+		if not is_instance_valid(canvas):
+			return
+		# Start tense adrenaline music
+		tension_player.play()
+		var music_tw := canvas.create_tween()
+		music_tw.tween_property(tension_player, "volume_db", -5.5, 1.2).set_trans(Tween.TRANS_SINE)
+
+		# Awakening sound whoosh
+		_play_ui_sound(_wav_launch, -2.0, 0.42)
+
+		# Snap eye open menacingly
+		var eye_tw := canvas.create_tween().set_parallel(true)
+		eye_tw.tween_property(eye_view, "eye_open", 1.0, 0.32).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		eye_tw.tween_property(corruption_view, "intensity", 1.0, 0.85).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	)
+
+	# 6. At t = 3.8s: Central King Sector Level Card Reveal
+	var card_container := CenterContainer.new()
+	ModalTemplate.apply_full_rect(card_container)
+	card_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	canvas.add_child(card_container)
+
+	var card_wrapper := Control.new()
+	card_wrapper.custom_minimum_size = Vector2(340, 220)
+	card_wrapper.pivot_offset = Vector2(170, 110)
+	card_wrapper.modulate.a = 0.0
+	card_wrapper.scale = Vector2(0.90, 0.90)
+	card_container.add_child(card_wrapper)
+
+	# Position card in lower half below the eye
+	card_wrapper.position.y += 90.0
+
+	var card_btn := Button.new()
+	card_btn.custom_minimum_size = Vector2(340, 220)
+	card_btn.set_anchors_preset(Control.PRESET_FULL_RECT)
+	card_btn.focus_mode = Control.FOCUS_NONE
+
+	var normal_sb := StyleBoxFlat.new()
+	normal_sb.bg_color = Color(0.06, 0.012, 0.024, 0.96)
+	normal_sb.border_color = Color(0.95, 0.22, 0.32, 0.95)
+	normal_sb.set_border_width_all(2)
+	normal_sb.set_corner_radius_all(14)
+	normal_sb.shadow_color = Color(0.9, 0.1, 0.2, 0.45)
+	normal_sb.shadow_size = 24
+
+	var hover_sb := normal_sb.duplicate() as StyleBoxFlat
+	hover_sb.bg_color = Color(0.09, 0.018, 0.035, 0.98)
+	hover_sb.border_color = Color(1.0, 0.38, 0.48, 1.0)
+	hover_sb.shadow_size = 32
+
+	card_btn.add_theme_stylebox_override("normal", normal_sb)
+	card_btn.add_theme_stylebox_override("hover", hover_sb)
+	card_btn.add_theme_stylebox_override("pressed", hover_sb)
+	card_wrapper.add_child(card_btn)
+
+	var margin := MarginContainer.new()
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	margin.add_theme_constant_override("margin_left", 20)
+	margin.add_theme_constant_override("margin_right", 20)
+	margin.add_theme_constant_override("margin_top", 22)
+	margin.add_theme_constant_override("margin_bottom", 22)
+	card_btn.add_child(margin)
+
+	var card_vbox := VBoxContainer.new()
+	card_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	card_vbox.add_theme_constant_override("separation", 10)
+	margin.add_child(card_vbox)
+
+	var card_pill := Label.new()
+	card_pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card_pill.text = "◈   K I N G   S E C T O R   ◈"
+	card_pill.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	card_pill.add_theme_font_size_override("font_size", 12)
+	card_pill.add_theme_color_override("font_color", Color(1.0, 0.78, 0.45, 0.95))
+	card_vbox.add_child(card_pill)
+
+	var card_title := Label.new()
+	card_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card_title.text = "THE FINAL ECHO"
+	card_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	card_title.add_theme_font_size_override("font_size", 24)
+	card_title.add_theme_color_override("font_color", Color(1.0, 0.96, 0.96, 1.0))
+	card_title.add_theme_color_override("font_shadow_color", Color(0.9, 0.1, 0.25, 0.95))
+	card_title.add_theme_constant_override("shadow_offset_y", 2)
+	card_vbox.add_child(card_title)
+
+	var card_depth := Label.new()
+	card_depth.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card_depth.text = "DEPTH: -9,999 M  •  ABYSSAL APEX"
+	card_depth.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	card_depth.add_theme_font_size_override("font_size", 13)
+	card_depth.add_theme_color_override("font_color", Color(1.0, 0.55, 0.75, 0.90))
+	card_vbox.add_child(card_depth)
+
+	var card_sep := HSeparator.new()
+	card_sep.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card_sep.custom_minimum_size = Vector2(180, 2)
+	card_sep.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	card_vbox.add_child(card_sep)
+
+	var card_prompt := Label.new()
+	card_prompt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card_prompt.text = "CONFRONT THE VOID"
+	card_prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	card_prompt.add_theme_font_size_override("font_size", 13)
+	card_prompt.add_theme_color_override("font_color", Color(1.0, 0.35, 0.45, 0.95))
+	card_vbox.add_child(card_prompt)
+
+	# Reveal card tween
+	get_tree().create_timer(3.8).timeout.connect(func():
+		if not is_instance_valid(canvas):
+			return
+		_play_ui_sound(_wav_launch, -3.0, 0.85)
+		var card_tw := canvas.create_tween().set_parallel(true)
+		card_tw.tween_property(card_wrapper, "modulate:a", 1.0, 0.75).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		card_tw.tween_property(card_wrapper, "scale", Vector2.ONE, 0.75).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		_suppress_level_click = false
+	)
+
+	# 7. Card Click: Rapid perspective zoom and transition into Level SP
+	card_btn.pressed.connect(func():
+		if _suppress_level_click:
+			return
+		_suppress_level_click = true
+		card_btn.disabled = true
+		_play_ui_sound(_wav_launch, 2.0, 0.65)
+
+		var zoom_tw := canvas.create_tween().set_parallel(true)
+		zoom_tw.tween_property(card_wrapper, "scale", Vector2(5.5, 5.5), 0.52).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+		zoom_tw.tween_property(card_wrapper, "modulate:a", 0.0, 0.48).set_delay(0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		zoom_tw.tween_property(eye_view, "scale", Vector2(3.5, 3.5), 0.52).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+		zoom_tw.tween_property(curtain, "color", Color.BLACK, 0.55)
+		zoom_tw.tween_property(curtain, "modulate:a", 1.0, 0.55).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		if tension_player != null and is_instance_valid(tension_player):
+			zoom_tw.tween_property(tension_player, "volume_db", -45.0, 0.50).set_trans(Tween.TRANS_QUAD)
+
+		zoom_tw.chain().tween_callback(func():
+			if tension_player != null and is_instance_valid(tension_player):
+				tension_player.stop()
+				tension_player.queue_free()
+			canvas.queue_free()
+			GameState.current_mode = GameState.GameMode.CHALLENGE
+			GameState.start_game(20)
+		)
+	)
+
+
+# --------------------------------------------------
+# CINEMATIC PROCEDURAL VIEWS
+# --------------------------------------------------
+
+class CrimsonEyeView extends Control:
+	var eye_open: float = 0.0
+	var eye_glow: float = 1.0
+	var pupil_dilation: float = 1.0
+	var eye_alpha: float = 1.0
+	var _pulse_time: float = 0.0
+
+	func _process(delta: float) -> void:
+		if eye_open > 0.02:
+			_pulse_time += delta
+			eye_glow = 1.0 + 0.16 * sin(_pulse_time * 2.4)
+			pupil_dilation = 1.0 + 0.10 * cos(_pulse_time * 1.8)
+			queue_redraw()
+
+	func _draw() -> void:
+		if eye_alpha <= 0.01:
+			return
+
+		var center := size * 0.5
+		var w: float = 240.0
+		var h: float = 110.0 * clampf(eye_open, 0.02, 1.0)
+
+		# 1. Atmospheric radial crimson glow
+		var glow_col := Color(0.95, 0.08, 0.18, 0.05 * eye_glow * eye_alpha)
+		for i in range(6, 0, -1):
+			var r: float = (w * 0.65) * (float(i) / 6.0)
+			draw_circle(center, r * 1.4, Color(glow_col.r, glow_col.g, glow_col.b, glow_col.a * (1.2 / float(i))))
+
+		# 2. Eye Sclera / contour
+		var points_upper := PackedVector2Array()
+		var points_lower := PackedVector2Array()
+		var segments := 20
+		var half_w := w * 0.5
+		var max_h := h * 0.5
+
+		for i in range(segments + 1):
+			var t: float = float(i) / float(segments)
+			var x: float = lerpf(-half_w, half_w, t)
+			var arch: float = sin(t * PI)
+			points_upper.append(center + Vector2(x, -max_h * arch))
+			points_lower.append(center + Vector2(x, max_h * arch))
+
+		var poly_points := PackedVector2Array()
+		poly_points.append_array(points_upper)
+		var lower_rev := points_lower.duplicate()
+		lower_rev.reverse()
+		poly_points.append_array(lower_rev)
+
+		draw_colored_polygon(poly_points, Color(0.10, 0.008, 0.02, 0.96 * eye_alpha))
+
+		var rim_col := Color(1.0, 0.22, 0.32, 0.90 * eye_alpha)
+		for i in range(points_upper.size() - 1):
+			draw_line(points_upper[i], points_upper[i + 1], rim_col, 2.5)
+			draw_line(points_lower[i], points_lower[i + 1], rim_col, 2.5)
+
+		# 3. Glowing Iris & Slit Pupil
+		if eye_open > 0.08:
+			var iris_r: float = 44.0 * eye_open
+			draw_circle(center, iris_r, Color(0.95, 0.12, 0.20, 0.88 * eye_alpha))
+			draw_circle(center, iris_r * 0.70, Color(1.0, 0.35, 0.30, 0.92 * eye_alpha))
+			draw_arc(center, iris_r, 0.0, TAU, 32, Color(1.0, 0.72, 0.42, 0.85 * eye_alpha), 1.8)
+
+			var pupil_w: float = 8.5 * pupil_dilation
+			var pupil_h: float = 45.0 * eye_open
+			var pupil_pts := PackedVector2Array([
+				center + Vector2(0, -pupil_h),
+				center + Vector2(pupil_w, 0),
+				center + Vector2(0, pupil_h),
+				center + Vector2(-pupil_w, 0)
+			])
+			draw_colored_polygon(pupil_pts, Color(0.01, 0.0, 0.0, 0.98 * eye_alpha))
+			draw_line(center + Vector2(0, -pupil_h), center + Vector2(pupil_w, 0), Color(1.0, 0.6, 0.5, 0.7 * eye_alpha), 1.2)
+			draw_line(center + Vector2(0, -pupil_h), center + Vector2(-pupil_w, 0), Color(1.0, 0.6, 0.5, 0.7 * eye_alpha), 1.2)
+
+
+class AbyssalCorruptionCanvas extends Control:
+	var intensity: float = 0.0
+	var _anim_time: float = 0.0
+
+	func _process(delta: float) -> void:
+		if intensity > 0.01:
+			_anim_time += delta
+			queue_redraw()
+
+	func _draw() -> void:
+		if intensity <= 0.01:
+			return
+		var vp := size
+		var pulse: float = 0.85 + 0.15 * sin(_anim_time * 2.2)
+		var cur_int: float = intensity * pulse
+
+		var v_thick: float = 140.0
+		var h_thick: float = 100.0
+
+		for i in range(10):
+			var frac: float = float(i) / 10.0
+			var band_a: float = (1.0 - frac) * 0.55 * cur_int
+			var band_col := Color(0.18, 0.01, 0.04, band_a)
+			draw_rect(Rect2(0, frac * v_thick, vp.x, v_thick / 10.0 + 1.0), band_col)
+			draw_rect(Rect2(0, vp.y - (frac + 1.0 / 10.0) * v_thick, vp.x, v_thick / 10.0 + 1.0), band_col)
+			draw_rect(Rect2(frac * h_thick, 0, h_thick / 10.0 + 1.0, vp.y), band_col)
+			draw_rect(Rect2(vp.x - (frac + 1.0 / 10.0) * h_thick, 0, h_thick / 10.0 + 1.0, vp.y), band_col)
+
+		var tendril_col := Color(0.78, 0.12, 0.24, 0.55 * cur_int)
+		var tendril_dark := Color(0.24, 0.02, 0.05, 0.75 * cur_int)
+
+		for k in range(5):
+			var tx: float = vp.x * (0.15 + float(k) * 0.18) + sin(_anim_time + float(k)) * 6.0
+			var tlen: float = (38.0 + sin(float(k) * 3.1) * 18.0) * cur_int
+			draw_line(Vector2(tx, 0), Vector2(tx + 5.0, tlen * 0.6), tendril_dark, 2.8)
+			draw_line(Vector2(tx + 5.0, tlen * 0.6), Vector2(tx + 10.0, tlen), tendril_col, 1.8)
+			draw_line(Vector2(tx + 5.0, tlen * 0.6), Vector2(tx - 7.0, tlen * 0.8), tendril_col, 1.2)
+
+		for k in range(5):
+			var bx: float = vp.x * (0.12 + float(k) * 0.19) + cos(_anim_time + float(k)) * 6.0
+			var blen: float = (42.0 + cos(float(k) * 2.7) * 20.0) * cur_int
+			draw_line(Vector2(bx, vp.y), Vector2(bx - 5.0, vp.y - blen * 0.6), tendril_dark, 2.8)
+			draw_line(Vector2(bx - 5.0, vp.y - blen * 0.6), Vector2(bx - 10.0, vp.y - blen), tendril_col, 1.8)
+			draw_line(Vector2(bx - 5.0, vp.y - blen * 0.6), Vector2(bx + 6.0, vp.y - blen * 0.75), tendril_col, 1.2)
+
+		for k in range(4):
+			var ly: float = vp.y * (0.20 + float(k) * 0.20) + sin(_anim_time * 1.2 + float(k)) * 5.0
+			var llen: float = (32.0 + sin(float(k) * 1.9) * 14.0) * cur_int
+			draw_line(Vector2(0, ly), Vector2(llen * 0.6, ly + 3.0), tendril_dark, 2.6)
+			draw_line(Vector2(llen * 0.6, ly + 3.0), Vector2(llen, ly + 6.0), tendril_col, 1.6)
+
+			var ry: float = vp.y * (0.28 + float(k) * 0.20) + cos(_anim_time * 1.2 + float(k)) * 5.0
+			var rlen: float = (32.0 + cos(float(k) * 2.3) * 14.0) * cur_int
+			draw_line(Vector2(vp.x, ry), Vector2(vp.x - rlen * 0.6, ry - 3.0), tendril_dark, 2.6)
+			draw_line(Vector2(vp.x - rlen * 0.6, ry - 3.0), Vector2(vp.x - rlen, ry - 6.0), tendril_col, 1.6)
 
 
 func _draw_level_path() -> void:
@@ -1123,6 +1597,8 @@ func _process(delta: float) -> void:
 			depth_gauge.queue_redraw()
 	if _abyss_arrow_canvas != null and is_instance_valid(_abyss_arrow_canvas):
 		_abyss_arrow_canvas.queue_redraw()
+	if _king_arrow_canvas != null and is_instance_valid(_king_arrow_canvas):
+		_king_arrow_canvas.queue_redraw()
 
 	# Redraw active level card (pulsing glow) and visible locked cards (scanning laser effect)
 	for lvl in _level_buttons:
@@ -1293,3 +1769,98 @@ func _play_ui_sound(wav: AudioStreamWAV, vol_db: float, pitch: float = 1.0) -> v
 	add_child(player)
 	player.finished.connect(player.queue_free)
 	player.play()
+
+
+# --- Challenge Mode Unlock Celebration Modal ---------------------------------
+
+func _show_challenge_unlock_celebration_modal() -> void:
+	if GameState.current_mode != GameState.GameMode.STORY:
+		GameState.current_mode = GameState.GameMode.STORY
+		_update_header_and_mode_ui()
+		_create_level_buttons()
+
+	var modal_layer := Control.new()
+	modal_layer.name = "ChallengeUnlockModal"
+	ModalTemplate.apply_full_rect(modal_layer)
+	modal_layer.mouse_filter = Control.MOUSE_FILTER_STOP
+	modal_layer.z_index = 350
+	add_child(modal_layer)
+
+	var dimmer := ColorRect.new()
+	ModalTemplate.apply_full_rect(dimmer)
+	dimmer.color = ModalTemplate.DIMMER_COLOR
+	dimmer.mouse_filter = Control.MOUSE_FILTER_STOP
+	modal_layer.add_child(dimmer)
+
+	var center := CenterContainer.new()
+	ModalTemplate.apply_full_rect(center)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	modal_layer.add_child(center)
+
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(ModalTemplate.CARD_WIDTH, 0.0)
+	panel.add_theme_stylebox_override("panel", ModalTemplate.make_card_style(ModalTemplate.ThemeKind.SONAR))
+	center.add_child(panel)
+
+	var vbox := VBoxContainer.new()
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	vbox.add_theme_constant_override("separation", 16)
+	panel.add_child(vbox)
+
+	var pill := Label.new()
+	pill.text = "◈   C H A L L E N G E   M O D E   U N L O C K E D   ◈"
+	pill.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	pill.add_theme_font_size_override("font_size", 12)
+	pill.add_theme_color_override("font_color", Color(0.85, 0.72, 0.40, 0.90))
+	vbox.add_child(pill)
+
+	var title := Label.new()
+	title.text = "CHALLENGE ABYSS UNLOCKED"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 22)
+	title.add_theme_color_override("font_color", Color(0.92, 0.96, 1.0, 1.0))
+	vbox.add_child(title)
+
+	var sub := Label.new()
+	sub.text = "THE DESCENT AWAITS  •  -4,500M  TO  -9,999M SP"
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sub.add_theme_font_size_override("font_size", 12)
+	sub.add_theme_color_override("font_color", Color(0.40, 0.75, 0.95, 0.80))
+	vbox.add_child(sub)
+
+	var sep := HSeparator.new()
+	sep.custom_minimum_size = Vector2(240.0, 2.0)
+	vbox.add_child(sep)
+
+	var desc1 := Label.new()
+	desc1.text = "◈ 21 Subterranean Abyss Sectors: Face absolute silence & apex blind predators\n◈ Abyssal Pacts: Balance grueling curses against powerful ancient boons\n◈ Global Leaderboard: Log total speedrun clear time on Huawei Game Service"
+	desc1.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	desc1.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	desc1.add_theme_font_size_override("font_size", 13)
+	desc1.add_theme_color_override("font_color", Color(0.72, 0.84, 0.94, 0.85))
+	vbox.add_child(desc1)
+
+	var spacer := Control.new()
+	spacer.custom_minimum_size = Vector2(0.0, 8.0)
+	vbox.add_child(spacer)
+
+	var btn := Button.new()
+	btn.text = "ENTER THE ABYSS"
+	btn.custom_minimum_size = Vector2(280.0, 48.0)
+	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	ModalTemplate.style_button(btn, true, ModalTemplate.ThemeKind.SONAR)
+	vbox.add_child(btn)
+
+	_wire_button_Juice(btn)
+
+	_play_ui_sound(_wav_launch, -3.0, 1.0)
+
+	btn.pressed.connect(func():
+		_play_ui_sound(_wav_click, -2.0, 1.1)
+		var tw := modal_layer.create_tween()
+		tw.tween_property(modal_layer, "modulate:a", 0.0, 0.25).set_trans(Tween.TRANS_SINE)
+		tw.tween_callback(func():
+			modal_layer.queue_free()
+			_descend_to_challenge_mode()
+		)
+	)
