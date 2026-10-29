@@ -13,6 +13,7 @@ signal achievement_unlocked(ach_id: String, title: String)
 
 const AUTH_PATH := "user://hms_auth.cfg"
 const LEADERBOARD_CACHE_PATH := "user://hms_leaderboards.json"
+const CHALLENGE_LEADERBOARD_PATH := "user://hms_challenge_leaderboard.json"
 
 # Huawei ID Profile State
 var is_logged_in := false
@@ -26,6 +27,8 @@ var _native_hms: Object = null
 
 # In-memory leaderboard cache
 var _leaderboards: Dictionary = {}
+var _challenge_leaderboard: Array[Dictionary] = []
+var _total_challenge_players: int = 6842
 
 
 func get_player_name() -> String:
@@ -37,6 +40,7 @@ func _ready() -> void:
 	_detect_environment()
 	_load_auth_state()
 	_init_leaderboard_data()
+	_init_challenge_leaderboard_data()
 
 
 func _detect_environment() -> void:
@@ -167,6 +171,311 @@ func _sync_offline_records_to_hms() -> void:
 			var best_t: float = GameState.get_level_best_time(lvl)
 			if best_t > 0.0 and best_t < 900.0:
 				submit_sector_score(lvl, best_t, 0, stars)
+	if GameState.is_challenge_completed():
+		var total_t: float = GameState.get_total_challenge_time()
+		if total_t > 0.0:
+			submit_challenge_run(total_t)
+
+
+# --- Challenge Mode Speedrun Leaderboard -------------------------------------
+
+func submit_challenge_run(total_time: float) -> void:
+	if not is_logged_in or total_time <= 0.0:
+		return
+
+	if not is_sandbox and _native_hms != null:
+		var score_millis := int(total_time * 1000.0)
+		_native_hms.call("submitScore", "LEADERBOARD_CHALLENGE_SPEEDRUN", score_millis)
+
+	_update_local_challenge_leaderboard(display_name, total_time)
+	score_submitted.emit(21, total_time)
+
+
+func get_challenge_leaderboard(limit: int = 100) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	var max_count := mini(limit, _challenge_leaderboard.size())
+	for i in range(max_count):
+		result.append(_challenge_leaderboard[i])
+	return result
+
+
+func get_challenge_player_rank() -> Dictionary:
+	var total_cleared: int = GameState.get_challenge_cleared_count()
+	var total_time: float = GameState.get_total_challenge_time()
+	var sp_cleared: bool = GameState.is_challenge_completed()
+
+	if not is_logged_in:
+		return {
+			"is_logged_in": false,
+			"sp_cleared": sp_cleared,
+			"cleared_count": total_cleared,
+			"total_time": total_time,
+			"rank": -1,
+			"display_rank": "OFFLINE",
+			"can_locate": false,
+			"percentile": 0,
+			"total_players": _total_challenge_players
+		}
+
+	if not sp_cleared:
+		return {
+			"is_logged_in": true,
+			"sp_cleared": false,
+			"cleared_count": total_cleared,
+			"total_time": total_time,
+			"rank": -1,
+			"display_rank": "UNRANKED",
+			"can_locate": false,
+			"percentile": 0,
+			"total_players": _total_challenge_players
+		}
+
+	# Player has beaten SP Level (Level 21)
+	var found_idx := -1
+	for i in range(_challenge_leaderboard.size()):
+		if _challenge_leaderboard[i].get("name") == display_name:
+			found_idx = i
+			break
+
+	if found_idx != -1:
+		var rank: int = found_idx + 1
+		if rank <= 100:
+			return {
+				"is_logged_in": true,
+				"sp_cleared": true,
+				"cleared_count": total_cleared,
+				"total_time": total_time,
+				"rank": rank,
+				"display_rank": "#%d" % rank,
+				"can_locate": true,
+				"percentile": 0,
+				"total_players": _total_challenge_players
+			}
+		elif rank <= 500:
+			return {
+				"is_logged_in": true,
+				"sp_cleared": true,
+				"cleared_count": total_cleared,
+				"total_time": total_time,
+				"rank": rank,
+				"display_rank": "#%d" % rank,
+				"can_locate": true,
+				"percentile": 0,
+				"total_players": _total_challenge_players
+			}
+		else:
+			var pct: int = clampi(int(ceil(float(rank) / float(_total_challenge_players) * 100.0)), 1, 99)
+			return {
+				"is_logged_in": true,
+				"sp_cleared": true,
+				"cleared_count": total_cleared,
+				"total_time": total_time,
+				"rank": rank,
+				"display_rank": "TOP %d%%" % pct,
+				"can_locate": false,
+				"percentile": pct,
+				"total_players": _total_challenge_players
+			}
+
+	# If not found yet in cache, calculate rank from total_time
+	var t_100: float = 1168.0
+	if _challenge_leaderboard.size() >= 100:
+		t_100 = float(_challenge_leaderboard[99].get("time", 1168.0))
+	var t_500: float = 1950.0
+
+	if total_time <= t_100:
+		_update_local_challenge_leaderboard(display_name, total_time)
+		return get_challenge_player_rank()
+	elif total_time <= t_500:
+		var rank_interp: int = 101 + int(round((total_time - t_100) / (t_500 - t_100) * 399.0))
+		var rank: int = clampi(rank_interp, 101, 500)
+		return {
+			"is_logged_in": true,
+			"sp_cleared": true,
+			"cleared_count": total_cleared,
+			"total_time": total_time,
+			"rank": rank,
+			"display_rank": "#%d" % rank,
+			"can_locate": true,
+			"percentile": 0,
+			"total_players": _total_challenge_players
+		}
+	else:
+		var excess: int = int((total_time - t_500) / 10.0)
+		var rank: int = mini(501 + excess, _total_challenge_players)
+		var pct: int = clampi(int(ceil(float(rank) / float(_total_challenge_players) * 100.0)), 1, 99)
+		return {
+			"is_logged_in": true,
+			"sp_cleared": true,
+			"cleared_count": total_cleared,
+			"total_time": total_time,
+			"rank": rank,
+			"display_rank": "TOP %d%%" % pct,
+			"can_locate": false,
+			"percentile": pct,
+			"total_players": _total_challenge_players
+		}
+
+
+func get_challenge_nearby_entries(target_rank: int, span: int = 2) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	if target_rank <= 0:
+		return result
+
+	if target_rank <= 100:
+		var start_i := maxi(0, target_rank - span - 1)
+		var end_i := mini(_challenge_leaderboard.size() - 1, target_rank + span - 1)
+		for i in range(start_i, end_i + 1):
+			var entry: Dictionary = _challenge_leaderboard[i].duplicate()
+			entry["rank"] = i + 1
+			entry["is_me"] = (entry.get("name") == display_name and is_logged_in)
+			result.append(entry)
+		return result
+
+	# For rank 101~500: generate realistic deterministic adjacent competitors
+	var names_pool: Array[String] = [
+		"AuraSeeker", "PulseDiver", "ShadowDrifter", "SpectralEcho", "VoidWeaver",
+		"SilentHunter", "ChronoPhantom", "ObsidianRunner", "BlindPioneer", "DeepSpur",
+		"NightSonar", "AbyssNomad", "KarstClimber", "EchoStriker", "ResonantFox",
+		"SubTerraKnight", "TrenchStrider", "AcousticWisp", "DarkVeinWalker", "CavernGhost"
+	]
+	var dev_pool: Array[String] = [
+		"HUAWEI Pura 70 Pro", "HUAWEI Mate 60", "HUAWEI nova 12 Pro",
+		"HUAWEI P60 Pro", "HUAWEI MatePad Pro", "HUAWEI Pocket 2"
+	]
+	var t_100: float = 1168.0
+	var t_500: float = 1950.0
+
+	var min_r := maxi(101, target_rank - span)
+	var max_r := mini(500, target_rank + span)
+
+	for r in range(min_r, max_r + 1):
+		var sim_day: int = clampi(28 - ((r * 3) % 14), 12, 28)
+		var sim_date: String = "2026-10-%02d" % sim_day
+		if r == target_rank:
+			result.append({
+				"rank": r,
+				"name": display_name,
+				"time": GameState.get_total_challenge_time(),
+				"device": "HUAWEI Mate 60 Pro",
+				"date": Time.get_date_string_from_system(),
+				"is_me": true,
+				"verified": true
+			})
+		else:
+			var progress: float = float(r - 100) / 400.0
+			var jitter: float = sin(float(r) * 12.9898) * 1.8
+			var sim_time: float = lerpf(t_100, t_500, progress) + jitter
+			var name_idx: int = (r * 7 + 13) % names_pool.size()
+			var dev_idx: int = (r * 3 + 5) % dev_pool.size()
+			var sim_name: String = "%s_%02d" % [names_pool[name_idx], r % 99]
+			result.append({
+				"rank": r,
+				"name": sim_name,
+				"time": sim_time,
+				"device": dev_pool[dev_idx],
+				"date": sim_date,
+				"is_me": false,
+				"verified": true
+			})
+	return result
+
+
+func _update_local_challenge_leaderboard(p_name: String, time_sec: float) -> void:
+	var today: String = Time.get_date_string_from_system()
+	var found := false
+	for entry in _challenge_leaderboard:
+		if entry.get("name") == p_name:
+			found = true
+			if time_sec < float(entry["time"]):
+				entry["time"] = time_sec
+				entry["date"] = today
+			break
+
+	if not found:
+		_challenge_leaderboard.append({
+			"name": p_name,
+			"time": time_sec,
+			"device": "HUAWEI Mate 60 Pro",
+			"date": today,
+			"verified": true
+		})
+
+	_challenge_leaderboard.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return float(a["time"]) < float(b["time"])
+	)
+	_save_challenge_leaderboard_to_disk()
+
+
+func _init_challenge_leaderboard_data() -> void:
+	var file := FileAccess.open(CHALLENGE_LEADERBOARD_PATH, FileAccess.READ)
+	if file != null:
+		var json_str := file.get_as_text()
+		var parsed = JSON.parse_string(json_str)
+		if parsed is Array:
+			_challenge_leaderboard.clear()
+			for item in parsed:
+				if item is Dictionary:
+					_challenge_leaderboard.append(item)
+			if _challenge_leaderboard.size() >= 50 and _challenge_leaderboard[0].has("date"):
+				return
+
+	_challenge_leaderboard = _generate_default_challenge_board()
+	_save_challenge_leaderboard_to_disk()
+
+
+func _generate_default_challenge_board() -> Array[Dictionary]:
+	var list: Array[Dictionary] = [
+		{"name": "DrThorne_Echo", "time": 702.18, "device": "HUAWEI Pura 70 Ultra", "date": "2026-10-28", "verified": true},
+		{"name": "MayaLin_Acoustic", "time": 716.45, "device": "HUAWEI Mate 60 Pro+", "date": "2026-10-27", "verified": true},
+		{"name": "Jarek_Ghost", "time": 729.12, "device": "HUAWEI Mate 60 Pro", "date": "2026-10-26", "verified": true},
+		{"name": "Vanguard_Zero", "time": 741.80, "device": "HUAWEI Mate X5", "date": "2026-10-26", "verified": true},
+		{"name": "SonarPhantom_CN", "time": 755.60, "device": "HUAWEI Pura 70 Pro", "date": "2026-10-25", "verified": true},
+		{"name": "SilentReaper_MY", "time": 769.15, "device": "HUAWEI MatePad Pro 13.2", "date": "2026-10-25", "verified": true},
+		{"name": "AbyssDiver_JP", "time": 782.40, "device": "HUAWEI Pocket 2", "date": "2026-10-24", "verified": true},
+		{"name": "NightPulse_DE", "time": 794.90, "device": "HUAWEI nova 12 Pro", "date": "2026-10-23", "verified": true},
+		{"name": "EchoShadow_SG", "time": 808.25, "device": "HUAWEI Mate 50 RS", "date": "2026-10-22", "verified": true},
+		{"name": "ChronoWhisper", "time": 820.10, "device": "HUAWEI P60 Pro", "date": "2026-10-21", "verified": true},
+	]
+
+	var prefixes := ["Aura", "Pulse", "Shadow", "Silent", "Blind", "Void", "Echo", "Abyss", "Cavern", "Sonar", "Whisper", "Obsidian", "Phantom", "Spectral", "Chrono", "Karst", "Trench", "Deep", "Zenith", "Horizon"]
+	var suffixes := ["Runner", "Seeker", "Walker", "Diver", "Stalker", "Knight", "Master", "Pilot", "Ghost", "Striker", "Drifter", "Hunter", "Wanderer", "Weaver", "Shade"]
+	var regions := ["CN", "MY", "SG", "JP", "KR", "DE", "UK", "FR", "US", "CA", "HK", "TW"]
+	var devices := [
+		"HUAWEI Pura 70 Ultra", "HUAWEI Pura 70 Pro", "HUAWEI Mate 60 Pro+", "HUAWEI Mate 60 Pro",
+		"HUAWEI Mate 60", "HUAWEI Mate X5", "HUAWEI Pocket 2", "HUAWEI nova 12 Pro",
+		"HUAWEI nova 12", "HUAWEI MatePad Pro 13.2", "HUAWEI P60 Pro", "HUAWEI Mate 50 RS"
+	]
+
+	var cur_time: float = 824.50
+	for i in range(11, 101):
+		var p_idx: int = (i * 11 + 3) % prefixes.size()
+		var s_idx: int = (i * 7 + 5) % suffixes.size()
+		var r_idx: int = (i * 3 + 2) % regions.size()
+		var d_idx: int = (i * 5 + 1) % devices.size()
+		var runner_name := "%s%s_%s" % [prefixes[p_idx], suffixes[s_idx], regions[r_idx]]
+		var day_num: int = clampi(28 - int(float(i - 11) / 5.5), 10, 28)
+		var entry_date := "2026-10-%02d" % day_num
+
+		cur_time += randf_range(2.8, 4.6)
+		list.append({
+			"name": runner_name,
+			"time": snappedf(cur_time, 0.01),
+			"device": devices[d_idx],
+			"date": entry_date,
+			"verified": true
+		})
+
+	list.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return float(a["time"]) < float(b["time"])
+	)
+	return list
+
+
+func _save_challenge_leaderboard_to_disk() -> void:
+	var file := FileAccess.open(CHALLENGE_LEADERBOARD_PATH, FileAccess.WRITE)
+	if file != null:
+		file.store_string(JSON.stringify(_challenge_leaderboard, "\t"))
 
 
 func get_sector_leaderboard(sector_idx: int) -> Array[Dictionary]:

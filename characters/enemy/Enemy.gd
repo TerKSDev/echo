@@ -82,7 +82,7 @@ var screamer_cooldown := 0.0
 var screamer_gap_timer := 0.0
 var scream_wave_radius := 0.0
 
-# Listener: a shout starts "listening"; counts sounds up to 5, then pulses the map
+# Listener: a shout starts "listening"; counts sounds up to 3 (2 under feedback curse), then pulses the map
 var listener_count := 0
 var listener_cooldown := 0.0
 var listener_gap_timer := 0.0
@@ -115,6 +115,7 @@ var _last_occ_self_pos := Vector2(-99999.0, -99999.0)
 var _last_occ_player_pos := Vector2(-99999.0, -99999.0)
 var _was_visually_active := true
 var _stun_timer := 0.0
+var acoustic_mark_timer := 0.0
 
 
 func _init() -> void:
@@ -152,11 +153,11 @@ func _apply_challenge_modifiers() -> void:
 	if ChallengeModifiers.has_curse("curse_predator_instinct"):
 		sneak_wake_radius *= 1.80
 		sleep_wake_radius *= 1.35
+		sneak_sense_radius *= 1.80
 
 
 func stun(duration: float) -> void:
 	_stun_timer = maxf(_stun_timer, duration)
-	velocity = Vector2.ZERO
 
 
 func _is_stationary() -> bool:
@@ -197,6 +198,7 @@ func on_sound(pos: Vector2, loudness: float, radius: float, is_voice: bool = fal
 	var p_node := _get_player()
 	var player_in_water := p_node != null and is_instance_valid(p_node) and p_node.get("water_count") != null and int(p_node.water_count) > 0
 	var is_water_move := not is_voice and player_in_water and not is_sneak
+	var has_resonance: bool = p_node != null and is_instance_valid(p_node) and p_node.has_method("has_resonance_backlash") and p_node.has_resonance_backlash()
 
 	if enemy_type == EnemyType.LISTENER:
 		# Listener ignores normal footsteps, but is alerted by shouts
@@ -215,7 +217,8 @@ func on_sound(pos: Vector2, loudness: float, radius: float, is_voice: bool = fal
 			return
 
 	var dist: float = global_position.distance_to(pos)
-	var effective_max := minf(radius, hearing_range)
+	var max_range := hearing_range * (1.50 if has_resonance else 1.0)
+	var effective_max := minf(radius * (1.50 if has_resonance else 1.0), max_range)
 	if dist > effective_max:
 		return
 
@@ -224,11 +227,14 @@ func on_sound(pos: Vector2, loudness: float, radius: float, is_voice: bool = fal
 	if wall_blocked:
 		if not is_voice:
 			return
-		if dist > 140.0:
+		var max_wall_dist := 210.0 if has_resonance else 140.0
+		if dist > max_wall_dist:
 			return
-		loudness *= 0.20
+		loudness *= (0.30 if has_resonance else 0.20)
 
 	var thresh := 0.07 if (enemy_type == EnemyType.SLEEPER and state != State.SLEEP) else hearing_threshold
+	if has_resonance:
+		thresh *= 0.65
 	var heard := loudness * (1.0 - dist / effective_max)
 	if heard < thresh:
 		return
@@ -402,8 +408,7 @@ func _handle_listener_sound(_is_voice: bool) -> void:
 	listener_gap_timer = LISTENER_MIN_GAP
 	reveal(1.2)
 
-	var max_count := 2 if (GameState.current_mode == GameState.GameMode.CHALLENGE and ChallengeModifiers.has_curse("curse_listener_feedback")) else 3
-	if listener_count >= max_count:
+	if listener_count >= 3:
 		_trigger_listener_alarm()
 	else:
 		_enter(State.ALERT)
@@ -414,10 +419,6 @@ func _trigger_listener_alarm() -> void:
 	_enter(State.ALARM)
 	alarm_wave_radius = 0.0
 	alarmed.emit(global_position, global_position)
-	if GameState.current_mode == GameState.GameMode.CHALLENGE and ChallengeModifiers.has_curse("curse_listener_feedback"):
-		var p := _get_player() as Player
-		if p != null and is_instance_valid(p) and p.alive:
-			p.immobilize(1.2)
 
 
 # --- State machine -----------------------------------------------------------
@@ -596,8 +597,17 @@ func get_threat_level(player_pos: Vector2) -> float:
 func _physics_process(delta: float) -> void:
 	if _stun_timer > 0.0:
 		_stun_timer = maxf(0.0, _stun_timer - delta)
-		velocity = Vector2.ZERO
+		if not _is_stationary() and velocity.length() > 5.0:
+			velocity = velocity.move_toward(Vector2.ZERO, 650.0 * delta)
+			move_and_slide()
+		else:
+			velocity = Vector2.ZERO
+		visible_alpha = maxf(visible_alpha, 0.85)
 		return
+
+	if acoustic_mark_timer > 0.0:
+		acoustic_mark_timer = maxf(0.0, acoustic_mark_timer - delta)
+		visible_alpha = maxf(visible_alpha, 0.80)
 
 	timer += delta
 	visible_alpha = move_toward(visible_alpha, 0.0, delta * 0.7)
@@ -661,6 +671,8 @@ func _physics_process(delta: float) -> void:
 	var is_visually_active: bool = (
 		visible_alpha > 0.01
 		or eye_linger_timer > 0.0
+		or acoustic_mark_timer > 0.0
+		or _stun_timer > 0.0
 		or spasm_timer > 0.0
 		or not step_ripples.is_empty()
 		or not trail_points.is_empty()
@@ -738,7 +750,10 @@ func _run_state(delta: float, cur_patrol: float, cur_chase: float) -> void:
 				if timer >= alert_time:
 					_enter(State.INVESTIGATE)
 		State.INVESTIGATE:
-			if _move_toward(target, cur_chase, delta) or timer >= investigate_timeout or _is_stuck(delta):
+			var p_node_inv := _get_player()
+			var is_calm_inv: bool = p_node_inv != null and is_instance_valid(p_node_inv) and p_node_inv.has_method("is_holding_breath") and p_node_inv.is_holding_breath()
+			var chase_dur := investigate_timeout * (0.65 if (GameState.current_mode == GameState.GameMode.CHALLENGE and ChallengeModifiers.has_boon("boon_calm_breath") and is_calm_inv) else 1.0)
+			if _move_toward(target, cur_chase, delta) or timer >= chase_dur or _is_stuck(delta):
 				velocity = Vector2.ZERO
 				_enter(State.SEARCH)
 		State.SEARCH:
@@ -748,7 +763,10 @@ func _run_state(delta: float, cur_patrol: float, cur_chase: float) -> void:
 			elif _move_toward(search_point, cur_patrol, delta) or _is_stuck(delta):
 				_search_wait_timer = 0.35
 				search_point = _random_search_point()
-			if timer >= SEARCH_TIME:
+			var p_node_srch := _get_player()
+			var is_calm_srch: bool = p_node_srch != null and is_instance_valid(p_node_srch) and p_node_srch.has_method("is_holding_breath") and p_node_srch.is_holding_breath()
+			var search_dur := SEARCH_TIME * (0.50 if (GameState.current_mode == GameState.GameMode.CHALLENGE and ChallengeModifiers.has_boon("boon_calm_breath") and is_calm_srch) else 1.0)
+			if timer >= search_dur:
 				is_investigating_decoy = false
 				_enter(State.RETURN)
 		State.RETURN:
@@ -908,6 +926,7 @@ func reveal(amount: float = 1.0) -> void:
 		spasm_offset = Vector2(randf_range(-3.2, 3.2), randf_range(-3.2, 3.2))
 	visible_alpha = clampf(visible_alpha + amount, 0.0, 1.0)
 	if GameState.current_mode == GameState.GameMode.CHALLENGE and ChallengeModifiers.has_boon("boon_acoustic_amplifier"):
+		acoustic_mark_timer = 4.0
 		eye_linger_timer = 4.0
 		visible_alpha = 1.0
 	else:

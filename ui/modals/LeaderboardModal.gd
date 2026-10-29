@@ -283,6 +283,10 @@ func _build_ui() -> void:
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	var vbar := scroll.get_v_scroll_bar()
+	if vbar != null:
+		vbar.modulate.a = 0.0
+		vbar.custom_minimum_size = Vector2.ZERO
 	vbox.add_child(scroll)
 
 	_list_container = VBoxContainer.new()

@@ -80,7 +80,7 @@ static func open_modal(parent: Node) -> Control:
 		var cur := parent.get_tree().current_scene
 		if cur != null:
 			from_path = cur.scene_file_path
-	GameState.go_to_intel(from_path, 0)
+	GameState.go_to_archives(from_path)
 	return null
 
 

@@ -171,6 +171,14 @@ func is_story_completed() -> bool:
 	return story_completed or story_highest_unlocked > STORY_LEVELS.size()
 
 
+func is_challenge_completed() -> bool:
+	return challenge_records.has(21) or has_seen_campaign_ending("challenge")
+
+
+func get_challenge_cleared_count() -> int:
+	return challenge_records.size()
+
+
 func is_challenge_unlocked() -> bool:
 	return challenge_unlocked or is_story_completed() or challenge_highest_unlocked > 1 or challenge_records.size() > 0
 
@@ -514,7 +522,7 @@ const LORE_NOTES: Dictionary = {
 		"title": "Monolith Log: The Hive Ear",
 		"author": "Biologist Maya Lin",
 		"depth": "-3,100 M",
-		"text": "At the center of Hush Hall sits an emerald monolith that breathes: The Listener. It possesses no limbs, and it ignores footsteps completely, yet its tympanic core spans the entire chamber. It accumulates vocal echoes and thrown stones like sand in an hourglass. On the fifth disturbance, it broadcasts a sector-wide alarm that drives every beast toward you."
+		"text": "At the center of Hush Hall sits an emerald monolith that breathes: The Listener. It possesses no limbs, and it ignores footsteps completely, yet its tympanic core spans the entire chamber. It accumulates vocal echoes and thrown stones like sand in an hourglass. On reaching its 3rd disturbance (or 2nd under feedback curse), it broadcasts a sector-wide alarm that drives every beast toward you."
 	},
 	"L06_2": {
 		"level": 6,
@@ -783,9 +791,11 @@ var sonar_palette := "cyan"        # "cyan", "emerald", "amber", "white"
 
 # Navigation tracking
 const SETTINGS_SCENE := "res://ui/screens/settings_scene.tscn"
-const INTEL_SCENE := "res://ui/screens/intel_scene.tscn"
+const ARCHIVES_SCENE := "res://ui/screens/archives_scene.tscn"
+const INTEL_SCENE := ARCHIVES_SCENE
 const LEADERBOARD_SCENE := "res://ui/screens/leaderboard_scene.tscn"
 var previous_scene_path: String = LEVEL_SELECT_SCENE
+var archives_target_section: String = "hub"
 var intel_default_tab: int = 0
 var leaderboard_default_sector: int = 1
 
@@ -1138,15 +1148,19 @@ func go_to_settings(from_scene: String = "") -> void:
 	transition_to_scene(SETTINGS_SCENE, 0.22, 0.28)
 
 
-func go_to_intel(from_scene: String = "", default_tab: int = 0) -> void:
+func go_to_archives(from_scene: String = "", target_section: String = "hub") -> void:
 	if from_scene != "":
 		previous_scene_path = from_scene
 	else:
 		var cur := get_tree().current_scene
 		if cur != null and cur.scene_file_path != "":
 			previous_scene_path = cur.scene_file_path
-	intel_default_tab = default_tab
-	transition_to_scene(INTEL_SCENE, 0.22, 0.28)
+	archives_target_section = target_section
+	transition_to_scene(ARCHIVES_SCENE, 0.22, 0.28)
+
+
+func go_to_intel(from_scene: String = "", _default_tab: int = 0) -> void:
+	go_to_archives(from_scene, "hub")
 
 
 func go_to_leaderboard(from_scene: String = "", default_sector: int = 1) -> void:

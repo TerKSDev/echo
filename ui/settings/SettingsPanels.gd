@@ -1,7 +1,8 @@
 class_name SettingsPanels
 extends RefCounted
 ## Tab Panel Construction for ECHO Settings System.
-## Modularly builds General, Controls, Display, and Advanced options.
+## Modularly builds General, Controls, Display, and Advanced options
+## using grouped section cards with live interactive audio/visual preview feedback.
 
 
 static func update_fps_btn_text(btn: Button) -> void:
@@ -35,16 +36,21 @@ static func update_palette_btn(btn: Button, chip: ColorRect) -> void:
 	SettingsUIFactory.style_action_button(btn, Color(0.35, 0.85, 1.0, 0.85), Color(0.04, 0.14, 0.25, 0.85), true)
 
 
+# --- 1. GENERAL TAB (AUDIO & MICROPHONE) -------------------------------------
+
 static func build_general_panel(scene: Control) -> VBoxContainer:
 	var root := VBoxContainer.new()
-	root.add_theme_constant_override("separation", 22)
+	root.mouse_filter = Control.MOUSE_FILTER_PASS
+	root.add_theme_constant_override("separation", 18)
 
-	# --- Section 1: Master Audio ---
-	root.add_child(SettingsUIFactory.create_section_header("AUDIO OUTPUT & VOLUMES"))
+	# --- Card 1: Master Audio Output ---
+	var audio_card := SettingsUIFactory.create_section_card("AUDIO OUTPUT & VOLUMES")
+	root.add_child(audio_card.card)
+	var audio_content: VBoxContainer = audio_card.content
 
 	# Master Audio Mute Switch
 	var mute_btn := Button.new()
-	mute_btn.custom_minimum_size = Vector2(136, 32)
+	mute_btn.custom_minimum_size = Vector2(144, 38)
 	mute_btn.focus_mode = Control.FOCUS_NONE
 	SettingsUIFactory.refresh_toggle_btn(mute_btn, not GameState.master_muted, "ENABLED", "MUTED")
 
@@ -58,9 +64,11 @@ static func build_general_panel(scene: Control) -> VBoxContainer:
 		GameState.set_bgm_volume(v)
 	)
 
-	# Sound Effects (SFX) Slider
+	# Sound Effects (SFX) Slider with Live Preview Ping
 	var sfx_vol_row := SettingsUIFactory.create_slider_row("SOUND EFFECTS (SFX)", "Acoustic ping sonar waves, monster roars, footsteps, and cave water droplets.", GameState.sfx_volume, true, func(v: float):
 		GameState.set_sfx_volume(v)
+		if scene.has_method("preview_sfx_ping"):
+			scene.call("preview_sfx_ping")
 	)
 
 	var update_audio_deps := func() -> void:
@@ -76,23 +84,24 @@ static func build_general_panel(scene: Control) -> VBoxContainer:
 		update_audio_deps.call()
 	)
 	scene.call("wire_juice", mute_btn)
-	root.add_child(SettingsUIFactory.create_setting_row(
+
+	audio_content.add_child(SettingsUIFactory.create_setting_row(
 		"MASTER AUDIO OUTPUT",
 		"Enable or silence all master game audio while preserving your volume slider levels.",
 		mute_btn
 	))
-	root.add_child(master_vol_row)
-	root.add_child(bgm_vol_row)
-	root.add_child(sfx_vol_row)
+	audio_content.add_child(master_vol_row)
+	audio_content.add_child(bgm_vol_row)
+	audio_content.add_child(sfx_vol_row)
 
-	root.add_child(SettingsUIFactory.create_category_divider())
-
-	# --- Section 2: Microphone Input ---
-	root.add_child(SettingsUIFactory.create_section_header("MICROPHONE SENSOR & CALIBRATION"))
+	# --- Card 2: Microphone Sensor ---
+	var mic_card := SettingsUIFactory.create_section_card("MICROPHONE SENSOR & CALIBRATION")
+	root.add_child(mic_card.card)
+	var mic_content: VBoxContainer = mic_card.content
 
 	# Mic Sensor Enabled Toggle
 	var mic_btn := Button.new()
-	mic_btn.custom_minimum_size = Vector2(136, 32)
+	mic_btn.custom_minimum_size = Vector2(144, 38)
 	mic_btn.focus_mode = Control.FOCUS_NONE
 	SettingsUIFactory.refresh_toggle_btn(mic_btn, GameState.mic_enabled, "ENABLED", "MUTED")
 
@@ -104,24 +113,26 @@ static func build_general_panel(scene: Control) -> VBoxContainer:
 
 	# Live Mic Meter & Calibration Button
 	var calib_row := HBoxContainer.new()
+	calib_row.mouse_filter = Control.MOUSE_FILTER_PASS
 	calib_row.add_theme_constant_override("separation", 10)
 
 	var meter_canvas := Control.new()
-	meter_canvas.custom_minimum_size = Vector2(0, 32)
+	meter_canvas.custom_minimum_size = Vector2(0, 36)
 	meter_canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	meter_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	meter_canvas.draw.connect(func(): scene.call("_draw_menu_mic_meter", meter_canvas))
 	calib_row.add_child(meter_canvas)
 	scene.set("_meter_canvas", meter_canvas)
 
 	var calib_btn := Button.new()
-	calib_btn.custom_minimum_size = Vector2(136, 32)
+	calib_btn.custom_minimum_size = Vector2(148, 38)
 	calib_btn.focus_mode = Control.FOCUS_NONE
 	calib_btn.add_theme_font_size_override("font_size", 12)
 	calib_btn.text = "CALIBRATE ROOM"
 	SettingsUIFactory.style_action_button(calib_btn, Color(0.35, 0.85, 1.0, 0.85), Color(0.04, 0.14, 0.25, 0.85), true)
 	calib_btn.pressed.connect(func():
 		scene.call("play_click")
-		var mic: Node = scene.get("_menu_mic")
+		var mic: Node = scene.call("ensure_menu_mic") if scene.has_method("ensure_menu_mic") else scene.get("_menu_mic")
 		if mic != null:
 			mic.call("recalibrate")
 	)
@@ -130,12 +141,14 @@ static func build_general_panel(scene: Control) -> VBoxContainer:
 	scene.set("_calib_btn", calib_btn)
 
 	var calib_container := VBoxContainer.new()
+	calib_container.mouse_filter = Control.MOUSE_FILTER_PASS
 	calib_container.add_theme_constant_override("separation", 6)
 	calib_container.add_child(calib_row)
 
 	var hint_lbl := Label.new()
+	hint_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hint_lbl.text = "SPEAK TO TEST  •  YELLOW LINE = TRIGGER THRESHOLD  •  KEY [M] = QUICK MUTE"
-	hint_lbl.add_theme_font_size_override("font_size", 12)
+	hint_lbl.add_theme_font_size_override("font_size", 11)
 	hint_lbl.add_theme_color_override("font_color", Color(0.42, 0.65, 0.85, 0.65))
 	calib_container.add_child(hint_lbl)
 
@@ -156,7 +169,7 @@ static func build_general_panel(scene: Control) -> VBoxContainer:
 		scene.call("play_click")
 		GameState.mic_enabled = not GameState.mic_enabled
 		GameState.save_settings()
-		var mic: Node = scene.get("_menu_mic")
+		var mic: Node = scene.call("ensure_menu_mic") if scene.has_method("ensure_menu_mic") else scene.get("_menu_mic")
 		if mic != null:
 			mic.set("enabled", GameState.mic_enabled)
 		SettingsUIFactory.refresh_toggle_btn(mic_btn, GameState.mic_enabled, "ENABLED", "MUTED")
@@ -166,13 +179,14 @@ static func build_general_panel(scene: Control) -> VBoxContainer:
 		update_mic_deps.call()
 	)
 	scene.call("wire_juice", mic_btn)
-	root.add_child(SettingsUIFactory.create_setting_row(
+
+	mic_content.add_child(SettingsUIFactory.create_setting_row(
 		"MICROPHONE SENSOR",
 		"Detects real-world vocalization to generate acoustic echo waves in the abyss.",
 		mic_btn
 	))
-	root.add_child(mic_sens_row)
-	root.add_child(calib_container)
+	mic_content.add_child(mic_sens_row)
+	mic_content.add_child(calib_container)
 
 	update_audio_deps.call()
 	update_mic_deps.call()
@@ -180,15 +194,21 @@ static func build_general_panel(scene: Control) -> VBoxContainer:
 	return root
 
 
+# --- 2. CONTROLS TAB (TOUCH, AIMING, ACCESSIBILITY) -------------------------
+
 static func build_controls_panel(scene: Control) -> VBoxContainer:
 	var root := VBoxContainer.new()
-	root.add_theme_constant_override("separation", 22)
+	root.mouse_filter = Control.MOUSE_FILTER_PASS
+	root.add_theme_constant_override("separation", 18)
 
-	root.add_child(SettingsUIFactory.create_section_header("MOVEMENT & STEALTH"))
+	# --- Card 1: Movement & Steering ---
+	var move_card := SettingsUIFactory.create_section_card("MOVEMENT & STEERING")
+	root.add_child(move_card.card)
+	var move_content: VBoxContainer = move_card.content
 
 	# Movement Scheme: Joystick vs Drag & Tap
 	var scheme_btn := Button.new()
-	scheme_btn.custom_minimum_size = Vector2(160, 32)
+	scheme_btn.custom_minimum_size = Vector2(156, 38)
 	scheme_btn.focus_mode = Control.FOCUS_NONE
 	SettingsUIFactory.refresh_toggle_btn(scheme_btn, GameState.virtual_joystick_enabled, "JOYSTICK", "DRAG & TAP")
 	scheme_btn.pressed.connect(func():
@@ -203,7 +223,7 @@ static func build_controls_panel(scene: Control) -> VBoxContainer:
 			hud.update_controls_layout()
 	)
 	scene.call("wire_juice", scheme_btn)
-	root.add_child(SettingsUIFactory.create_setting_row(
+	move_content.add_child(SettingsUIFactory.create_setting_row(
 		"MOVEMENT SCHEME",
 		"Choose between dual-thumb Virtual Joystick or direct Drag & Tap touch steering.",
 		scheme_btn
@@ -211,7 +231,7 @@ static func build_controls_panel(scene: Control) -> VBoxContainer:
 
 	# Action Buttons Side / Handedness
 	var layout_btn := Button.new()
-	layout_btn.custom_minimum_size = Vector2(160, 32)
+	layout_btn.custom_minimum_size = Vector2(160, 38)
 	layout_btn.focus_mode = Control.FOCUS_NONE
 	SettingsUIFactory.refresh_toggle_btn(layout_btn, GameState.controls_layout == "right", "ACTIONS RIGHT", "ACTIONS LEFT")
 	layout_btn.pressed.connect(func():
@@ -226,7 +246,7 @@ static func build_controls_panel(scene: Control) -> VBoxContainer:
 			hud.update_controls_layout()
 	)
 	scene.call("wire_juice", layout_btn)
-	root.add_child(SettingsUIFactory.create_setting_row(
+	move_content.add_child(SettingsUIFactory.create_setting_row(
 		"ACTION BUTTONS SIDE",
 		"Position action buttons on the Right (left-thumb move) or Left (right-thumb move).",
 		layout_btn
@@ -234,7 +254,7 @@ static func build_controls_panel(scene: Control) -> VBoxContainer:
 
 	# Sneak Mode: Hold vs Toggle
 	var sneak_btn := Button.new()
-	sneak_btn.custom_minimum_size = Vector2(148, 32)
+	sneak_btn.custom_minimum_size = Vector2(156, 38)
 	sneak_btn.focus_mode = Control.FOCUS_NONE
 	SettingsUIFactory.refresh_toggle_btn(sneak_btn, GameState.sneak_hold_mode, "HOLD TO SNEAK", "TOGGLE SNEAK")
 	sneak_btn.pressed.connect(func():
@@ -244,21 +264,18 @@ static func build_controls_panel(scene: Control) -> VBoxContainer:
 		SettingsUIFactory.refresh_toggle_btn(sneak_btn, GameState.sneak_hold_mode, "HOLD TO SNEAK", "TOGGLE SNEAK")
 	)
 	scene.call("wire_juice", sneak_btn)
-	root.add_child(SettingsUIFactory.create_setting_row(
+	move_content.add_child(SettingsUIFactory.create_setting_row(
 		"SNEAK INPUT MODE",
 		"Choose whether holding Shift / Sneak button maintains stealth or a single tap toggles.",
 		sneak_btn
 	))
 
-	root.add_child(SettingsUIFactory.create_category_divider())
-
-	# --- Section 2: Aiming & Sensitivity ---
-	root.add_child(SettingsUIFactory.create_section_header("AIMING & THROW SENSITIVITY"))
-
-	# Pebble Throw Aiming Sensitivity (50% ~ 200%)
-	root.add_child(SettingsUIFactory.create_slider_row(
+	# --- Card 2: Aiming & Sensitivity ---
+	var aim_card := SettingsUIFactory.create_section_card("AIMING & SENSITIVITY")
+	root.add_child(aim_card.card)
+	aim_card.content.add_child(SettingsUIFactory.create_slider_row(
 		"PEBBLE THROW SENSITIVITY",
-		"Adjust touch drag sensitivity for pebble aiming reach and distance.",
+		"Adjust touch drag sensitivity for pebble aiming reach and trajectory distance.",
 		GameState.pebble_sensitivity,
 		true,
 		func(v: float):
@@ -266,14 +283,14 @@ static func build_controls_panel(scene: Control) -> VBoxContainer:
 			GameState.save_settings()
 	, 0.5, 2.0, 0.05))
 
-	root.add_child(SettingsUIFactory.create_category_divider())
-
-	# --- Section 3: Sonar & Acoustic Assistance ---
-	root.add_child(SettingsUIFactory.create_section_header("SONAR & ACOUSTIC ASSISTANCE"))
+	# --- Card 3: Sonar & Acoustic Assistance ---
+	var assist_card := SettingsUIFactory.create_section_card("SONAR & ACOUSTIC ASSISTANCE")
+	root.add_child(assist_card.card)
+	var assist_content: VBoxContainer = assist_card.content
 
 	# Fast Pulse Mode
 	var pulse_btn := Button.new()
-	pulse_btn.custom_minimum_size = Vector2(136, 32)
+	pulse_btn.custom_minimum_size = Vector2(144, 38)
 	pulse_btn.focus_mode = Control.FOCUS_NONE
 	SettingsUIFactory.refresh_toggle_btn(pulse_btn, GameState.fast_pulse_mode, "ENABLED", "DISABLED")
 	pulse_btn.pressed.connect(func():
@@ -283,7 +300,7 @@ static func build_controls_panel(scene: Control) -> VBoxContainer:
 		SettingsUIFactory.refresh_toggle_btn(pulse_btn, GameState.fast_pulse_mode, "ENABLED", "DISABLED")
 	)
 	scene.call("wire_juice", pulse_btn)
-	root.add_child(SettingsUIFactory.create_setting_row(
+	assist_content.add_child(SettingsUIFactory.create_setting_row(
 		"FAST PULSE DOUBLE CLICK",
 		"Double-click or double-tap to instantly emit a quick sonar pulse without holding Space.",
 		pulse_btn
@@ -291,7 +308,7 @@ static func build_controls_panel(scene: Control) -> VBoxContainer:
 
 	# Directional Sound Visual Indicator
 	var ind_btn := Button.new()
-	ind_btn.custom_minimum_size = Vector2(136, 32)
+	ind_btn.custom_minimum_size = Vector2(144, 38)
 	ind_btn.focus_mode = Control.FOCUS_NONE
 	SettingsUIFactory.refresh_toggle_btn(ind_btn, GameState.sound_indicator_enabled, "ENABLED", "DISABLED")
 	ind_btn.pressed.connect(func():
@@ -301,7 +318,7 @@ static func build_controls_panel(scene: Control) -> VBoxContainer:
 		SettingsUIFactory.refresh_toggle_btn(ind_btn, GameState.sound_indicator_enabled, "ENABLED", "DISABLED")
 	)
 	scene.call("wire_juice", ind_btn)
-	root.add_child(SettingsUIFactory.create_setting_row(
+	assist_content.add_child(SettingsUIFactory.create_setting_row(
 		"OFF-SCREEN SOUND COMPASS",
 		"Displays subtle directional arcs at the screen edge when entities screech or roar out of view.",
 		ind_btn
@@ -309,7 +326,7 @@ static func build_controls_panel(scene: Control) -> VBoxContainer:
 
 	# Visually Impaired (Blind) Echolocation & Navigation Mode
 	var blind_btn := Button.new()
-	blind_btn.custom_minimum_size = Vector2(136, 32)
+	blind_btn.custom_minimum_size = Vector2(144, 38)
 	blind_btn.focus_mode = Control.FOCUS_NONE
 	SettingsUIFactory.refresh_toggle_btn(blind_btn, GameState.blind_assist_mode, "ENABLED", "DISABLED")
 	blind_btn.pressed.connect(func():
@@ -319,20 +336,17 @@ static func build_controls_panel(scene: Control) -> VBoxContainer:
 		SettingsUIFactory.refresh_toggle_btn(blind_btn, GameState.blind_assist_mode, "ENABLED", "DISABLED")
 	)
 	scene.call("wire_juice", blind_btn)
-	root.add_child(SettingsUIFactory.create_setting_row(
+	assist_content.add_child(SettingsUIFactory.create_setting_row(
 		"UNIVERSAL ACCESSIBILITY MODE",
 		"Enhanced binaural cane echoes, wall proximity warnings, and tactile navigation support.",
 		blind_btn
 	))
 
-	root.add_child(SettingsUIFactory.create_category_divider())
-
-	# --- Section 4: HUD & On-Screen Layout ---
-	root.add_child(SettingsUIFactory.create_section_header("HUD & ON-SCREEN CONTROLS"))
-
-	# Custom HUD Layout Editor
+	# --- Card 4: HUD & Layout Editor ---
+	var hud_card := SettingsUIFactory.create_section_card("HUD & ON-SCREEN CONTROLS")
+	root.add_child(hud_card.card)
 	var custom_btn := Button.new()
-	custom_btn.custom_minimum_size = Vector2(160, 32)
+	custom_btn.custom_minimum_size = Vector2(160, 38)
 	custom_btn.focus_mode = Control.FOCUS_NONE
 	custom_btn.text = "CUSTOMIZE HUD"
 	custom_btn.add_theme_font_size_override("font_size", 12)
@@ -342,7 +356,7 @@ static func build_controls_panel(scene: Control) -> VBoxContainer:
 		HudLayoutCustomizer.open(scene.get_tree().root)
 	)
 	scene.call("wire_juice", custom_btn)
-	root.add_child(SettingsUIFactory.create_setting_row(
+	hud_card.content.add_child(SettingsUIFactory.create_setting_row(
 		"CUSTOMIZE HUD LAYOUT",
 		"Freely reposition and resize buttons, sector info, voice sensor, and pause button.",
 		custom_btn
@@ -351,27 +365,35 @@ static func build_controls_panel(scene: Control) -> VBoxContainer:
 	return root
 
 
+# --- 3. DISPLAY TAB (VISUALS & PERFORMANCE) ----------------------------------
+
 static func build_display_panel(scene: Control) -> VBoxContainer:
 	var root := VBoxContainer.new()
-	root.add_theme_constant_override("separation", 22)
+	root.mouse_filter = Control.MOUSE_FILTER_PASS
+	root.add_theme_constant_override("separation", 18)
 
-	root.add_child(SettingsUIFactory.create_section_header("VISUAL FEEDBACK & MOTION"))
+	# --- Card 1: Visual Feedback & Motion ---
+	var vis_card := SettingsUIFactory.create_section_card("VISUAL FEEDBACK & MOTION")
+	root.add_child(vis_card.card)
+	var vis_content: VBoxContainer = vis_card.content
 
-	# Screen Shake Intensity Slider
-	root.add_child(SettingsUIFactory.create_slider_row("SCREEN SHAKE INTENSITY", "Camera vibration strength upon monster roars and cavern shocks.", GameState.screen_shake_intensity, true, func(v: float):
+	# Screen Shake Intensity Slider with Live Tremor Preview
+	vis_content.add_child(SettingsUIFactory.create_slider_row("SCREEN SHAKE INTENSITY", "Camera vibration strength upon monster roars and cavern shocks.", GameState.screen_shake_intensity, true, func(v: float):
 		GameState.screen_shake_intensity = v
 		GameState.save_settings()
+		if scene.has_method("preview_screen_shake"):
+			scene.call("preview_screen_shake", v)
 	))
 
 	# Sonar Glow Boost Slider
-	root.add_child(SettingsUIFactory.create_slider_row("SONAR PHOSPHOR BRIGHTNESS", "Multiplies visibility and lingering decay glow of wall echo marks.", GameState.sonar_glow_boost, false, func(v: float):
+	vis_content.add_child(SettingsUIFactory.create_slider_row("SONAR PHOSPHOR BRIGHTNESS", "Multiplies visibility and lingering decay glow of wall echo marks.", GameState.sonar_glow_boost, false, func(v: float):
 		GameState.sonar_glow_boost = v
 		GameState.save_settings()
 	))
 
 	# Vignette & Distortion Toggle
 	var vig_btn := Button.new()
-	vig_btn.custom_minimum_size = Vector2(136, 32)
+	vig_btn.custom_minimum_size = Vector2(144, 38)
 	vig_btn.focus_mode = Control.FOCUS_NONE
 	SettingsUIFactory.refresh_toggle_btn(vig_btn, GameState.vignette_enabled, "ENABLED", "DISABLED")
 	vig_btn.pressed.connect(func():
@@ -381,19 +403,20 @@ static func build_display_panel(scene: Control) -> VBoxContainer:
 		SettingsUIFactory.refresh_toggle_btn(vig_btn, GameState.vignette_enabled, "ENABLED", "DISABLED")
 	)
 	scene.call("wire_juice", vig_btn)
-	root.add_child(SettingsUIFactory.create_setting_row(
+	vis_content.add_child(SettingsUIFactory.create_setting_row(
 		"HEARTBEAT THREAT VIGNETTE",
 		"Pulsing edge shadow and claustrophobic chromatic distortion when monsters approach.",
 		vig_btn
 	))
 
-	root.add_child(SettingsUIFactory.create_category_divider())
+	# --- Card 2: Mobile Performance & Power ---
+	var perf_card := SettingsUIFactory.create_section_card("MOBILE PERFORMANCE & POWER")
+	root.add_child(perf_card.card)
+	var perf_content: VBoxContainer = perf_card.content
 
-	root.add_child(SettingsUIFactory.create_section_header("MOBILE PERFORMANCE & POWER"))
-
-	# Target Frame Rate (30 / 60 / 120 FPS)
+	# Target Frame Rate (30 / 60 / 120 FPS / Uncapped)
 	var fps_btn := Button.new()
-	fps_btn.custom_minimum_size = Vector2(170, 34)
+	fps_btn.custom_minimum_size = Vector2(174, 38)
 	fps_btn.focus_mode = Control.FOCUS_NONE
 	update_fps_btn_text(fps_btn)
 	fps_btn.pressed.connect(func():
@@ -412,7 +435,7 @@ static func build_display_panel(scene: Control) -> VBoxContainer:
 		update_fps_btn_text(fps_btn)
 	)
 	scene.call("wire_juice", fps_btn)
-	root.add_child(SettingsUIFactory.create_setting_row(
+	perf_content.add_child(SettingsUIFactory.create_setting_row(
 		"TARGET FRAME RATE",
 		"Cycle between 30 FPS (Battery Saver), 60 FPS (Balanced), 120 FPS (Smooth), and Uncapped (Max).",
 		fps_btn
@@ -421,24 +444,29 @@ static func build_display_panel(scene: Control) -> VBoxContainer:
 	return root
 
 
+# --- 4. ADVANCED TAB (PALETTE & DATA MANAGEMENT) -----------------------------
+
 static func build_advanced_panel(scene: Control) -> VBoxContainer:
 	var root := VBoxContainer.new()
-	root.add_theme_constant_override("separation", 22)
+	root.mouse_filter = Control.MOUSE_FILTER_PASS
+	root.add_theme_constant_override("separation", 18)
 
-	root.add_child(SettingsUIFactory.create_section_header("ACOUSTIC HUD PALETTE"))
+	# --- Card 1: Acoustic HUD Palette ---
+	var pal_card := SettingsUIFactory.create_section_card("ACOUSTIC HUD PALETTE")
+	root.add_child(pal_card.card)
 
-	# Sonar Color Theme Cycle
 	var palette_box := HBoxContainer.new()
+	palette_box.mouse_filter = Control.MOUSE_FILTER_PASS
 	palette_box.add_theme_constant_override("separation", 10)
 
 	var preview_chip := ColorRect.new()
-	preview_chip.custom_minimum_size = Vector2(24, 24)
+	preview_chip.custom_minimum_size = Vector2(26, 26)
 	preview_chip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	preview_chip.color = GameState.get_sonar_color()
 	palette_box.add_child(preview_chip)
 
 	var palette_btn := Button.new()
-	palette_btn.custom_minimum_size = Vector2(136, 32)
+	palette_btn.custom_minimum_size = Vector2(144, 38)
 	palette_btn.focus_mode = Control.FOCUS_NONE
 	palette_btn.add_theme_font_size_override("font_size", 13)
 	update_palette_btn(palette_btn, preview_chip)
@@ -462,23 +490,25 @@ static func build_advanced_panel(scene: Control) -> VBoxContainer:
 	scene.call("wire_juice", palette_btn)
 	palette_box.add_child(palette_btn)
 
-	root.add_child(SettingsUIFactory.create_setting_row(
+	pal_card.content.add_child(SettingsUIFactory.create_setting_row(
 		"SONAR PHOSPHOR COLOR",
 		"Choose the bioluminescent acoustic frequency theme for echo ripples and scan markers.",
 		palette_box
 	))
 
-	root.add_child(SettingsUIFactory.create_category_divider())
+	# --- Card 2: Expedition Archive & Data ---
+	var data_card := SettingsUIFactory.create_section_card("EXPEDITION ARCHIVE & DATA")
+	root.add_child(data_card.card)
+	var data_content: VBoxContainer = data_card.content
 
-	root.add_child(SettingsUIFactory.create_section_header("EXPEDITION ARCHIVE & DATA"))
-
-	# Progress diagnostic status
+	# Progress diagnostic status box
 	var diag_card := PanelContainer.new()
+	diag_card.mouse_filter = Control.MOUSE_FILTER_PASS
 	var d_style := StyleBoxFlat.new()
-	d_style.bg_color = Color(0.03, 0.07, 0.13, 0.85)
+	d_style.bg_color = Color(0.02, 0.05, 0.10, 0.85)
 	d_style.set_border_width_all(1)
-	d_style.border_color = Color(0.18, 0.38, 0.60, 0.4)
-	d_style.set_corner_radius_all(8)
+	d_style.border_color = Color(0.18, 0.38, 0.60, 0.40)
+	d_style.set_corner_radius_all(10)
 	d_style.content_margin_left = 16.0
 	d_style.content_margin_right = 16.0
 	d_style.content_margin_top = 12.0
@@ -486,26 +516,29 @@ static func build_advanced_panel(scene: Control) -> VBoxContainer:
 	diag_card.add_theme_stylebox_override("panel", d_style)
 
 	var diag_box := VBoxContainer.new()
+	diag_box.mouse_filter = Control.MOUSE_FILTER_PASS
 	diag_box.add_theme_constant_override("separation", 6)
 
 	var lvl_lbl := Label.new()
+	lvl_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	lvl_lbl.text = "FURTHEST SECTOR UNLOCKED:  %s" % GameState.get_level_name(GameState.highest_unlocked_level)
 	lvl_lbl.add_theme_font_size_override("font_size", 13)
 	lvl_lbl.add_theme_color_override("font_color", Color(0.5, 0.85, 1.0, 0.95))
 	diag_box.add_child(lvl_lbl)
 
 	var floor_lbl := Label.new()
+	floor_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	floor_lbl.text = "CALIBRATED AMBIENT NOISE FLOOR:  %.1f dB" % GameState.mic_noise_floor_db
 	floor_lbl.add_theme_font_size_override("font_size", 12)
 	floor_lbl.add_theme_color_override("font_color", Color(0.4, 0.65, 0.85, 0.75))
 	diag_box.add_child(floor_lbl)
 
 	diag_card.add_child(diag_box)
-	root.add_child(diag_card)
+	data_content.add_child(diag_card)
 
 	# Replay Prologue / Opening Story
 	var prologue_btn := Button.new()
-	prologue_btn.custom_minimum_size = Vector2(160, 32)
+	prologue_btn.custom_minimum_size = Vector2(160, 38)
 	prologue_btn.focus_mode = Control.FOCUS_NONE
 	prologue_btn.text = "REPLAY PROLOGUE"
 	SettingsUIFactory.style_action_button(prologue_btn, Color(0.35, 0.85, 1.0, 0.85), Color(0.04, 0.14, 0.25, 0.85), true)
@@ -515,20 +548,20 @@ static func build_advanced_panel(scene: Control) -> VBoxContainer:
 	)
 	scene.call("wire_juice", prologue_btn)
 
-	root.add_child(SettingsUIFactory.create_setting_row(
+	data_content.add_child(SettingsUIFactory.create_setting_row(
 		"OPENING PROLOGUE",
 		"Re-experience the initial awakening at the bottom of the abyss and the tutorial sequence.",
 		prologue_btn
 	))
 
-	root.add_child(SettingsUIFactory.create_category_divider())
-
-	# Danger Zone: Reset Progress / Return to Abyss
-	root.add_child(SettingsUIFactory.create_section_header("DANGER ZONE • RETURN TO ABYSS"))
+	# --- Card 3: Danger Zone ---
+	var danger_card := SettingsUIFactory.create_section_card("DANGER ZONE • RETURN TO ABYSS")
+	root.add_child(danger_card.card)
+	var danger_content: VBoxContainer = danger_card.content
 
 	var has_cleared_adv := GameState.highest_unlocked_level > 1
 	var reset_btn := Button.new()
-	reset_btn.custom_minimum_size = Vector2(160, 32)
+	reset_btn.custom_minimum_size = Vector2(160, 38)
 	reset_btn.focus_mode = Control.FOCUS_NONE
 	reset_btn.add_theme_font_size_override("font_size", 12)
 	if has_cleared_adv:
@@ -543,7 +576,7 @@ static func build_advanced_panel(scene: Control) -> VBoxContainer:
 
 	var adv_desc := "Reset Story Mode's 20 sectors back to Sector 01. Challenge Mode and Tutorial progress are preserved." if GameState.is_challenge_unlocked() else "Reset Story Mode's 20 sectors back to Sector 01. Tutorial progress is preserved."
 
-	root.add_child(SettingsUIFactory.create_setting_row(
+	danger_content.add_child(SettingsUIFactory.create_setting_row(
 		"RETURN TO ABYSS",
 		adv_desc,
 		reset_btn

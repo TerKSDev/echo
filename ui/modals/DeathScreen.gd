@@ -34,7 +34,7 @@ const KILLER_INFO: Array[Dictionary] = [
 	{
 		"name": "HUNTED BY: LISTENER",
 		"color": Color(0.2, 0.94, 0.68),
-		"tip": "Listeners ignore footsteps, but 5 shouts trigger a map-wide alarm that summons every monster.",
+		"tip": "Listeners ignore footsteps, but 3 shouts or sound pulses trigger a map-wide alarm that summons every monster.",
 	},
 ]
 

@@ -426,3 +426,216 @@ static func draw_stopwatch(canvas: Control, col: Color = Color(0.75, 0.85, 0.95,
 static func draw_stopwatch_icon(canvas: Control) -> void:
 	draw_stopwatch(canvas)
 
+
+# --------------------------------------------------
+# ARCHIVES CODEX CATEGORY ICONS
+# --------------------------------------------------
+
+static func draw_archives_player(canvas: Control) -> void:
+	var c := canvas.size * 0.5
+	var is_hovered := false
+	var parent := canvas.get_parent()
+	if parent is BaseButton:
+		is_hovered = (parent as BaseButton).is_hovered() or (parent as BaseButton).button_pressed
+
+	var col: Color = Color(0.45, 0.95, 1.0, 1.0) if is_hovered else Color(0.35, 0.85, 1.0, 0.90)
+	var fill_col: Color = Color(0.12, 0.35, 0.55, 0.35) if is_hovered else Color(0.06, 0.20, 0.35, 0.25)
+	var glow_col := Color(0.35, 0.85, 1.0, 0.16 if is_hovered else 0.09)
+
+	# 1. Subtle ambient sound glow
+	canvas.draw_circle(c, 16.0, glow_col)
+
+	# 2. Explorer Helmet (Dome)
+	var helm_c := c + Vector2(0.0, -2.5)
+	canvas.draw_circle(helm_c, 5.5, fill_col)
+	canvas.draw_arc(helm_c, 5.5, 0.0, TAU, 24, col, 1.6)
+
+	# 3. Visor slit (horizontal glowing scanner bar)
+	canvas.draw_line(Vector2(helm_c.x - 3.5, helm_c.y), Vector2(helm_c.x + 3.5, helm_c.y), Color(1.0, 1.0, 1.0, 0.95), 1.8)
+
+	# 4. Concentric acoustic echolocation ripples radiating above helmet (distinct separation)
+	canvas.draw_arc(helm_c, 9.5, -PI * 0.75, -PI * 0.25, 16, Color(col.r, col.g, col.b, 0.55), 1.5)
+	canvas.draw_arc(helm_c, 13.5, -PI * 0.70, -PI * 0.30, 16, Color(col.r, col.g, col.b, 0.30), 1.3)
+
+	# 5. Explorer Shoulders / Expedition Suit Harness (clear gap below helmet)
+	var shoulder_pts := PackedVector2Array([
+		Vector2(c.x - 3.5, c.y + 5.5),
+		Vector2(c.x - 10.5, c.y + 8.5),
+		Vector2(c.x - 10.5, c.y + 12.5),
+		Vector2(c.x + 10.5, c.y + 12.5),
+		Vector2(c.x + 10.5, c.y + 8.5),
+		Vector2(c.x + 3.5, c.y + 5.5)
+	])
+	canvas.draw_colored_polygon(shoulder_pts, fill_col)
+	var shoulder_closed := shoulder_pts.duplicate()
+	shoulder_closed.append(shoulder_pts[0])
+	canvas.draw_polyline(shoulder_closed, col, 1.6)
+
+	# 6. Central Chest Acoustic Sensor / Core Node
+	canvas.draw_circle(Vector2(c.x, c.y + 9.0), 1.4, Color(col.r, col.g, col.b, 0.95))
+
+
+static func draw_archives_monsters(canvas: Control) -> void:
+	var c := canvas.size * 0.5
+	var is_hovered := false
+	var parent := canvas.get_parent()
+	if parent is BaseButton:
+		is_hovered = (parent as BaseButton).is_hovered() or (parent as BaseButton).button_pressed
+
+	var col: Color = Color(1.0, 0.45, 0.45, 1.0) if is_hovered else Color(0.95, 0.35, 0.38, 0.92)
+	var fill_col: Color = Color(0.45, 0.10, 0.12, 0.35) if is_hovered else Color(0.30, 0.06, 0.08, 0.22)
+	var glow_col := Color(1.0, 0.25, 0.30, 0.16 if is_hovered else 0.09)
+
+	# 1. Menacing crimson threat aura
+	canvas.draw_circle(c, 16.0, glow_col)
+
+	# 2. Stylized Subterranean Apex Eye (Almond silhouette, strictly bounded)
+	var eye_pts := PackedVector2Array()
+	var w := 10.5
+	var h := 5.5
+	for i in range(13):
+		var ang := float(i) * PI / 12.0
+		eye_pts.append(Vector2(c.x + cos(ang) * w, c.y - sin(ang) * h))
+	for i in range(13):
+		var ang := float(i) * PI / 12.0
+		eye_pts.append(Vector2(c.x - cos(ang) * w, c.y + sin(ang) * h))
+
+	canvas.draw_colored_polygon(eye_pts, fill_col)
+	var closed_eye := eye_pts.duplicate()
+	closed_eye.append(eye_pts[0])
+	canvas.draw_polyline(closed_eye, col, 1.6)
+
+	# 3. Vertical Predatory Slit Pupil
+	var pupil_pts := PackedVector2Array([
+		Vector2(c.x, c.y - 4.2),
+		Vector2(c.x + 1.8, c.y),
+		Vector2(c.x, c.y + 4.2),
+		Vector2(c.x - 1.8, c.y)
+	])
+	canvas.draw_colored_polygon(pupil_pts, Color(1.0, 0.85, 0.25, 0.95))
+	canvas.draw_circle(c, 1.2, Color(1.0, 0.95, 0.70, 1.0))
+
+	# 4. Predatory Threat Radar Arcs (Well separated from eye corners: gap >= 4.5px)
+	# Left arcs (eye left tip is at c.x - 10.5)
+	canvas.draw_arc(c, 15.0, PI * 0.76, PI * 1.24, 12, Color(col.r, col.g, col.b, 0.50), 1.5)
+	canvas.draw_arc(c, 18.5, PI * 0.80, PI * 1.20, 12, Color(col.r, col.g, col.b, 0.25), 1.2)
+	# Right arcs (eye right tip is at c.x + 10.5)
+	canvas.draw_arc(c, 15.0, -PI * 0.24, PI * 0.24, 12, Color(col.r, col.g, col.b, 0.50), 1.5)
+	canvas.draw_arc(c, 18.5, -PI * 0.20, PI * 0.20, 12, Color(col.r, col.g, col.b, 0.25), 1.2)
+
+	# 5. Detached Apex Threat Markers (Above & Below with clear 2.5px gap from eye)
+	canvas.draw_line(Vector2(c.x, c.y - 8.0), Vector2(c.x, c.y - 12.0), col, 1.5)
+	canvas.draw_line(Vector2(c.x, c.y + 8.0), Vector2(c.x, c.y + 11.5), col, 1.5)
+
+
+static func draw_archives_story(canvas: Control) -> void:
+	var c := canvas.size * 0.5
+	var is_hovered := false
+	var parent := canvas.get_parent()
+	if parent is BaseButton:
+		is_hovered = (parent as BaseButton).is_hovered() or (parent as BaseButton).button_pressed
+
+	var col: Color = Color(1.0, 0.88, 0.45, 1.0) if is_hovered else Color(0.95, 0.80, 0.38, 0.92)
+	var fill_col: Color = Color(0.35, 0.24, 0.08, 0.35) if is_hovered else Color(0.22, 0.15, 0.04, 0.25)
+	var glow_col := Color(1.0, 0.78, 0.25, 0.16 if is_hovered else 0.08)
+
+	# 1. Warm amber archive glow
+	canvas.draw_circle(c, 16.0, glow_col)
+
+	# 2. Outer Journal Cover / Folio (Cleanly proportioned book)
+	var left_poly := PackedVector2Array([
+		Vector2(c.x - 1.5, c.y - 9.5),
+		Vector2(c.x - 7.0, c.y - 11.0),
+		Vector2(c.x - 13.0, c.y - 9.0),
+		Vector2(c.x - 13.0, c.y + 8.0),
+		Vector2(c.x - 7.0, c.y + 6.5),
+		Vector2(c.x - 1.5, c.y + 8.0)
+	])
+	canvas.draw_colored_polygon(left_poly, fill_col)
+	var left_closed := left_poly.duplicate()
+	left_closed.append(left_poly[0])
+	canvas.draw_polyline(left_closed, col, 1.6)
+
+	var right_poly := PackedVector2Array([
+		Vector2(c.x + 1.5, c.y - 9.5),
+		Vector2(c.x + 7.0, c.y - 11.0),
+		Vector2(c.x + 13.0, c.y - 9.0),
+		Vector2(c.x + 13.0, c.y + 8.0),
+		Vector2(c.x + 7.0, c.y + 6.5),
+		Vector2(c.x + 1.5, c.y + 8.0)
+	])
+	canvas.draw_colored_polygon(right_poly, fill_col)
+	var right_closed := right_poly.duplicate()
+	right_closed.append(right_poly[0])
+	canvas.draw_polyline(right_closed, col, 1.6)
+
+	# 3. Center Spine
+	canvas.draw_line(Vector2(c.x, c.y - 9.5), Vector2(c.x, c.y + 9.5), Color(1.0, 0.92, 0.60, 1.0), 2.0)
+
+	# 4. Decrypted Log Text Lines
+	var text_col := Color(col.r, col.g, col.b, 0.65)
+	canvas.draw_line(Vector2(c.x - 10.5, c.y - 3.2), Vector2(c.x - 4.0, c.y - 4.0), text_col, 1.4)
+	canvas.draw_line(Vector2(c.x - 10.5, c.y + 1.8), Vector2(c.x - 4.0, c.y + 1.0), text_col, 1.4)
+	canvas.draw_line(Vector2(c.x + 4.0, c.y - 4.0), Vector2(c.x + 10.5, c.y - 3.2), text_col, 1.4)
+	canvas.draw_line(Vector2(c.x + 4.0, c.y + 1.0), Vector2(c.x + 10.5, c.y + 1.8), text_col, 1.4)
+
+	# 5. Vanguard VII Beacon Bookmark Ribbon hanging below
+	var ribbon_pts := PackedVector2Array([
+		Vector2(c.x - 2.0, c.y + 8.0),
+		Vector2(c.x + 2.0, c.y + 8.0),
+		Vector2(c.x + 2.0, c.y + 13.5),
+		Vector2(c.x, c.y + 11.5),
+		Vector2(c.x - 2.0, c.y + 13.5)
+	])
+	canvas.draw_colored_polygon(ribbon_pts, Color(0.95, 0.35, 0.30, 0.95))
+
+
+static func draw_archives_ethos(canvas: Control) -> void:
+	var c := canvas.size * 0.5
+	var is_hovered := false
+	var parent := canvas.get_parent()
+	if parent is BaseButton:
+		is_hovered = (parent as BaseButton).is_hovered() or (parent as BaseButton).button_pressed
+
+	var col: Color = Color(0.45, 1.0, 0.80, 1.0) if is_hovered else Color(0.35, 0.95, 0.72, 0.92)
+	var fill_col: Color = Color(0.08, 0.35, 0.25, 0.35) if is_hovered else Color(0.05, 0.22, 0.16, 0.22)
+	var glow_col := Color(0.35, 0.95, 0.72, 0.16 if is_hovered else 0.09)
+
+	# 1. Mindful emerald peace aura
+	canvas.draw_circle(c, 16.0, glow_col)
+
+	# 2. Dual-Spectrum Protective Wings / Open Hands (Clean 6px bottom gap between hands)
+	var left_wing := PackedVector2Array([
+		Vector2(c.x - 3.0, c.y + 10.5),
+		Vector2(c.x - 8.5, c.y + 9.5),
+		Vector2(c.x - 13.0, c.y + 4.0),
+		Vector2(c.x - 13.0, c.y - 1.5),
+		Vector2(c.x - 9.0, c.y + 2.5),
+		Vector2(c.x - 4.0, c.y + 7.0)
+	])
+	canvas.draw_colored_polygon(left_wing, fill_col)
+	var left_closed := left_wing.duplicate()
+	left_closed.append(left_wing[0])
+	canvas.draw_polyline(left_closed, col, 1.6)
+
+	var right_wing := PackedVector2Array([
+		Vector2(c.x + 3.0, c.y + 10.5),
+		Vector2(c.x + 8.5, c.y + 9.5),
+		Vector2(c.x + 13.0, c.y + 4.0),
+		Vector2(c.x + 13.0, c.y - 1.5),
+		Vector2(c.x + 9.0, c.y + 2.5),
+		Vector2(c.x + 4.0, c.y + 7.0)
+	])
+	canvas.draw_colored_polygon(right_wing, fill_col)
+	var right_closed := right_wing.duplicate()
+	right_closed.append(right_wing[0])
+	canvas.draw_polyline(right_closed, col, 1.6)
+
+	# 3. Harmonic Sound Spark & Gentle Resonance Rings (Generous clearance from wings)
+	var spark_c := c + Vector2(0.0, -1.5)
+	canvas.draw_circle(spark_c, 2.5, Color(1.0, 1.0, 1.0, 0.95))
+	canvas.draw_arc(spark_c, 5.5, 0.0, TAU, 16, col, 1.5)
+	canvas.draw_arc(spark_c, 9.5, -PI * 0.78, -PI * 0.22, 16, Color(col.r, col.g, col.b, 0.60), 1.4)
+	canvas.draw_arc(spark_c, 13.5, -PI * 0.70, -PI * 0.30, 16, Color(col.r, col.g, col.b, 0.30), 1.2)
+
+

@@ -62,6 +62,22 @@ func _draw() -> void:
 		var boost_pulse := 16.0 + 3.0 * sin(t * 18.0)
 		draw_arc(Vector2.ZERO, boost_pulse, 0.0, TAU, 24, Color(1.0, 0.45, 0.1, 0.65 * maxf(enemy.visible_alpha, 0.5)), 1.8)
 
+	# Acoustic mark pulse (boon_acoustic_amplifier feedback)
+	if enemy.acoustic_mark_timer > 0.0 and not enemy.is_wall_occluded:
+		var mark_ratio := clampf(enemy.acoustic_mark_timer / 4.0, 0.0, 1.0)
+		var mark_pulse := 18.0 + 3.0 * sin(t * 12.0)
+		var mark_col := Color(0.35, 0.88, 1.0, 0.65 * mark_ratio)
+		draw_arc(Vector2.ZERO, mark_pulse, 0.0, TAU, 28, mark_col, 2.0)
+		for i in 4:
+			var ang := i * (PI * 0.5) + t * 3.5
+			var spark_pt := Vector2.from_angle(ang) * mark_pulse
+			draw_circle(spark_pt, 2.0, Color(0.7, 0.95, 1.0, 0.85 * mark_ratio))
+
+	# Stunned reeling aura (boon_sonic_stagger & boon_second_wind feedback)
+	if enemy._stun_timer > 0.0:
+		var stun_pulse := 16.0 + 2.0 * sin(t * 22.0)
+		draw_arc(Vector2.ZERO, stun_pulse, 0.0, TAU, 24, Color(1.0, 0.75, 0.25, 0.75), 1.8)
+
 	# Body is hidden until revealed by an echo (or while alert/screaming/alarming)
 	if enemy.visible_alpha < 0.02 and not always_shown:
 		if enemy.eye_linger_timer > 0.0 and not enemy.is_wall_occluded:

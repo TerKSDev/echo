@@ -1,31 +1,24 @@
 extends Control
-## Full-Screen Expedition Intel & Acoustic Bestiary Screen for ECHO.
-## Displays Threat Archives (Sleeper, Patroller, Chaser, Screamer, Listener),
-## interactive acoustic provocation preview, Vanguard VII Lore Archives,
-## and Dual-Spectrum Universal Accessibility guides.
+## Full-Screen Expedition Archives Screen for ECHO.
+## Features a dedicated 4-Category Codex Hub (Player, Monsters, Story, Ethos)
+## with custom vector drawn icons, detailed survival mechanics guide,
+## interactive acoustic monster bestiary, Vanguard VII field logs, and accessibility doctrine.
 
 @onready var back_button: Button = $TopBar/BackButton
 @onready var title_lbl: Label = $TopBar/TitleBox/Title
 @onready var subtitle_lbl: Label = $TopBar/TitleBox/Subtitle
-@onready var archive_pill: PanelContainer = $TopBar/ArchivePill
-@onready var archive_pill_lbl: Label = $TopBar/ArchivePill/PillMargin/ArchivePillLabel
-
-@onready var tab_bestiary_btn: Button = $TabBar/TabBestiary
-@onready var tab_archives_btn: Button = $TabBar/TabArchives
-@onready var tab_ethos_btn: Button = $TabBar/TabEthos
 
 @onready var sonar_backdrop: Control = $SonarBackdrop
 @onready var scroll_container: ScrollContainer = $MainArea/ScrollContainer
 @onready var content_box: VBoxContainer = $MainArea/ScrollContainer/ContentMargin/ContentBox
 
-var _tab_buttons: Array[Button] = []
-var _current_tab: int = 0
+var _current_section: String = "hub"
 var _bestiary_entries: Array[Dictionary] = []
 
-var _sfx_mgr: SfxManager = null
 var _wav_click: AudioStreamWAV
 var _wav_hover: AudioStreamWAV
 var _wav_back: AudioStreamWAV
+var _monster_wavs: Dictionary = {}
 
 var _time := 0.0
 var _ambient_wave_timer := 2.5
@@ -37,24 +30,34 @@ func _ready() -> void:
 	_build_ui_audio()
 	GameState.start_menu_bgm()
 	_init_spores()
+	WorkerThreadPool.add_task(func():
+		for key in ["screamer_crack", "screamer_shriek", "echo_ping", "charge_full", "roar_sleeper", "roar_patroller", "roar_chaser", "listener_pip", "listener_alarm"]:
+			_get_monster_sfx(key)
+	)
 
 	if sonar_backdrop != null:
 		sonar_backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		sonar_backdrop.draw.connect(_draw_sonar_backdrop)
 
+	if scroll_container != null:
+		scroll_container.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		var vbar := scroll_container.get_v_scroll_bar()
+		if vbar != null:
+			vbar.modulate.a = 0.0
+			vbar.custom_minimum_size = Vector2.ZERO
+		var hbar := scroll_container.get_h_scroll_bar()
+		if hbar != null:
+			hbar.modulate.a = 0.0
+			hbar.custom_minimum_size = Vector2.ZERO
+
 	_setup_top_bar()
-	_setup_tab_bar()
 
-	if archive_pill != null:
-		var pill_style := StyleBoxFlat.new()
-		pill_style.bg_color = Color(0.04, 0.12, 0.22, 0.85)
-		pill_style.border_color = Color(0.35, 0.85, 1.0, 0.6)
-		pill_style.set_border_width_all(1)
-		pill_style.set_corner_radius_all(12)
-		archive_pill.add_theme_stylebox_override("panel", pill_style)
+	var start_section := GameState.archives_target_section
+	if start_section == "" or start_section == "hub":
+		open_section("hub", false)
+	else:
+		open_section(start_section, false)
 
-	_update_archive_pill()
-	_switch_tab(GameState.intel_default_tab)
 	_apply_safe_area()
 
 
@@ -74,11 +77,9 @@ func _apply_safe_area() -> void:
 		var target_top := maxf(top_pad + 6.0, 29.0)
 		if has_node("TopBar"):
 			$TopBar.position.y = target_top
-		if has_node("TabBar"):
-			$TabBar.position.y = target_top + 70.0
 		if has_node("MainArea"):
 			var main := $MainArea as Control
-			main.offset_top = target_top + 126.0
+			main.offset_top = target_top + 66.0
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -90,8 +91,8 @@ func _unhandled_input(event: InputEvent) -> void:
 func _process(delta: float) -> void:
 	_time += delta
 
-	# Process bestiary active entities and shockwaves
-	if _current_tab == 0:
+	# Process bestiary active entities and shockwaves when in monsters section
+	if _current_section == "monsters":
 		for entry in _bestiary_entries:
 			var timer: float = float(entry.get("timer", 0.0)) + delta
 			entry["timer"] = timer
@@ -166,104 +167,307 @@ func _setup_top_bar() -> void:
 		wire_juice(back_button)
 
 
-func _setup_tab_bar() -> void:
-	_tab_buttons = [tab_bestiary_btn, tab_archives_btn, tab_ethos_btn]
-	for i in _tab_buttons.size():
-		var btn := _tab_buttons[i]
-		if btn != null:
-			btn.pressed.connect(_switch_tab.bind(i))
-			wire_juice(btn)
+func open_section(section_name: String, play_sound: bool = true) -> void:
+	if play_sound:
+		_play_ui_sound(_wav_click, -6.0, 1.05)
 
+	_current_section = section_name
 
-func _update_archive_pill() -> void:
-	var col_notes := GameState.get_collected_note_count()
-	var tot_notes := GameState.get_total_note_count()
-	if archive_pill_lbl != null:
-		archive_pill_lbl.text = "◈ ARCHIVES: %d / %d" % [col_notes, tot_notes]
-		if col_notes == tot_notes and tot_notes > 0:
-			archive_pill_lbl.add_theme_color_override("font_color", Color(0.35, 1.0, 0.75, 1.0))
-		else:
-			archive_pill_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.4, 0.95))
-
-
-func _switch_tab(tab_idx: int) -> void:
-	_play_ui_sound(_wav_click, -7.0, 1.05)
-	_current_tab = clampi(tab_idx, 0, _tab_buttons.size() - 1)
-
-	var col_notes := GameState.get_collected_note_count()
-	var tot_notes := GameState.get_total_note_count()
-	var tab_names := [
-		"THREAT BESTIARY",
-		"SURVIVOR ARCHIVES (%d/%d)" % [col_notes, tot_notes],
-		"ACCESSIBILITY & ETHOS"
-	]
-
-	for i in _tab_buttons.size():
-		var btn := _tab_buttons[i]
-		if btn == null:
-			continue
-		btn.text = tab_names[i]
-		var is_active := (i == _current_tab)
-		var style := StyleBoxFlat.new()
-		style.set_corner_radius_all(10)
-		style.content_margin_left = 12.0
-		style.content_margin_right = 12.0
-		style.content_margin_top = 6.0
-		style.content_margin_bottom = 6.0
-		if is_active:
-			if i == 1:
-				style.bg_color = Color(0.24, 0.16, 0.05, 0.95)
-				style.border_color = Color(1.0, 0.82, 0.35, 0.95)
-				style.shadow_color = Color(0.65, 0.45, 0.10, 0.35)
-				btn.add_theme_color_override("font_color", Color(1.0, 0.95, 0.85, 1.0))
-			else:
-				style.bg_color = Color(0.06, 0.22, 0.38, 0.95)
-				style.border_color = Color(0.35, 0.88, 1.0, 1.0)
-				style.shadow_color = Color(0.15, 0.55, 0.95, 0.35)
-				btn.add_theme_color_override("font_color", Color(0.40, 1.0, 1.0, 1.0))
-			style.set_border_width_all(2)
-			style.shadow_size = 4
-		else:
-			style.bg_color = Color(0.025, 0.07, 0.13, 0.80)
-			style.border_color = Color(0.18, 0.38, 0.60, 0.50)
-			style.set_border_width_all(1)
-			btn.add_theme_color_override("font_color", Color(0.55, 0.72, 0.85, 0.75))
-		btn.add_theme_stylebox_override("normal", style)
-		btn.add_theme_stylebox_override("hover", style)
-		btn.add_theme_stylebox_override("pressed", style)
-		btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-		btn.add_theme_font_size_override("font_size", 12)
-
-	_populate_content()
-	if scroll_container != null:
-		scroll_container.scroll_vertical = 0
-
-
-func _populate_content() -> void:
 	for child in content_box.get_children():
 		child.queue_free()
 	_bestiary_entries.clear()
 
-	match _current_tab:
-		0:
-			if subtitle_lbl != null:
-				subtitle_lbl.text = "ACOUSTIC BESTIARY • TAP ENTITY TO PROVOKE EFFECTS"
-			_populate_bestiary()
-		1:
+	match _current_section:
+		"hub":
+			title_lbl.text = "EXPEDITION ARCHIVES"
+			subtitle_lbl.text = "SURVIVAL CODEX, BESTIARY & FIELD RECORDS"
+			_populate_hub()
+		"player":
+			title_lbl.text = "PLAYER ARCHIVE"
+			subtitle_lbl.text = "EXPLORER SUIT, STEALTH & ACOUSTIC TECHNIQUES"
+			_populate_player()
+		"monsters":
+			title_lbl.text = "THREAT BESTIARY"
+			subtitle_lbl.text = "5 SPECIMENS • TAP ENTITY TO PROVOKE EFFECTS"
+			_populate_monsters()
+		"story":
 			var col := GameState.get_collected_note_count()
 			var tot := GameState.get_total_note_count()
-			if subtitle_lbl != null:
-				subtitle_lbl.text = "VANGUARD VII EXPEDITION LOGS • %d / %d ARCHIVES RECOVERED" % [col, tot]
-			_populate_lore_notes()
-		2:
-			if subtitle_lbl != null:
-				subtitle_lbl.text = "NON-VIOLENT ETHOS • UNIVERSAL ACCESSIBILITY GUIDELINES"
+			title_lbl.text = "VANGUARD VII LOGS"
+			subtitle_lbl.text = "FIELD ARCHIVES • %d / %d RECOVERED" % [col, tot]
+			_populate_story()
+		"ethos":
+			title_lbl.text = "ETHOS & ACCESS"
+			subtitle_lbl.text = "NON-VIOLENCE PHILOSOPHY • DUAL-SPECTRUM DESIGN"
 			_populate_ethos()
 
+	if scroll_container != null:
+		scroll_container.scroll_vertical = 0
 
-# --- TAB 0: BESTIARY ---------------------------------------------------------
 
-func _populate_bestiary() -> void:
+# --- 1. HUB VIEW (4 LARGE ENTRY CARDS WITH DRAWN ICONS) -----------------------
+
+func _populate_hub() -> void:
+	var col_notes := GameState.get_collected_note_count()
+	var tot_notes := GameState.get_total_note_count()
+	var pct: float = (float(col_notes) / float(tot_notes) * 100.0) if tot_notes > 0 else 0.0
+
+	# 1. Player Card
+	_add_hub_card(
+		"player",
+		"PLAYER",
+		"EXPLORER SUIT & ACOUSTIC TECHNIQUES",
+		"Echolocation pulses, stealth footsteps, pebble throws, and binaural cane feelers.",
+		"5 CORE TECHNIQUES",
+		Color(0.35, 0.88, 1.0),
+		Callable(Icons, "draw_archives_player")
+	)
+
+	# 2. Monsters Card
+	_add_hub_card(
+		"monsters",
+		"MONSTERS",
+		"SUBTERRANEAN THREAT BESTIARY",
+		"Sleeper, Patroller, Chaser, Screamer, Listener. Acoustic triggers and weaknesses.",
+		"5 IDENTIFIED SPECIMENS",
+		Color(1.0, 0.40, 0.35),
+		Callable(Icons, "draw_archives_monsters")
+	)
+
+	# 3. Story Card
+	_add_hub_card(
+		"story",
+		"STORY",
+		"VANGUARD VII EXPEDITION LOGS",
+		"Field journals and deep cavern recordings left by Dr. Thorne, Maya Lin, and Jarek.",
+		"COLLECTED: %d / %d (%.0f%%)" % [col_notes, tot_notes, pct],
+		Color(1.0, 0.82, 0.38),
+		Callable(Icons, "draw_archives_story")
+	)
+
+	# 4. Ethos & Accessibility Card
+	_add_hub_card(
+		"ethos",
+		"ETHOS & ACCESS",
+		"NON-VIOLENT DOCTRINE & ACCESSIBILITY",
+		"Core non-violence ethos, mindfulness survival, and full dual-spectrum blind/deaf guidance.",
+		"BLIND PLAYABLE & DEAF INCLUSIVE",
+		Color(0.35, 0.95, 0.72),
+		Callable(Icons, "draw_archives_ethos")
+	)
+
+
+func _add_hub_card(
+	section_id: String,
+	title_text: String,
+	subtitle_text: String,
+	desc_text: String,
+	badge_text: String,
+	accent_color: Color,
+	draw_icon_callable: Callable
+) -> void:
+	var card_btn := Button.new()
+	card_btn.custom_minimum_size = Vector2(0, 114)
+	card_btn.focus_mode = Control.FOCUS_NONE
+	card_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	var base_style := StyleBoxFlat.new()
+	base_style.bg_color = Color(0.02, 0.05, 0.09, 0.88)
+	base_style.border_color = accent_color * Color(1, 1, 1, 0.55)
+	base_style.set_border_width_all(1)
+	base_style.set_corner_radius_all(12)
+	base_style.content_margin_left = 18.0
+	base_style.content_margin_right = 18.0
+	base_style.content_margin_top = 14.0
+	base_style.content_margin_bottom = 14.0
+
+	var hover_style := base_style.duplicate() as StyleBoxFlat
+	hover_style.bg_color = Color(0.04, 0.10, 0.18, 0.95)
+	hover_style.border_color = accent_color
+	hover_style.set_border_width_all(2)
+	hover_style.shadow_color = Color(accent_color.r, accent_color.g, accent_color.b, 0.35)
+	hover_style.shadow_size = 6
+
+	card_btn.add_theme_stylebox_override("normal", base_style)
+	card_btn.add_theme_stylebox_override("hover", hover_style)
+	card_btn.add_theme_stylebox_override("pressed", hover_style)
+	card_btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+
+	var card_margin := MarginContainer.new()
+	card_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	card_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card_margin.add_theme_constant_override("margin_left", 20)
+	card_margin.add_theme_constant_override("margin_right", 20)
+	card_margin.add_theme_constant_override("margin_top", 14)
+	card_margin.add_theme_constant_override("margin_bottom", 14)
+	card_btn.add_child(card_margin)
+
+	var hbox := HBoxContainer.new()
+	hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hbox.add_theme_constant_override("separation", 18)
+	hbox.alignment = BoxContainer.ALIGNMENT_BEGIN
+	card_margin.add_child(hbox)
+
+	# Left Icon Canvas Container
+	var icon_box := PanelContainer.new()
+	icon_box.custom_minimum_size = Vector2(56, 56)
+	icon_box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	icon_box.clip_contents = true
+	var ibox_style := StyleBoxFlat.new()
+	ibox_style.bg_color = Color(0.012, 0.03, 0.055, 0.95)
+	ibox_style.border_color = accent_color * Color(1, 1, 1, 0.6)
+	ibox_style.set_border_width_all(1)
+	ibox_style.set_corner_radius_all(10)
+	icon_box.add_theme_stylebox_override("panel", ibox_style)
+	hbox.add_child(icon_box)
+
+	var icon_canvas := Control.new()
+	icon_canvas.set_anchors_preset(Control.PRESET_FULL_RECT)
+	icon_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if draw_icon_callable.is_valid():
+		icon_canvas.draw.connect(func(): draw_icon_callable.call(icon_canvas))
+		card_btn.mouse_entered.connect(func(): icon_canvas.queue_redraw())
+		card_btn.mouse_exited.connect(func(): icon_canvas.queue_redraw())
+	icon_box.add_child(icon_canvas)
+
+	# Center Titles & Information
+	var vbox := VBoxContainer.new()
+	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.add_theme_constant_override("separation", 3)
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	hbox.add_child(vbox)
+
+	var top_row := HBoxContainer.new()
+	top_row.add_theme_constant_override("separation", 10)
+	vbox.add_child(top_row)
+
+	var title_lbl_node := Label.new()
+	title_lbl_node.text = title_text
+	title_lbl_node.add_theme_font_size_override("font_size", 16)
+	title_lbl_node.add_theme_color_override("font_color", accent_color.lerp(Color.WHITE, 0.35))
+	top_row.add_child(title_lbl_node)
+
+	var badge_lbl := Label.new()
+	badge_lbl.text = "[ %s ]" % badge_text
+	badge_lbl.add_theme_font_size_override("font_size", 11)
+	badge_lbl.add_theme_color_override("font_color", accent_color * Color(1, 1, 1, 0.85))
+	badge_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top_row.add_child(badge_lbl)
+
+	var subtitle_lbl_node := Label.new()
+	subtitle_lbl_node.text = subtitle_text
+	subtitle_lbl_node.add_theme_font_size_override("font_size", 11)
+	subtitle_lbl_node.add_theme_color_override("font_color", Color(0.75, 0.86, 0.96, 0.85))
+	vbox.add_child(subtitle_lbl_node)
+
+	var desc_lbl := Label.new()
+	desc_lbl.text = desc_text
+	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	desc_lbl.add_theme_font_size_override("font_size", 11)
+	desc_lbl.add_theme_color_override("font_color", Color(0.55, 0.68, 0.80, 0.80))
+	vbox.add_child(desc_lbl)
+
+	# Right Chevron Indicator
+	var chevron_box := CenterContainer.new()
+	chevron_box.custom_minimum_size = Vector2(28, 0)
+	chevron_box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var chevron_lbl := Label.new()
+	chevron_lbl.text = "▶"
+	chevron_lbl.add_theme_font_size_override("font_size", 14)
+	chevron_lbl.add_theme_color_override("font_color", accent_color * Color(1, 1, 1, 0.75))
+	chevron_box.add_child(chevron_lbl)
+	hbox.add_child(chevron_box)
+
+	card_btn.pressed.connect(open_section.bind(section_id, true))
+	wire_juice(card_btn)
+	content_box.add_child(card_btn)
+
+
+# --- 2. PLAYER SECTION (SURVIVAL TECHNIQUES & MECHANICS) ---------------------
+
+func _populate_player() -> void:
+	_add_section_header("EXPEDITION SUIT & ACOUSTIC SURVIVAL DOCTRINE")
+
+	_add_technique_card(
+		"ECHOLOCATION & PULSE WAVES",
+		"Emit acoustic sonar pulses (Spacebar, Touch Pulse Button, or Microphone) to illuminate the dark abyss. Sound waves bounce off stone barriers, painting cavern walls in bioluminescent cyan phosphors.",
+		"Pulse waves pierce utter darkness, but awaken and attract sound-sensitive beasts. Use with tactical caution.",
+		Color(0.35, 0.88, 1.0)
+	)
+
+	_add_technique_card(
+		"STEALTH & FOOTSTEP NOISE",
+		"Hold SNEAK (or toggle) to damp all footfall decibels. Sneaking allows you to safely brush past sleeping monsters and slip through sentry patrol sightlines undetected.",
+		"Never sprint or stomp near Sleeper halos or Patroller ears. Flooded water puddles amplify footstep noise!",
+		Color(0.40, 1.0, 0.75)
+	)
+
+	_add_technique_card(
+		"PEBBLE DIVERSION & RICOCHET",
+		"Aim and fling stone pebbles across the cavern. When a pebble collides with a distant wall, it generates a sharp acoustic impact point that lures predators away from your extraction route.",
+		"Pebbles are your primary non-violent distraction tool. Conserve stones for tight bottlenecks.",
+		Color(1.0, 0.85, 0.35)
+	)
+
+	_add_technique_card(
+		"BINAURAL AUDIO & CANE PROBING",
+		"For visually-impaired or pure acoustic play: the explorer cane feels the path ahead and clicks softly against rock faces. True 3D stereo audio balance indicates the precise direction of exits and threats.",
+		"Wear stereo headphones for full spatial awareness. Center the exit chime between your ears to escape.",
+		Color(0.85, 0.70, 1.0)
+	)
+
+	_add_technique_card(
+		"MICROPHONE VOICE SENSOR",
+		"Use your actual voice, whispers, or handclaps to generate in-game sonar pulses. The room calibration system automatically samples your ambient room noise floor to prevent false triggers.",
+		"Press [M] to instantly mute the mic sensor when playing in public or noisy environments.",
+		Color(0.45, 0.75, 1.0)
+	)
+
+
+func _add_technique_card(tech_name: String, description: String, tip: String, col: Color) -> void:
+	var card := PanelContainer.new()
+	card.mouse_filter = Control.MOUSE_FILTER_PASS
+	var style := StyleBoxFlat.new()
+	style.content_margin_left = 18.0
+	style.content_margin_top = 12.0
+	style.content_margin_right = 18.0
+	style.content_margin_bottom = 12.0
+	style.bg_color = Color(0.02, 0.05, 0.09, 0.88)
+	style.border_color = col * Color(1, 1, 1, 0.55)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(10)
+	card.add_theme_stylebox_override("panel", style)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 4)
+	card.add_child(vbox)
+
+	var title_node := Label.new()
+	title_node.text = tech_name
+	title_node.add_theme_font_size_override("font_size", 14)
+	title_node.add_theme_color_override("font_color", col.lerp(Color.WHITE, 0.35))
+	vbox.add_child(title_node)
+
+	var desc_lbl := Label.new()
+	desc_lbl.text = description
+	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	desc_lbl.add_theme_font_size_override("font_size", 12)
+	desc_lbl.add_theme_color_override("font_color", Color(0.82, 0.90, 0.98, 0.92))
+	vbox.add_child(desc_lbl)
+
+	var tip_lbl := Label.new()
+	tip_lbl.text = "TACTICAL NOTE: " + tip
+	tip_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	tip_lbl.add_theme_font_size_override("font_size", 11)
+	tip_lbl.add_theme_color_override("font_color", col * Color(1, 1, 1, 0.85))
+	vbox.add_child(tip_lbl)
+
+	content_box.add_child(card)
+
+
+# --- 3. MONSTERS SECTION (ACOUSTIC BESTIARY) ---------------------------------
+
+func _populate_monsters() -> void:
 	_add_section_header("THREAT ARCHIVE & ACOUSTIC SPECIMENS")
 
 	_add_bestiary_card(
@@ -271,7 +475,7 @@ func _populate_bestiary() -> void:
 		Color(0.72, 0.45, 1.0),
 		"SLEEPER",
 		"DORMANT LURKER",
-		"Remains in deep torpor within the subterranean shadows. Awakens only if you sprint or step directly into its immediate proximity halo.",
+		"Remains in deep torpor within subterranean shadows. Awakens only if you sprint or step directly into its immediate proximity halo.",
 		"Hold SNEAK to quietly slip past its sleep radius without detection."
 	)
 	_add_bestiary_card(
@@ -303,8 +507,8 @@ func _populate_bestiary() -> void:
 		Color(0.22, 0.95, 0.68),
 		"LISTENER",
 		"THE HIVE EAR",
-		"Completely deaf to normal footsteps. Accumulates sound waves; on reaching its 5th acoustic trigger, it transmits a global alarm to all beasts in the sector.",
-		"Minimize voice and sonar usage; extract swiftly before the fifth pip fills."
+		"Completely deaf to normal footsteps. Accumulates acoustic triggers; on reaching its 3rd sound wave, it unleashes a map-wide alarm buffing all beasts.",
+		"Minimize voice and sonar usage; navigate carefully before the third pip fills."
 	)
 
 
@@ -317,6 +521,7 @@ func _add_bestiary_card(
 	tip: String
 ) -> void:
 	var card := PanelContainer.new()
+	card.mouse_filter = Control.MOUSE_FILTER_PASS
 	var card_style := StyleBoxFlat.new()
 	card_style.content_margin_left = 18.0
 	card_style.content_margin_top = 14.0
@@ -487,17 +692,17 @@ func _update_bestiary_entry_labels(entry: Dictionary) -> void:
 		"listener":
 			var pips: int = int(entry.get("pips", 0))
 			if pips == 0:
-				status_lbl.text = "[ PASSIVE (0/5 PIPS) ]"
+				status_lbl.text = "[ PASSIVE (0/3 PIPS) ]"
 				status_lbl.add_theme_color_override("font_color", col)
-				hint_lbl.text = "▶ TAP ENTITY: Accumulate Acoustic Sound"
-			elif pips < 4:
-				status_lbl.text = "[ ACOUSTIC PIPS %d/5 ]" % pips
+				hint_lbl.text = "▶ TAP ENTITY: 1st Acoustic Sound"
+			elif pips == 1:
+				status_lbl.text = "[ ACOUSTIC PIPS 1/3 ]"
 				status_lbl.add_theme_color_override("font_color", Color(0.35, 1.0, 0.75))
-				hint_lbl.text = "▶ TAP AGAIN: Sound Pip (%d/5)" % (pips + 1)
-			elif pips == 4:
-				status_lbl.text = "[ CRITICAL (4/5 PIPS) ]"
+				hint_lbl.text = "▶ TAP AGAIN: 2nd Acoustic Sound"
+			elif pips == 2:
+				status_lbl.text = "[ CRITICAL (2/3 PIPS) ]"
 				status_lbl.add_theme_color_override("font_color", Color(1.0, 0.75, 0.2))
-				hint_lbl.text = "▶ TAP AGAIN: 5/5 GLOBAL HIVE ALARM!"
+				hint_lbl.text = "▶ TAP AGAIN: 3rd Sound (GLOBAL HIVE ALARM!)"
 			else:
 				status_lbl.text = "[ GLOBAL ALARM TRANSMITTED ]"
 				status_lbl.add_theme_color_override("font_color", Color(0.2, 1.0, 0.65))
@@ -505,8 +710,24 @@ func _update_bestiary_entry_labels(entry: Dictionary) -> void:
 
 
 func _on_monster_canvas_gui_input(event: InputEvent, entry: Dictionary) -> void:
-	if (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT) or (event is InputEventScreenTouch and event.pressed):
-		_on_bestiary_entity_clicked(entry)
+	if not ((event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT) or (event is InputEventScreenTouch and event.pressed)):
+		return
+
+	# Frame-level debounce to catch simultaneously emitted mouse & emulated touch events
+	var cur_frame: int = Engine.get_process_frames()
+	if cur_frame == int(entry.get("last_click_frame", -1)):
+		accept_event()
+		return
+	entry["last_click_frame"] = cur_frame
+
+	# Time debounce (400ms) to ensure double taps don't misfire
+	var now: int = Time.get_ticks_msec()
+	if now - int(entry.get("last_click_ms", 0)) < 400:
+		accept_event()
+		return
+	entry["last_click_ms"] = now
+	accept_event()
+	_on_bestiary_entity_clicked(entry)
 
 
 func _on_bestiary_entity_clicked(entry: Dictionary) -> void:
@@ -520,15 +741,13 @@ func _on_bestiary_entity_clicked(entry: Dictionary) -> void:
 		tw.tween_property(box, "scale", Vector2(1.10, 1.10), 0.05).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 		tw.tween_property(box, "scale", Vector2.ONE, 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
-	var sfx := _get_or_create_sfx_mgr()
-
 	match m_type:
 		"screamer":
 			if cur_stage == 0:
 				entry["stage"] = 1
 				entry["shake"] = 4.0
 				entry["timer"] = 0.0
-				_play_ui_sound(sfx._wav_screamer_crack, 1.5, randf_range(0.96, 1.04))
+				_play_ui_sound(_get_monster_sfx("screamer_crack"), 1.5, randf_range(0.96, 1.04))
 			elif cur_stage == 1:
 				entry["stage"] = 2
 				entry["shake"] = 12.0
@@ -538,7 +757,7 @@ func _on_bestiary_entity_clicked(entry: Dictionary) -> void:
 					{"r": -22.0, "max_r": 95.0, "col": Color(1.0, 0.35, 0.65, 0.85)},
 					{"r": -44.0, "max_r": 95.0, "col": Color(1.0, 0.5, 0.8, 0.75)}
 				]
-				_play_ui_sound(sfx._wav_screamer_shriek, 3.5, 1.0)
+				_play_ui_sound(_get_monster_sfx("screamer_shriek"), 3.5, 1.0)
 			else:
 				entry["stage"] = 0
 				entry["shake"] = 0.0
@@ -549,7 +768,7 @@ func _on_bestiary_entity_clicked(entry: Dictionary) -> void:
 				entry["stage"] = 1
 				entry["shake"] = 2.5
 				entry["timer"] = 0.0
-				_play_ui_sound(sfx._wav_echo_ping, -10.0, 0.75)
+				_play_ui_sound(_get_monster_sfx("echo_ping"), -10.0, 0.75)
 			elif cur_stage == 1:
 				entry["stage"] = 2
 				entry["shake"] = 10.0
@@ -558,7 +777,7 @@ func _on_bestiary_entity_clicked(entry: Dictionary) -> void:
 					{"r": 0.0, "max_r": 90.0, "col": Color(0.72, 0.45, 1.0, 0.95)},
 					{"r": -25.0, "max_r": 90.0, "col": Color(0.85, 0.65, 1.0, 0.8)}
 				]
-				_play_ui_sound(sfx._wav_roar_sleeper, 2.5, 0.95)
+				_play_ui_sound(_get_monster_sfx("roar_sleeper"), 2.5, 0.95)
 			else:
 				entry["stage"] = 0
 				entry["shake"] = 0.0
@@ -569,7 +788,7 @@ func _on_bestiary_entity_clicked(entry: Dictionary) -> void:
 				entry["stage"] = 1
 				entry["shake"] = 2.0
 				entry["timer"] = 0.0
-				_play_ui_sound(sfx._wav_echo_ping, -8.0, 1.35)
+				_play_ui_sound(_get_monster_sfx("echo_ping"), -8.0, 1.35)
 			elif cur_stage == 1:
 				entry["stage"] = 2
 				entry["shake"] = 9.0
@@ -578,7 +797,7 @@ func _on_bestiary_entity_clicked(entry: Dictionary) -> void:
 					{"r": 0.0, "max_r": 90.0, "col": Color(1.0, 0.82, 0.25, 0.95)},
 					{"r": -25.0, "max_r": 90.0, "col": Color(1.0, 0.95, 0.5, 0.8)}
 				]
-				_play_ui_sound(sfx._wav_roar_patroller, 2.5, 1.0)
+				_play_ui_sound(_get_monster_sfx("roar_patroller"), 2.5, 1.0)
 			else:
 				entry["stage"] = 0
 				entry["shake"] = 0.0
@@ -589,7 +808,7 @@ func _on_bestiary_entity_clicked(entry: Dictionary) -> void:
 				entry["stage"] = 1
 				entry["shake"] = 4.0
 				entry["timer"] = 0.0
-				_play_ui_sound(sfx._wav_charge_full, -6.0, 0.85)
+				_play_ui_sound(_get_monster_sfx("charge_full"), -6.0, 0.85)
 			elif cur_stage == 1:
 				entry["stage"] = 2
 				entry["shake"] = 12.0
@@ -598,7 +817,7 @@ func _on_bestiary_entity_clicked(entry: Dictionary) -> void:
 					{"r": 0.0, "max_r": 95.0, "col": Color(1.0, 0.2, 0.2, 0.95)},
 					{"r": -25.0, "max_r": 95.0, "col": Color(1.0, 0.4, 0.4, 0.8)}
 				]
-				_play_ui_sound(sfx._wav_roar_chaser, 3.0, 1.05)
+				_play_ui_sound(_get_monster_sfx("roar_chaser"), 3.0, 1.05)
 			else:
 				entry["stage"] = 0
 				entry["shake"] = 0.0
@@ -606,14 +825,14 @@ func _on_bestiary_entity_clicked(entry: Dictionary) -> void:
 
 		"listener":
 			var pips: int = int(entry.get("pips", 0))
-			if pips < 4:
+			if pips < 2:
 				entry["pips"] = pips + 1
 				entry["stage"] = 1
 				entry["shake"] = 2.5
-				var pip_pitch: float = 0.85 + float(entry["pips"]) * 0.12
-				_play_ui_sound(sfx._wav_listener_pip, 1.0, pip_pitch)
-			elif pips == 4:
-				entry["pips"] = 5
+				var pip_pitch: float = 0.90 + float(entry["pips"]) * 0.18
+				_play_ui_sound(_get_monster_sfx("listener_pip"), 1.0, pip_pitch)
+			elif pips == 2:
+				entry["pips"] = 3
 				entry["stage"] = 2
 				entry["shake"] = 14.0
 				entry["timer"] = 0.0
@@ -622,7 +841,7 @@ func _on_bestiary_entity_clicked(entry: Dictionary) -> void:
 					{"r": -25.0, "max_r": 100.0, "col": Color(0.35, 1.0, 0.85, 0.85)},
 					{"r": -50.0, "max_r": 100.0, "col": Color(0.55, 1.0, 0.95, 0.75)}
 				]
-				_play_ui_sound(sfx._wav_listener_alarm, 3.5, 1.0)
+				_play_ui_sound(_get_monster_sfx("listener_alarm"), 3.5, 1.0)
 			else:
 				entry["pips"] = 0
 				entry["stage"] = 0
@@ -635,14 +854,15 @@ func _on_bestiary_entity_clicked(entry: Dictionary) -> void:
 		canvas.queue_redraw()
 
 
-# --- TAB 1: SURVIVOR ARCHIVES ------------------------------------------------
+# --- 4. STORY SECTION (VANGUARD VII FIELD LOGS) ------------------------------
 
-func _populate_lore_notes() -> void:
+func _populate_story() -> void:
 	var col_count: int = GameState.get_collected_note_count()
 	var tot_count: int = GameState.get_total_note_count()
 	var pct: float = (float(col_count) / float(tot_count) * 100.0) if tot_count > 0 else 0.0
 
 	var banner := PanelContainer.new()
+	banner.mouse_filter = Control.MOUSE_FILTER_PASS
 	var b_style := StyleBoxFlat.new()
 	b_style.content_margin_left = 18.0
 	b_style.content_margin_top = 12.0
@@ -696,6 +916,7 @@ func _add_lore_note_card(note_data: Dictionary) -> void:
 	var text_str: String = str(note_data.get("text", ""))
 
 	var card := PanelContainer.new()
+	card.mouse_filter = Control.MOUSE_FILTER_PASS
 	var card_style := StyleBoxFlat.new()
 	card_style.content_margin_left = 16.0
 	card_style.content_margin_top = 10.0
@@ -813,7 +1034,7 @@ func _add_lore_note_card(note_data: Dictionary) -> void:
 	content_box.add_child(card)
 
 
-# --- TAB 2: ETHOS & ACCESSIBILITY --------------------------------------------
+# --- 5. ETHOS & ACCESSIBILITY SECTION ----------------------------------------
 
 func _populate_ethos() -> void:
 	_add_section_header("CORE ETHOS • POSITIVE VALUES & MINDFUL SURVIVAL")
@@ -844,6 +1065,7 @@ func _add_divider() -> void:
 
 func _add_guide_row(dot_color: Color, label_text: String, desc_text: String) -> void:
 	var card := PanelContainer.new()
+	card.mouse_filter = Control.MOUSE_FILTER_PASS
 	var style := StyleBoxFlat.new()
 	style.content_margin_left = 16.0
 	style.content_margin_top = 12.0
@@ -885,22 +1107,6 @@ func _add_guide_row(dot_color: Color, label_text: String, desc_text: String) -> 
 
 # --- HELPERS & AMBIENT DRAW --------------------------------------------------
 
-func _init_sfx_manager() -> void:
-	_sfx_mgr = SfxManager.new()
-	_sfx_mgr.name = "IntelSfxManager"
-	add_child(_sfx_mgr)
-
-
-func _get_or_create_sfx_mgr() -> SfxManager:
-	if _sfx_mgr != null and is_instance_valid(_sfx_mgr):
-		return _sfx_mgr
-	var existing = get_tree().get_first_node_in_group("sfx_manager") as SfxManager
-	if existing != null:
-		return existing
-	_init_sfx_manager()
-	return _sfx_mgr
-
-
 func _init_spores() -> void:
 	_spores.clear()
 	var w := maxf(size.x, 720.0)
@@ -940,7 +1146,10 @@ func _draw_sonar_backdrop() -> void:
 
 func _on_back_pressed() -> void:
 	_play_ui_sound(_wav_back, -4.0, 0.95)
-	GameState.go_to_previous_scene()
+	if _current_section != "hub":
+		open_section("hub", false)
+	else:
+		GameState.go_to_previous_scene()
 
 
 func wire_juice(btn: Button) -> void:
@@ -1009,3 +1218,182 @@ func _play_ui_sound(stream: AudioStreamWAV, vol_db: float, pitch: float, bus_nam
 	add_child(player)
 	player.finished.connect(player.queue_free)
 	player.play()
+
+
+# --- MONSTER PREVIEW PROCEDURAL AUDIO -----------------------------------------
+
+func _get_monster_sfx(key: String) -> AudioStreamWAV:
+	if _monster_wavs.has(key):
+		return _monster_wavs[key]
+	var wav: AudioStreamWAV = null
+	match key:
+		"screamer_crack":
+			wav = _synth_screamer_crack()
+		"screamer_shriek":
+			wav = _synth_screamer_shriek()
+		"echo_ping":
+			wav = _synth_echo_ping()
+		"charge_full":
+			wav = _synth_charge_full()
+		"roar_sleeper":
+			wav = _synth_monster_roar(95.0, 0.78, 0.35)
+		"roar_patroller":
+			wav = _synth_monster_roar(135.0, 0.68, 0.55)
+		"roar_chaser":
+			wav = _synth_monster_roar(185.0, 0.62, 0.85)
+		"listener_pip":
+			wav = _synth_listener_pip()
+		"listener_alarm":
+			wav = _synth_listener_alarm()
+	if wav != null:
+		_monster_wavs[key] = wav
+	return wav
+
+
+static func _make_wav_from_samples(samples: PackedFloat32Array, sample_rate: int = 22050) -> AudioStreamWAV:
+	var byte_data := PackedByteArray()
+	byte_data.resize(samples.size() * 2)
+	for i in samples.size():
+		var s: float = clampf(samples[i], -1.0, 1.0)
+		var pcm: int = int(s * 32767.0)
+		byte_data.encode_s16(i * 2, pcm)
+
+	var wav := AudioStreamWAV.new()
+	wav.format = AudioStreamWAV.FORMAT_16_BITS
+	wav.mix_rate = sample_rate
+	wav.stereo = false
+	wav.data = byte_data
+	return wav
+
+
+func _synth_screamer_crack() -> AudioStreamWAV:
+	var dur := 0.38
+	var count := int(dur * 22050.0)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	for i in count:
+		var t: float = float(i) / 22050.0
+		var snap1: float = randf_range(-1.0, 1.0) * exp(-t * 55.0)
+		var snap2: float = randf_range(-1.0, 1.0) * exp(-maxf(t - 0.07, 0.0) * 65.0) if t >= 0.07 else 0.0
+		var ring: float = (sin(TAU * 1480.0 * t) + 0.6 * sin(TAU * 2120.0 * t)) * exp(-t * 9.5)
+		out[i] = clampf((snap1 * 0.8 + snap2 * 0.7 + ring * 0.45) * 0.85, -1.0, 1.0)
+	return _make_wav_from_samples(out)
+
+
+func _synth_screamer_shriek() -> AudioStreamWAV:
+	var dur := 1.15
+	var count := int(dur * 22050.0)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	var p1 := 0.0
+	var p2 := 0.0
+	for i in count:
+		var t: float = float(i) / 22050.0
+		var norm_t: float = t / dur
+		var env: float = clampf(t / 0.03, 0.0, 1.0) * exp(-norm_t * 2.2)
+		var fm: float = sin(TAU * 38.0 * t) * 65.0
+		var f1: float = lerpf(1180.0, 760.0, norm_t) + fm
+		var f2: float = lerpf(1790.0, 1120.0, norm_t) - fm * 0.7
+		p1 += TAU * f1 / 22050.0
+		p2 += TAU * f2 / 22050.0
+		var shriek: float = sin(p1) * 0.55 + sin(p2) * 0.4 + randf_range(-0.35, 0.35) * exp(-t * 2.5)
+		var boom: float = sin(TAU * lerpf(160.0, 45.0, clampf(t / 0.25, 0.0, 1.0)) * t) * exp(-t * 8.0) * 0.5
+		out[i] = tanh((shriek + boom) * 1.6) * env * 0.82
+	return _make_wav_from_samples(out)
+
+
+func _synth_echo_ping() -> AudioStreamWAV:
+	var dur := 0.68
+	var count := int(dur * 22050.0)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	for i in count:
+		var t: float = float(i) / 22050.0
+		var env: float = minf(t / 0.006, 1.0) * exp(-t * 5.4)
+		var f1 := 528.0
+		var f2 := 792.0
+		var f3 := 1056.0
+		var f4 := 1584.0
+		var sig: float = sin(TAU * f1 * t) * 0.55 + sin(TAU * f2 * t) * 0.24 * exp(-t * 7.5) + sin(TAU * f3 * t) * 0.16 * exp(-t * 11.0) + sin(TAU * f4 * t) * 0.09 * exp(-t * 15.0)
+		var sub: float = sin(TAU * 132.0 * t) * exp(-t * 12.0) * 0.38
+		out[i] = clampf((sig * env + sub) * 0.85, -1.0, 1.0)
+	return _make_wav_from_samples(out)
+
+
+func _synth_charge_full() -> AudioStreamWAV:
+	var dur := 0.28
+	var count := int(dur * 22050.0)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	for i in count:
+		var t: float = float(i) / 22050.0
+		var env: float = minf(t / 0.006, 1.0) * exp(-t * 11.0)
+		out[i] = (sin(TAU * 880.0 * t) * 0.55 + sin(TAU * 1320.0 * t) * 0.35) * env * 0.7
+	return _make_wav_from_samples(out)
+
+
+func _synth_monster_roar(base_freq: float, dur: float, aggression: float) -> AudioStreamWAV:
+	var count := int(dur * 22050.0)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	var p1 := 0.0
+	var p2 := 0.0
+	var p3 := 0.0
+	var noise_lp := 0.0
+	for i in count:
+		var t: float = float(i) / 22050.0
+		var norm_t: float = t / dur
+		var attack: float = clampf(t / 0.04, 0.0, 1.0)
+		var decay: float = clampf((1.0 - norm_t) / 0.28, 0.0, 1.0)
+		var env: float = attack * decay
+
+		var pitch_curve: float = 1.0 + 0.28 * sin(norm_t * PI) - 0.22 * norm_t
+		var vibrato: float = 1.0 + 0.06 * sin(TAU * 26.0 * t)
+		var f: float = base_freq * pitch_curve * vibrato
+
+		p1 += TAU * f / 22050.0
+		p2 += TAU * (f * 1.48) / 22050.0
+		p3 += TAU * (f * 0.5) / 22050.0
+
+		var cords: float = sin(p1) + 0.55 * sin(p1 * 2.0) + 0.35 * sin(p2) + 0.6 * sin(p3)
+		var raw_noise: float = randf_range(-1.0, 1.0)
+		noise_lp = lerpf(noise_lp, raw_noise, 0.18 + 0.22 * aggression)
+		var rasp: float = noise_lp * (0.65 + 0.5 * sin(p1))
+
+		var mixed: float = tanh((cords * 0.7 + rasp * (0.6 + 0.4 * aggression)) * (1.8 + aggression))
+		out[i] = mixed * env * 0.85
+	return _make_wav_from_samples(out)
+
+
+func _synth_listener_pip() -> AudioStreamWAV:
+	var dur := 0.24
+	var count := int(dur * 22050.0)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	for i in count:
+		var t: float = float(i) / 22050.0
+		var env: float = minf(t / 0.005, 1.0) * exp(-t * 14.0)
+		var sig: float = sin(TAU * 740.0 * t) * 0.7 + sin(TAU * 1480.0 * t) * 0.3
+		out[i] = sig * env * 0.75
+	return _make_wav_from_samples(out)
+
+
+func _synth_listener_alarm() -> AudioStreamWAV:
+	var dur := 1.6
+	var count := int(dur * 22050.0)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	var p_horn := 0.0
+	var p_sweep := 0.0
+	for i in count:
+		var t: float = float(i) / 22050.0
+		var norm_t: float = t / dur
+		var env: float = clampf(t / 0.05, 0.0, 1.0) * clampf((1.0 - norm_t) / 0.2, 0.0, 1.0)
+		var horn_f: float = 110.0 * (1.0 - 0.12 * norm_t)
+		var sweep_f: float = 440.0 + 320.0 * sin(TAU * 3.0 * t)
+		p_horn += TAU * horn_f / 22050.0
+		p_sweep += TAU * sweep_f / 22050.0
+		var horn: float = sin(p_horn) + 0.5 * sin(p_horn * 2.0) + 0.3 * sin(p_horn * 3.0)
+		var radar: float = sin(p_sweep) * 0.35 * (0.5 + 0.5 * sin(TAU * 6.0 * t))
+		out[i] = tanh((horn * 0.65 + radar) * 1.5) * env * 0.85
+	return _make_wav_from_samples(out)

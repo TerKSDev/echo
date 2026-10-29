@@ -361,7 +361,7 @@ func _on_leaderboard_pressed() -> void:
 
 func _on_intel_pressed() -> void:
 	_play_ui_sound(_wav_click, -5.0, 1.0)
-	GameState.go_to_intel("res://ui/screens/level_select.tscn", 0)
+	GameState.go_to_archives("res://ui/screens/level_select.tscn")
 
 
 func _on_settings_pressed() -> void:

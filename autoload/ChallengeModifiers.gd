@@ -87,16 +87,16 @@ const CURSES: Dictionary = {
 		"icon": "heart_broken",
 		"color": Color(1.0, 0.30, 0.60)
 	},
-	"curse_listener_feedback": {
-		"id": "curse_listener_feedback",
+	"curse_resonance_backlash": {
+		"id": "curse_resonance_backlash",
 		"name": "共鸣反噬",
-		"title_en": "ACOUSTIC OVERLOAD",
-		"flavor": "静默之耳吸收过量声波，即将引爆刺耳声啸。",
-		"flavor_en": "Silent ears absorb resonance until exploding in a concussive burst.",
-		"description": "Listener 累积 4 次声波后引发全图音爆短暂眩晕",
-		"desc_en": "Listener beasts trigger a room-wide acoustic shock after 4 echoes",
+		"title_en": "RESONANCE BACKLASH",
+		"flavor": "发声探路激荡洞窟共振，回音暴露出你的位置与声息。",
+		"flavor_en": "Sonar reverberates violently, exposing your position to nearby beasts.",
+		"description": "发声探路后产生 2.5 秒共振余波，怪对你的感知范围扩大 50% 且步响增加",
+		"desc_en": "Vocal sonar triggers 2.5s resonance; enemy hearing range vs you +50% and footsteps louder",
 		"icon": "bell",
-		"color": Color(0.68, 0.20, 0.88)
+		"color": Color(0.85, 0.25, 0.95)
 	},
 	"curse_predator_instinct": {
 		"id": "curse_predator_instinct",
@@ -201,16 +201,16 @@ const BOONS: Dictionary = {
 		"icon": "pouch",
 		"color": Color(0.85, 0.90, 0.40)
 	},
-	"boon_wall_penetration": {
-		"id": "boon_wall_penetration",
-		"name": "透壁回声",
-		"title_en": "PIERCING SONAR",
-		"flavor": "超低频共振波轻易穿透坚硬石壁，直达出口。",
-		"flavor_en": "Low-frequency resonance pulses effortlessly through dense rock.",
-		"description": "声波穿透墙体感知门后空间，且出口光柱常态亮起",
-		"desc_en": "Sonar waves penetrate walls, and the exit beacon remains permanently visible",
-		"icon": "wall_pierce",
-		"color": Color(0.45, 0.95, 0.70)
+	"boon_echo_surge": {
+		"id": "boon_echo_surge",
+		"name": "声涌疾步",
+		"title_en": "SONIC SURGE",
+		"flavor": "发声探路释放的动能反冲足底，化为疾掠的爆发推力。",
+		"flavor_en": "Kinetic acoustic discharge propels your stride with sudden explosive velocity.",
+		"description": "主动发声探路释放推力，发声后 2 秒内移速提升 25%",
+		"desc_en": "Vocal sonar grants +25% burst movement speed for 2.0s after shouting",
+		"icon": "boot",
+		"color": Color(0.25, 0.95, 0.85)
 	},
 	"boon_second_wind": {
 		"id": "boon_second_wind",
@@ -241,6 +241,7 @@ var active_curses: Array[String] = []
 var active_boons: Array[String] = []
 var claimed_milestones: Dictionary = {} # int level -> { "curse": String, "boon": String }
 var reroll_used_milestones: Dictionary = {} # int level -> bool
+var run_seed := 0
 
 
 func _ready() -> void:
@@ -256,16 +257,30 @@ func is_milestone_claimed(level_num: int) -> bool:
 
 
 func has_curse(curse_id: String) -> bool:
-	return active_curses.has(curse_id)
+	if active_curses.has(curse_id):
+		return true
+	if curse_id == "curse_resonance_backlash" and active_curses.has("curse_listener_feedback"):
+		return true
+	if curse_id == "curse_listener_feedback" and active_curses.has("curse_resonance_backlash"):
+		return true
+	return false
 
 
 func has_boon(boon_id: String) -> bool:
-	return active_boons.has(boon_id)
+	if active_boons.has(boon_id):
+		return true
+	if boon_id == "boon_echo_surge" and active_boons.has("boon_wall_penetration"):
+		return true
+	if boon_id == "boon_wall_penetration" and active_boons.has("boon_echo_surge"):
+		return true
+	return false
 
 
 # Returns candidates for a given milestone
 func generate_pact_candidates(level_num: int) -> Dictionary:
-	var seed_val := int(GameState.challenge_highest_unlocked * 137 + level_num * 31)
+	if run_seed == 0:
+		run_seed = int(Time.get_unix_time_from_system()) ^ randi()
+	var seed_val := int(run_seed + level_num * 137)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_val
 
@@ -340,6 +355,7 @@ func reset_challenge_run() -> void:
 	active_boons.clear()
 	claimed_milestones.clear()
 	reroll_used_milestones.clear()
+	run_seed = int(Time.get_unix_time_from_system()) ^ randi()
 	save_modifiers_to_save()
 	modifiers_updated.emit()
 
@@ -352,6 +368,7 @@ func save_modifiers_to_save() -> void:
 	cfg.set_value("challenge_modifiers", "active_boons", active_boons)
 	cfg.set_value("challenge_modifiers", "claimed_milestones", claimed_milestones)
 	cfg.set_value("challenge_modifiers", "reroll_used_milestones", reroll_used_milestones)
+	cfg.set_value("challenge_modifiers", "run_seed", run_seed)
 	cfg.save(save_path)
 
 
@@ -364,3 +381,12 @@ func load_modifiers_from_save() -> void:
 	active_boons = Array(cfg.get_value("challenge_modifiers", "active_boons", []), TYPE_STRING, &"", null)
 	claimed_milestones = cfg.get_value("challenge_modifiers", "claimed_milestones", {})
 	reroll_used_milestones = cfg.get_value("challenge_modifiers", "reroll_used_milestones", {})
+	run_seed = int(cfg.get_value("challenge_modifiers", "run_seed", 0))
+
+	# Migration: update legacy modifier IDs in active arrays
+	for i in active_curses.size():
+		if active_curses[i] == "curse_listener_feedback":
+			active_curses[i] = "curse_resonance_backlash"
+	for i in active_boons.size():
+		if active_boons[i] == "boon_wall_penetration":
+			active_boons[i] = "boon_echo_surge"

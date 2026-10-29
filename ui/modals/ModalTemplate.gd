@@ -30,6 +30,20 @@ static func apply_full_rect(control: Control) -> void:
 	control.offset_bottom = 0.0
 
 
+static func hide_scrollbars(scroll: ScrollContainer) -> void:
+	if scroll == null or not is_instance_valid(scroll):
+		return
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	var vbar := scroll.get_v_scroll_bar()
+	if vbar != null and is_instance_valid(vbar):
+		vbar.modulate.a = 0.0
+		vbar.custom_minimum_size = Vector2.ZERO
+	var hbar := scroll.get_h_scroll_bar()
+	if hbar != null and is_instance_valid(hbar):
+		hbar.modulate.a = 0.0
+		hbar.custom_minimum_size = Vector2.ZERO
+
+
 static func make_card_style(kind: int = ThemeKind.SONAR) -> StyleBoxFlat:
 	var s := StyleBoxFlat.new()
 	s.content_margin_left = MARGIN_H

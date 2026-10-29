@@ -135,7 +135,12 @@ func _on_hit_ground() -> void:
 		var bounce_dir := (final_pos - origin_pt).normalized().rotated(randf_range(-0.35, 0.35))
 		if bounce_dir.is_zero_approx():
 			bounce_dir = Vector2.RIGHT
-		var bounce_dest := final_pos + bounce_dir * randf_range(65.0, 105.0)
+		var raw_dest := final_pos + bounce_dir * randf_range(65.0, 105.0)
+		var space := get_world_2d().direct_space_state
+		var q := PhysicsRayQueryParameters2D.create(final_pos, raw_dest)
+		q.collision_mask = 1
+		var hit := space.intersect_ray(q)
+		var bounce_dest: Vector2 = (Vector2(hit.position) - bounce_dir * 8.0) if not hit.is_empty() else raw_dest
 		get_tree().create_timer(0.25).timeout.connect(func():
 			var bus := get_tree().get_first_node_in_group("sound_bus") as SoundBus
 			if bus != null and is_instance_valid(bus):

@@ -88,6 +88,29 @@ var _wall_bump_alpha := 0.0
 var _second_wind_used := false
 var _second_wind_burst_timer := 0.0
 var _terror_shiver_timer := 0.0
+var _sonic_surge_timer := 0.0
+var _resonance_backlash_timer := 0.0
+
+
+func has_resonance_backlash() -> bool:
+	return _resonance_backlash_timer > 0.0
+
+
+func has_sonic_surge() -> bool:
+	return _sonic_surge_timer > 0.0
+
+
+func is_holding_breath() -> bool:
+	return _idle_timer >= 1.0
+
+
+func get_max_pebbles() -> int:
+	if GameState.current_mode == GameState.GameMode.CHALLENGE:
+		if ChallengeModifiers.has_curse("curse_single_stone"):
+			return 1
+		if ChallengeModifiers.has_boon("boon_deep_pockets"):
+			return 4
+	return MAX_PEBBLES
 
 
 func trigger_terror_shiver(duration: float = 3.0) -> void:
@@ -177,16 +200,13 @@ func _ready() -> void:
 
 
 func reset_for_level() -> void:
-	pebbles = MAX_PEBBLES
-	if GameState.current_mode == GameState.GameMode.CHALLENGE:
-		if ChallengeModifiers.has_curse("curse_single_stone"):
-			pebbles = 1
-		elif ChallengeModifiers.has_boon("boon_deep_pockets"):
-			pebbles = 4
+	pebbles = get_max_pebbles()
 	pebble_count_changed.emit(pebbles)
 	_second_wind_used = false
 	_second_wind_burst_timer = 0.0
 	_terror_shiver_timer = 0.0
+	_sonic_surge_timer = 0.0
+	_resonance_backlash_timer = 0.0
 	is_aiming_pebble = false
 	moving = false
 	charging = false
@@ -431,6 +451,8 @@ func _physics_process(delta: float) -> void:
 	var speed: float = base_sneak if sneaking else WALK_SPEED
 	if _second_wind_burst_timer > 0.0:
 		speed *= 1.40
+	if _sonic_surge_timer > 0.0 and GameState.current_mode == GameState.GameMode.CHALLENGE and ChallengeModifiers.has_boon("boon_echo_surge"):
+		speed *= 1.25
 	if water_count > 0:
 		if GameState.current_mode == GameState.GameMode.CHALLENGE and ChallengeModifiers.has_boon("boon_water_strider"):
 			speed *= 1.20
@@ -502,7 +524,12 @@ func _physics_process(delta: float) -> void:
 	
 	# Fluid resistance in water: cushioned acceleration and heavier viscous drag
 	var base_rate: float = ACCEL if desired != Vector2.ZERO else FRICTION
-	var rate: float = (base_rate * 0.72) if (water_count > 0 and desired != Vector2.ZERO) else (base_rate * (1.3 if water_count > 0 else 1.0))
+	var is_water_strider: bool = (GameState.current_mode == GameState.GameMode.CHALLENGE and ChallengeModifiers.has_boon("boon_water_strider"))
+	var rate: float
+	if is_water_strider:
+		rate = base_rate
+	else:
+		rate = (base_rate * 0.72) if (water_count > 0 and desired != Vector2.ZERO) else (base_rate * (1.3 if water_count > 0 else 1.0))
 	velocity = velocity.move_toward(desired, rate * delta)
 	move_and_slide()
 
@@ -601,6 +628,8 @@ func _physics_process(delta: float) -> void:
 
 			if _terror_shiver_timer > 0.0 and GameState.current_mode == GameState.GameMode.CHALLENGE and ChallengeModifiers.has_curse("curse_terror_shiver"):
 				step_loud *= 1.50
+			if _resonance_backlash_timer > 0.0 and GameState.current_mode == GameState.GameMode.CHALLENGE and ChallengeModifiers.has_curse("curse_resonance_backlash"):
+				step_loud *= 1.50
 
 			make_sound(step_loud, false, is_sneak)
 	else:
@@ -615,6 +644,12 @@ func _update_charging_and_visuals(delta: float) -> void:
 		_second_wind_burst_timer = maxf(0.0, _second_wind_burst_timer - delta)
 	if _terror_shiver_timer > 0.0:
 		_terror_shiver_timer = maxf(0.0, _terror_shiver_timer - delta)
+	if _sonic_surge_timer > 0.0:
+		_sonic_surge_timer = maxf(0.0, _sonic_surge_timer - delta)
+		queue_redraw()
+	if _resonance_backlash_timer > 0.0:
+		_resonance_backlash_timer = maxf(0.0, _resonance_backlash_timer - delta)
+		queue_redraw()
 
 	# Voice charging
 	var sfx_mgr := _get_sfx()
@@ -719,6 +754,14 @@ func make_sound(loudness: float, is_voice := false, force_sneak := false) -> voi
 	_burst_alpha = clampf(final_loudness * 2.0, 0.4, 1.0)
 
 	if is_voice:
+		if GameState.current_mode == GameState.GameMode.CHALLENGE:
+			if ChallengeModifiers.has_boon("boon_echo_surge"):
+				_sonic_surge_timer = 2.0
+				queue_redraw()
+			if ChallengeModifiers.has_curse("curse_resonance_backlash"):
+				_resonance_backlash_timer = 2.5
+				queue_redraw()
+
 		if GameState.current_mode == GameState.GameMode.CHALLENGE and ChallengeModifiers.has_boon("boon_sonic_stagger") and final_loudness >= 0.50:
 			for node in get_tree().get_nodes_in_group("enemy"):
 				var enemy_node := node as Enemy
@@ -895,6 +938,10 @@ func reset(pos: Vector2) -> void:
 	_shake_timer = 0.0
 	_shake_intensity = 0.0
 	_stun_timer = 0.0
+	_second_wind_burst_timer = 0.0
+	_terror_shiver_timer = 0.0
+	_sonic_surge_timer = 0.0
+	_resonance_backlash_timer = 0.0
 	_idle_timer = 0.0
 	_entry_timer = 1.2
 	_sneak_blend = 0.0
@@ -1027,6 +1074,32 @@ func _draw() -> void:
 		var slow_pulse := 15.0 + 1.8 * sin(t * 10.0)
 		draw_arc(Vector2.ZERO, slow_pulse, 0.0, TAU, 24, Color(0.2, 0.94, 0.68, 0.70), 1.6)
 		draw_circle(Vector2.ZERO, 5.0, Color(0.1, 0.65, 0.45, 0.25))
+
+	# Sonic surge boon feedback (cyan sprint stream)
+	if _sonic_surge_timer > 0.0:
+		var surge_ratio: float = clampf(_sonic_surge_timer / 2.0, 0.0, 1.0)
+		var surge_r: float = 17.0 + 2.5 * sin(t * 16.0)
+		draw_arc(core_ofs, surge_r, 0.0, TAU, 28, Color(0.25, 0.95, 0.85, 0.52 * surge_ratio), 1.8)
+		if velocity.length() > 10.0:
+			var trail_back := -velocity.normalized() * (12.0 * surge_ratio)
+			draw_line(core_ofs, core_ofs + trail_back, Color(0.35, 1.0, 0.90, 0.70 * surge_ratio), 2.2)
+
+	# Resonance backlash curse feedback (unstable magenta acoustic vibration ring)
+	if _resonance_backlash_timer > 0.0:
+		var res_ratio: float = clampf(_resonance_backlash_timer / 2.5, 0.0, 1.0)
+		var res_r: float = 21.0 + 3.5 * sin(t * 20.0)
+		draw_arc(core_ofs, res_r, 0.0, TAU, 28, Color(0.85, 0.25, 0.95, 0.55 * res_ratio), 1.8)
+		for i in 3:
+			var ang := i * (TAU / 3.0) + t * 4.0
+			var orb := core_ofs + Vector2.from_angle(ang) * res_r
+			draw_circle(orb, 2.0, Color(1.0, 0.45, 0.95, 0.75 * res_ratio))
+
+	# Calm breath boon feedback (serene mint breathing aura when idle for >= 1.0s)
+	if _idle_timer >= 1.0 and GameState.current_mode == GameState.GameMode.CHALLENGE and ChallengeModifiers.has_boon("boon_calm_breath"):
+		var calm_breathe := 0.5 + 0.5 * sin(t * 2.0)
+		var calm_r: float = 16.0 + 2.0 * calm_breathe
+		draw_arc(core_ofs, calm_r, 0.0, TAU, 24, Color(0.35, 0.95, 0.75, 0.40 + 0.20 * calm_breathe), 1.5)
+		draw_circle(core_ofs, 4.0, Color(0.4, 1.0, 0.8, 0.18 * calm_breathe))
 
 	# Pebble Aiming trajectory arc & noise landing reticle
 	if is_aiming_pebble:

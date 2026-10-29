@@ -163,11 +163,11 @@ static func draw_preview_chaser(canvas: Control, c: Vector2, stage: int, col: Co
 static func draw_preview_listener(canvas: Control, c: Vector2, stage: int, col: Color, pips: int, time: float) -> void:
 	canvas.draw_arc(c, 18.0, -PI * 0.8, PI * 0.8, 28, col, 2.8)
 	canvas.draw_circle(c, 9.5, Color(col, 0.45))
-	for i in 5:
-		var ang := -PI * 0.72 + i * (PI * 1.44 / 4.0)
+	for i in 3:
+		var ang := -PI * 0.65 + i * (PI * 1.30 / 2.0)
 		var pip_pos := c + Vector2.from_angle(ang) * 28.0
 		if pips > i:
-			var flare: float = 1.0 + (0.35 * sin(time * 20.0) if pips == 5 else 0.0)
+			var flare: float = 1.0 + (0.35 * sin(time * 20.0) if pips == 3 else 0.0)
 			canvas.draw_circle(pip_pos, 4.8 * flare, Color(0.2, 1.0, 0.7, 1.0))
 			canvas.draw_circle(pip_pos, 2.2 * flare, Color(1.0, 1.0, 1.0, 1.0))
 		else:

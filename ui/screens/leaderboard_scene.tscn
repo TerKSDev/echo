@@ -134,105 +134,152 @@ alignment = 1
 
 [node name="Title" type="Label" parent="TopBar/TitleBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.92, 0.96, 1, 1)
-theme_override_font_sizes/font_size = 22
+theme_override_colors/font_color = Color(0.94, 0.97, 1, 1)
+theme_override_font_sizes/font_size = 20
 text = "GLOBAL LEADERBOARD"
 
 [node name="Subtitle" type="Label" parent="TopBar/TitleBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.45, 0.76, 1, 0.78)
-theme_override_font_sizes/font_size = 12
-text = "HUAWEI GAME SERVICE • ABYSS SPEEDRUN RANKINGS"
+theme_override_colors/font_color = Color(0.4, 0.72, 0.95, 0.75)
+theme_override_font_sizes/font_size = 11
+text = "CHALLENGE SPEEDRUN  //  HUAWEI GAME SERVICE"
 
 [node name="AccountBox" type="HBoxContainer" parent="TopBar"]
 layout_mode = 2
 size_flags_vertical = 4
 theme_override_constants/separation = 8
 
-[node name="AccountStatusPill" type="PanelContainer" parent="TopBar/AccountBox"]
-layout_mode = 2
-
-[node name="Margin" type="MarginContainer" parent="TopBar/AccountBox/AccountStatusPill"]
-layout_mode = 2
-theme_override_constants/margin_left = 12
-theme_override_constants/margin_top = 6
-theme_override_constants/margin_right = 12
-theme_override_constants/margin_bottom = 6
-
-[node name="AccountStatusLabel" type="Label" parent="TopBar/AccountBox/AccountStatusPill/Margin"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.35, 0.95, 0.75, 1)
-theme_override_font_sizes/font_size = 11
-text = "◈ HUAWEI ID: Guest Explorer"
-
 [node name="AccountActionBtn" type="Button" parent="TopBar/AccountBox"]
 custom_minimum_size = Vector2(90, 32)
 layout_mode = 2
 focus_mode = 0
 theme_override_font_sizes/font_size = 11
-text = "SIGN OUT"
+text = "SIGN IN"
 
-[node name="SectorBar" type="HBoxContainer" parent="."]
+[node name="CampaignCard" type="PanelContainer" parent="."]
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
 offset_left = 32.0
-offset_top = 99.0
+offset_top = 88.0
 offset_right = -32.0
-offset_bottom = 143.0
+offset_bottom = 140.0
 grow_horizontal = 2
-theme_override_constants/separation = 12
 
-[node name="PrevSectorBtn" type="Button" parent="SectorBar"]
-custom_minimum_size = Vector2(44, 40)
-layout_mode = 2
-focus_mode = 0
-theme_override_font_sizes/font_size = 16
-text = "◀"
-
-[node name="SectorInfoCard" type="PanelContainer" parent="SectorBar"]
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="Margin" type="MarginContainer" parent="SectorBar/SectorInfoCard"]
+[node name="Margin" type="MarginContainer" parent="CampaignCard"]
 layout_mode = 2
 theme_override_constants/margin_left = 16
-theme_override_constants/margin_top = 6
+theme_override_constants/margin_top = 8
 theme_override_constants/margin_right = 16
-theme_override_constants/margin_bottom = 6
+theme_override_constants/margin_bottom = 8
 
-[node name="SectorBox" type="HBoxContainer" parent="SectorBar/SectorInfoCard/Margin"]
+[node name="CampaignBox" type="HBoxContainer" parent="CampaignCard/Margin"]
 layout_mode = 2
 alignment = 1
+theme_override_constants/separation = 14
+
+[node name="CampaignIconCanvas" type="Control" parent="CampaignCard/Margin/CampaignBox"]
+custom_minimum_size = Vector2(30, 30)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+
+[node name="CampaignTextBox" type="VBoxContainer" parent="CampaignCard/Margin/CampaignBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 1
+theme_override_constants/separation = 2
+
+[node name="CampaignNameLabel" type="Label" parent="CampaignCard/Margin/CampaignBox/CampaignTextBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.84, 0.35, 1)
+theme_override_font_sizes/font_size = 13
+text = "CHALLENGE CAMPAIGN SPEEDRUN"
+
+[node name="CampaignDetailLabel" type="Label" parent="CampaignCard/Margin/CampaignBox/CampaignTextBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.78, 0.95, 0.75)
+theme_override_font_sizes/font_size = 10
+text = "ALL 21 SECTORS (-4,500M TO -9,999M SP) • METRIC: TOTAL CLEAR TIME"
+
+[node name="CampaignTagPill" type="PanelContainer" parent="CampaignCard/Margin/CampaignBox"]
+layout_mode = 2
+size_flags_vertical = 4
+
+[node name="TagMargin" type="MarginContainer" parent="CampaignCard/Margin/CampaignBox/CampaignTagPill"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 4
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 4
+
+[node name="CampaignTagLabel" type="Label" parent="CampaignCard/Margin/CampaignBox/CampaignTagPill/TagMargin"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.35, 0.95, 0.75, 0.95)
+theme_override_font_sizes/font_size = 10
+text = "TOP 100 BOARD"
+
+[node name="TableHeader" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 32.0
+offset_top = 148.0
+offset_right = -32.0
+offset_bottom = 178.0
+grow_horizontal = 2
+
+[node name="Margin" type="MarginContainer" parent="TableHeader"]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 4
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 4
+
+[node name="HeaderHBox" type="HBoxContainer" parent="TableHeader/Margin"]
+layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="SectorNameLabel" type="Label" parent="SectorBar/SectorInfoCard/Margin/SectorBox"]
+[node name="HeaderRank" type="Label" parent="TableHeader/Margin/HeaderHBox"]
+custom_minimum_size = Vector2(68, 0)
 layout_mode = 2
-theme_override_colors/font_color = Color(0.9, 0.96, 1, 1)
-theme_override_font_sizes/font_size = 14
-text = "SECTOR 01: SHALLOW RING"
+theme_override_colors/font_color = Color(0.45, 0.72, 0.95, 0.85)
+theme_override_font_sizes/font_size = 11
+text = "RANK"
 
-[node name="SectorDepthLabel" type="Label" parent="SectorBar/SectorInfoCard/Margin/SectorBox"]
+[node name="HeaderExplorer" type="Label" parent="TableHeader/Margin/HeaderHBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.45, 0.76, 1, 0.8)
-theme_override_font_sizes/font_size = 12
-text = "•  DEPTH: -4,200 M"
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.45, 0.72, 0.95, 0.85)
+theme_override_font_sizes/font_size = 11
+text = "EXPLORER / DEVICE"
 
-[node name="NextSectorBtn" type="Button" parent="SectorBar"]
-custom_minimum_size = Vector2(44, 40)
+[node name="HeaderDate" type="Label" parent="TableHeader/Margin/HeaderHBox"]
+custom_minimum_size = Vector2(88, 0)
 layout_mode = 2
-focus_mode = 0
-theme_override_font_sizes/font_size = 16
-text = "▶"
+theme_override_colors/font_color = Color(0.45, 0.72, 0.95, 0.85)
+theme_override_font_sizes/font_size = 11
+text = "DATE"
+horizontal_alignment = 1
+
+[node name="HeaderTime" type="Label" parent="TableHeader/Margin/HeaderHBox"]
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.45, 0.72, 0.95, 0.85)
+theme_override_font_sizes/font_size = 11
+text = "TOTAL TIME"
+horizontal_alignment = 2
 
 [node name="MainArea" type="Control" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_top = 155.0
+offset_top = 184.0
+offset_bottom = -130.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 1
 
 [node name="ScrollContainer" type="ScrollContainer" parent="MainArea"]
 layout_mode = 1
@@ -246,12 +293,102 @@ horizontal_scroll_mode = 0
 [node name="ContentMargin" type="MarginContainer" parent="MainArea/ScrollContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
+mouse_filter = 1
 theme_override_constants/margin_left = 32
-theme_override_constants/margin_top = 12
+theme_override_constants/margin_top = 6
 theme_override_constants/margin_right = 32
-theme_override_constants/margin_bottom = 40
+theme_override_constants/margin_bottom = 20
 
 [node name="ContentBox" type="VBoxContainer" parent="MainArea/ScrollContainer/ContentMargin"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_constants/separation = 12
+mouse_filter = 1
+theme_override_constants/separation = 6
+
+[node name="BottomBar" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 28.0
+offset_top = -116.0
+offset_right = -28.0
+offset_bottom = -48.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="Margin" type="MarginContainer" parent="BottomBar"]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 8
+
+[node name="BottomHBox" type="HBoxContainer" parent="BottomBar/Margin"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 14
+
+[node name="RankPill" type="PanelContainer" parent="BottomBar/Margin/BottomHBox"]
+custom_minimum_size = Vector2(74, 36)
+layout_mode = 2
+size_flags_vertical = 4
+
+[node name="RankPillMargin" type="MarginContainer" parent="BottomBar/Margin/BottomHBox/RankPill"]
+layout_mode = 2
+theme_override_constants/margin_left = 6
+theme_override_constants/margin_right = 6
+
+[node name="RankLabel" type="Label" parent="BottomBar/Margin/BottomHBox/RankPill/RankPillMargin"]
+layout_mode = 2
+horizontal_alignment = 1
+vertical_alignment = 1
+theme_override_colors/font_color = Color(1, 0.85, 0.3, 1)
+theme_override_font_sizes/font_size = 12
+text = "--"
+
+[node name="PlayerInfoBox" type="VBoxContainer" parent="BottomBar/Margin/BottomHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 1
+theme_override_constants/separation = 2
+
+[node name="PlayerNameLabel" type="Label" parent="BottomBar/Margin/BottomHBox/PlayerInfoBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.94, 0.97, 1, 1)
+theme_override_font_sizes/font_size = 13
+text = "Guest Explorer"
+
+[node name="PlayerStatusLabel" type="Label" parent="BottomBar/Margin/BottomHBox/PlayerInfoBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.48, 0.68, 0.88, 0.75)
+theme_override_font_sizes/font_size = 10
+text = "HUAWEI Game Service • Sign in to record run"
+
+[node name="TimeBox" type="VBoxContainer" parent="BottomBar/Margin/BottomHBox"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 2
+
+[node name="PlayerTimeLabel" type="Label" parent="BottomBar/Margin/BottomHBox/TimeBox"]
+layout_mode = 2
+horizontal_alignment = 2
+theme_override_colors/font_color = Color(0.35, 1, 0.8, 1)
+theme_override_font_sizes/font_size = 13
+text = "--:--.--"
+
+[node name="TimeCaptionLabel" type="Label" parent="BottomBar/Margin/BottomHBox/TimeBox"]
+layout_mode = 2
+horizontal_alignment = 2
+theme_override_colors/font_color = Color(0.45, 0.65, 0.85, 0.75)
+theme_override_font_sizes/font_size = 9
+text = "TOTAL TIME"
+
+[node name="LocateBtn" type="Button" parent="BottomBar/Margin/BottomHBox"]
+custom_minimum_size = Vector2(88, 34)
+layout_mode = 2
+size_flags_vertical = 4
+focus_mode = 0
+theme_override_font_sizes/font_size = 11
+text = "LOCATE"

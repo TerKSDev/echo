@@ -12,7 +12,7 @@ extends Control
 @onready var tab_advanced_btn: Button = $TabBar/TabAdvanced
 
 var _tab_buttons: Array[Button] = []
-var _panels: Array[VBoxContainer] = []
+var _panel_cache: Dictionary = {}
 var _current_tab: int = 0
 
 var _menu_mic: MicInput = null
@@ -37,17 +37,28 @@ func _ready() -> void:
 	_build_ui_audio()
 	GameState.start_menu_bgm()
 	_init_spores()
-	_init_menu_mic()
 
 	if sonar_backdrop != null:
 		sonar_backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		sonar_backdrop.draw.connect(_draw_sonar_backdrop)
 
+	if scroll_container != null:
+		scroll_container.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		var vbar := scroll_container.get_v_scroll_bar()
+		if vbar != null:
+			vbar.modulate.a = 0.0
+			vbar.custom_minimum_size = Vector2.ZERO
+		var hbar := scroll_container.get_h_scroll_bar()
+		if hbar != null:
+			hbar.modulate.a = 0.0
+			hbar.custom_minimum_size = Vector2.ZERO
+
 	_setup_top_bar()
 	_setup_tab_bar()
-	_build_all_panels()
-	_switch_tab(0)
+	_switch_tab(0, false)
 	_apply_safe_area()
+
+	call_deferred("_defer_init_menu_mic")
 
 
 func _notification(what: int) -> void:
@@ -108,30 +119,52 @@ func _setup_top_bar() -> void:
 		wire_juice(reset_defaults_btn)
 
 
+var _last_sfx_preview_time: float = 0.0
+
+func preview_sfx_ping() -> void:
+	var now := Time.get_ticks_msec() / 1000.0
+	if now - _last_sfx_preview_time < 0.10:
+		return
+	_last_sfx_preview_time = now
+	_play_ui_sound(_wav_click, -4.0, 1.25)
+
+
+func preview_screen_shake(intensity: float) -> void:
+	if content_box == null or not is_instance_valid(content_box):
+		return
+	var offset_px := intensity * 7.0
+	var tw := create_tween()
+	tw.tween_property(content_box, "position:x", offset_px, 0.05).set_trans(Tween.TRANS_QUAD)
+	tw.tween_property(content_box, "position:x", -offset_px * 0.6, 0.06).set_trans(Tween.TRANS_QUAD)
+	tw.tween_property(content_box, "position:x", 0.0, 0.08).set_trans(Tween.TRANS_SINE)
+
+
 func _setup_tab_bar() -> void:
 	_tab_buttons = [tab_general_btn, tab_controls_btn, tab_display_btn, tab_advanced_btn]
 	for i in _tab_buttons.size():
 		var btn := _tab_buttons[i]
 		if btn != null:
-			btn.pressed.connect(_switch_tab.bind(i))
+			btn.custom_minimum_size = Vector2(0, 38)
+			btn.pressed.connect(func(): _switch_tab(i, true))
 			wire_juice(btn)
 
 
-func _switch_tab(tab_idx: int) -> void:
-	_play_ui_sound(_wav_click, -7.0, 1.05)
-	_current_tab = tab_idx
+func _switch_tab(tab_idx: int, play_sound: bool = true) -> void:
+	if play_sound:
+		_play_ui_sound(_wav_click, -7.0, 1.05)
+	_current_tab = clampi(tab_idx, 0, _tab_buttons.size() - 1)
 
 	for i in _tab_buttons.size():
 		var btn := _tab_buttons[i]
 		if btn == null:
 			continue
-		var is_active := (i == tab_idx)
+		var is_active := (i == _current_tab)
 		var style := StyleBoxFlat.new()
 		style.set_corner_radius_all(10)
 		style.content_margin_left = 12.0
 		style.content_margin_right = 12.0
-		style.content_margin_top = 6.0
-		style.content_margin_bottom = 6.0
+		style.content_margin_top = 8.0
+		style.content_margin_bottom = 8.0
 		if is_active:
 			style.bg_color = Color(0.06, 0.22, 0.38, 0.95)
 			style.border_color = Color(0.35, 0.88, 1.0, 1.0)
@@ -150,31 +183,39 @@ func _switch_tab(tab_idx: int) -> void:
 		btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 		btn.add_theme_font_size_override("font_size", 12)
 
-	for i in _panels.size():
-		var p := _panels[i]
-		if p != null:
-			p.visible = (i == tab_idx)
+	_show_tab_panel(_current_tab)
 
 	if scroll_container != null:
 		scroll_container.scroll_vertical = 0
 
 
+func _show_tab_panel(tab_idx: int) -> void:
+	if not _panel_cache.has(tab_idx) or _panel_cache[tab_idx] == null or not is_instance_valid(_panel_cache[tab_idx]):
+		var new_p: VBoxContainer = null
+		match tab_idx:
+			0:
+				new_p = SettingsPanels.build_general_panel(self)
+			1:
+				new_p = SettingsPanels.build_controls_panel(self)
+			2:
+				new_p = SettingsPanels.build_display_panel(self)
+			3:
+				new_p = SettingsPanels.build_advanced_panel(self)
+		if new_p != null:
+			_panel_cache[tab_idx] = new_p
+			content_box.add_child(new_p)
+
+	for idx in _panel_cache.keys():
+		var p: VBoxContainer = _panel_cache[idx]
+		if p != null and is_instance_valid(p):
+			p.visible = (idx == tab_idx)
+
+
 func _build_all_panels() -> void:
 	for child in content_box.get_children():
 		child.queue_free()
-	_panels.clear()
-
-	_panels.append(SettingsPanels.build_general_panel(self))
-	_panels.append(SettingsPanels.build_controls_panel(self))
-	_panels.append(SettingsPanels.build_display_panel(self))
-	_panels.append(SettingsPanels.build_advanced_panel(self))
-
-	for p in _panels:
-		content_box.add_child(p)
-		p.visible = false
-
-	if _current_tab >= 0 and _current_tab < _panels.size():
-		_panels[_current_tab].visible = true
+	_panel_cache.clear()
+	_show_tab_panel(_current_tab)
 
 
 func play_click() -> void:
@@ -218,8 +259,10 @@ func _on_back_pressed() -> void:
 func _on_reset_defaults_pressed() -> void:
 	_play_ui_sound(_wav_back, -3.0, 1.1)
 	GameState.reset_to_defaults()
-	_build_all_panels()
-	_switch_tab(_current_tab)
+	for child in content_box.get_children():
+		child.queue_free()
+	_panel_cache.clear()
+	_switch_tab(_current_tab, false)
 
 
 func open_confirm_modal() -> void:
@@ -234,8 +277,10 @@ func open_confirm_modal() -> void:
 		func():
 			_danger_modal_visible = false
 			_confirm_modal = null
-			_build_all_panels()
-			_switch_tab(_current_tab),
+			for child in content_box.get_children():
+				child.queue_free()
+			_panel_cache.clear()
+			_switch_tab(_current_tab, false),
 		func():
 			_danger_modal_visible = false
 			_confirm_modal = null,
@@ -252,11 +297,30 @@ func _close_confirm_modal() -> void:
 		_confirm_modal = null
 
 
+func _defer_init_menu_mic() -> void:
+	# Wait until transition curtain has opened and screen has rendered smoothly
+	await get_tree().create_timer(0.32).timeout
+	if not is_inside_tree():
+		return
+	if GameState.mic_enabled:
+		ensure_menu_mic()
+
+
+func ensure_menu_mic() -> MicInput:
+	if _menu_mic == null:
+		_init_menu_mic()
+	elif GameState.mic_enabled and not _menu_mic.enabled:
+		_menu_mic.enabled = true
+		_menu_mic.start()
+	return _menu_mic
+
+
 func _init_menu_mic() -> void:
 	if _menu_mic == null:
 		_menu_mic = MicInput.new()
 		add_child(_menu_mic)
 		_menu_mic.calibration_finished.connect(_on_mic_calibration_finished)
+	if GameState.mic_enabled and not _menu_mic.enabled:
 		_menu_mic.start()
 
 
@@ -269,8 +333,10 @@ func _on_mic_calibration_finished(floor_db: float) -> void:
 		_calib_btn.text = "CALIBRATE ROOM"
 		_calib_btn.disabled = false
 	if _current_tab == 3:
-		_build_all_panels()
-		_switch_tab(3)
+		if _panel_cache.has(3) and _panel_cache[3] != null and is_instance_valid(_panel_cache[3]):
+			_panel_cache[3].queue_free()
+			_panel_cache.erase(3)
+		_switch_tab(3, false)
 
 
 func _process(delta: float) -> void:

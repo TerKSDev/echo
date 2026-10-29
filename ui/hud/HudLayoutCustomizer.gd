@@ -520,9 +520,9 @@ func _draw_proxy_element(ctrl: Control, id: String) -> void:
 		ctrl.draw_line(sel_rect.position, sel_rect.position + Vector2(clen, 0), Color.WHITE, 2.5)
 		ctrl.draw_line(sel_rect.position, sel_rect.position + Vector2(0, clen), Color.WHITE, 2.5)
 		# Top-right
-		var tr := sel_rect.position + Vector2(sel_rect.size.x, 0)
-		ctrl.draw_line(tr, tr - Vector2(clen, 0), Color.WHITE, 2.5)
-		ctrl.draw_line(tr, tr + Vector2(0, clen), Color.WHITE, 2.5)
+		var top_right := sel_rect.position + Vector2(sel_rect.size.x, 0)
+		ctrl.draw_line(top_right, top_right - Vector2(clen, 0), Color.WHITE, 2.5)
+		ctrl.draw_line(top_right, top_right + Vector2(0, clen), Color.WHITE, 2.5)
 		# Bottom-left
 		var bl := sel_rect.position + Vector2(0, sel_rect.size.y)
 		ctrl.draw_line(bl, bl + Vector2(clen, 0), Color.WHITE, 2.5)

@@ -1003,6 +1003,9 @@ func _on_challenge_clear_next(cur_sector: int) -> void:
 
 func _proceed_challenge_after_pact(_cur_sector: int) -> void:
 	if not GameState.has_next_level():
+		var total_t: float = GameState.get_total_challenge_time()
+		if total_t > 0.0:
+			HMSService.submit_challenge_run(total_t)
 		var ending_lines: Array = []
 		if not GameState.has_seen_campaign_ending("challenge"):
 			ending_lines = GameState.get_campaign_ending_lines()
@@ -1035,7 +1038,8 @@ func _press_switch(cell: Vector2i) -> void:
 	pressed[cell] = true
 	_echo_features_dirty = true
 	if GameState.current_mode == GameState.GameMode.CHALLENGE and ChallengeModifiers.has_boon("boon_deep_pockets") and is_instance_valid(player):
-		player.pebbles = mini(player.pebbles + 1, 4)
+		var cap: int = player.get_max_pebbles() if player.has_method("get_max_pebbles") else 4
+		player.pebbles = mini(player.pebbles + 1, cap)
 		player.pebble_count_changed.emit(player.pebbles)
 	var id: String = str(switch_cells[cell]).to_upper()
 	for body in door_nodes.get(id, []):

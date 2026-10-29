@@ -229,7 +229,10 @@ func _build_modal_shell() -> void:
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.custom_minimum_size = Vector2(0, 210)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	var vbar := scroll.get_v_scroll_bar()
+	if vbar != null:
+		vbar.modulate.a = 0.0
+		vbar.custom_minimum_size = Vector2.ZERO
 	outer_vbox.add_child(scroll)
 
 	var text_margin := MarginContainer.new()
