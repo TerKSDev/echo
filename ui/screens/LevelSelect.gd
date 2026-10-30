@@ -35,6 +35,13 @@ var _king_arrow_canvas: Control = null
 var _is_mode_transitioning: bool = false
 var _king_cinematic_layer: CanvasLayer = null
 
+var _is_dragging_scroll := false
+var _drag_touch_id := -1
+var _drag_start_pos := Vector2.ZERO
+var _drag_last_pos := Vector2.ZERO
+var _drag_velocity := 0.0
+var _drag_last_time := 0.0
+
 # Procedural UI Audio
 var _wav_click: AudioStreamWAV
 var _wav_hover: AudioStreamWAV
@@ -163,44 +170,64 @@ func _get_playable_levels() -> Array[String]:
 	return GameState.STORY_LEVELS
 
 
-func _on_scroll_container_gui_input(event: InputEvent) -> void:
-	if event is InputEventScreenDrag or (event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT)):
-		_depth_tag_timer = 1.0
-		var rel_y: float = event.relative.y
+func _apply_scroll_delta(dy: float) -> void:
+	if scroll_container == null or not is_instance_valid(scroll_container):
+		return
+	_depth_tag_timer = 1.0
+	var vbar := scroll_container.get_v_scroll_bar()
+	var page := vbar.page if vbar.page > 0.0 else scroll_container.size.y
+	var max_scroll := maxf(0.0, vbar.max_value - page)
 
-		var vbar := scroll_container.get_v_scroll_bar()
-		var page := vbar.page if vbar.page > 0.0 else scroll_container.size.y
-		var max_scroll := maxf(0.0, vbar.max_value - page)
+	var new_scroll: float = clampf(scroll_container.scroll_vertical - dy, 0.0, max_scroll)
+	scroll_container.scroll_vertical = int(new_scroll)
 
-		if GameState.current_mode == GameState.GameMode.STORY:
-			# At bottom of story mode: dragging upwards pulls downward past the abyss (only active once challenge unlocked)
-			if GameState.is_challenge_unlocked() and scroll_container.scroll_vertical >= max_scroll - 10.0 and rel_y < -3.0:
-				_overscroll_dist += absf(rel_y)
-				if _overscroll_dist >= 45.0:
-					_overscroll_dist = 0.0
-					_descend_to_challenge_mode()
-			elif scroll_container.scroll_vertical < max_scroll - 25.0:
+	_check_overscroll(dy, max_scroll)
+
+
+func _check_overscroll(rel_y: float, max_scroll: float) -> void:
+	if scroll_container == null or not is_instance_valid(scroll_container):
+		return
+
+	if GameState.current_mode == GameState.GameMode.STORY:
+		# At bottom of story mode: dragging upwards pulls downward past the abyss (only active once challenge unlocked)
+		if GameState.is_challenge_unlocked() and scroll_container.scroll_vertical >= max_scroll - 10.0 and rel_y < -3.0:
+			_overscroll_dist += absf(rel_y)
+			if _overscroll_dist >= 45.0:
 				_overscroll_dist = 0.0
-		else:
-			# At top of challenge mode: dragging downwards pulls upwards to ascend to story mode
-			if scroll_container.scroll_vertical <= 10.0 and rel_y > 3.0:
-				_overscroll_dist += rel_y
-				if _overscroll_dist >= 45.0:
-					_overscroll_dist = 0.0
-					_ascend_to_story_mode()
-			elif scroll_container.scroll_vertical > 25.0:
+				_descend_to_challenge_mode()
+		elif scroll_container.scroll_vertical < max_scroll - 25.0:
+			_overscroll_dist = 0.0
+	else:
+		# At top of challenge mode: dragging downwards pulls upwards to ascend to story mode
+		if scroll_container.scroll_vertical <= 10.0 and rel_y > 3.0:
+			_overscroll_dist += rel_y
+			if _overscroll_dist >= 45.0:
 				_overscroll_dist = 0.0
+				_ascend_to_story_mode()
+		elif scroll_container.scroll_vertical > 25.0:
+			_overscroll_dist = 0.0
 
-			# At bottom of challenge mode: dragging upwards pulls downward to enter King Sector (only if Level 20 cleared)
-			if GameState.challenge_highest_unlocked >= 21 and scroll_container.scroll_vertical >= max_scroll - 10.0 and rel_y < -3.0:
-				_overscroll_dist_king += absf(rel_y)
-				if _overscroll_dist_king >= 45.0:
-					_overscroll_dist_king = 0.0
-					_show_king_sector_confirmation_modal()
-			elif scroll_container.scroll_vertical < max_scroll - 25.0:
+		# At bottom of challenge mode: dragging upwards pulls downward to enter King Sector (only if Level 20 cleared)
+		if GameState.challenge_highest_unlocked >= 21 and scroll_container.scroll_vertical >= max_scroll - 10.0 and rel_y < -3.0:
+			_overscroll_dist_king += absf(rel_y)
+			if _overscroll_dist_king >= 45.0:
 				_overscroll_dist_king = 0.0
+				_show_king_sector_confirmation_modal()
+		elif scroll_container.scroll_vertical < max_scroll - 25.0:
+			_overscroll_dist_king = 0.0
 
-	elif event is InputEventMouseButton and event.is_pressed():
+
+func _reset_all_button_press_states() -> void:
+	for btn: Button in _level_buttons.values():
+		if btn != null and is_instance_valid(btn):
+			btn.button_pressed = false
+			if btn.scale != Vector2.ONE:
+				var tw := btn.create_tween()
+				tw.tween_property(btn, "scale", Vector2.ONE, 0.08)
+
+
+func _on_scroll_container_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.is_pressed():
 		var vbar := scroll_container.get_v_scroll_bar()
 		var page := vbar.page if vbar.page > 0.0 else scroll_container.size.y
 		var max_scroll := maxf(0.0, vbar.max_value - page)
@@ -479,16 +506,18 @@ func _create_level_buttons() -> void:
 			king_prompt.mouse_filter = Control.MOUSE_FILTER_PASS
 			king_prompt.draw.connect(func(): _draw_king_sector_descent_prompt(king_prompt))
 			king_prompt.gui_input.connect(func(ev: InputEvent):
-				if (ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT) or (ev is InputEventScreenTouch and ev.pressed):
-					_show_king_sector_confirmation_modal()
+				if (ev is InputEventMouseButton and not ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT) or (ev is InputEventScreenTouch and not ev.pressed):
+					if not _suppress_level_click:
+						_show_king_sector_confirmation_modal()
 			)
 
 			var king_spacer := Control.new()
 			king_spacer.custom_minimum_size = Vector2(290, 110)
 			king_spacer.mouse_filter = Control.MOUSE_FILTER_PASS
 			king_spacer.gui_input.connect(func(ev: InputEvent):
-				if (ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT) or (ev is InputEventScreenTouch and ev.pressed):
-					_show_king_sector_confirmation_modal()
+				if (ev is InputEventMouseButton and not ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT) or (ev is InputEventScreenTouch and not ev.pressed):
+					if not _suppress_level_click:
+						_show_king_sector_confirmation_modal()
 			)
 
 			level_grid.add_child(king_prompt)
@@ -535,16 +564,18 @@ func _create_level_buttons() -> void:
 			arrow_canvas.mouse_filter = Control.MOUSE_FILTER_PASS
 			arrow_canvas.draw.connect(func(): _draw_abyss_descent_prompt(arrow_canvas))
 			arrow_canvas.gui_input.connect(func(ev: InputEvent):
-				if (ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT) or (ev is InputEventScreenTouch and ev.pressed):
-					_descend_to_challenge_mode()
+				if (ev is InputEventMouseButton and not ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT) or (ev is InputEventScreenTouch and not ev.pressed):
+					if not _suppress_level_click:
+						_descend_to_challenge_mode()
 			)
 
 			var arrow_spacer := Control.new()
 			arrow_spacer.custom_minimum_size = Vector2(290, 110)
 			arrow_spacer.mouse_filter = Control.MOUSE_FILTER_PASS
 			arrow_spacer.gui_input.connect(func(ev: InputEvent):
-				if (ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT) or (ev is InputEventScreenTouch and ev.pressed):
-					_descend_to_challenge_mode()
+				if (ev is InputEventMouseButton and not ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT) or (ev is InputEventScreenTouch and not ev.pressed):
+					if not _suppress_level_click:
+						_descend_to_challenge_mode()
 			)
 
 			level_grid.add_child(arrow_canvas)
@@ -560,7 +591,7 @@ func _update_header_and_mode_ui() -> void:
 			tracker_label.text = "((   F O R B I D D E N   A B Y S S   ))"
 			tracker_label.add_theme_color_override("font_color", Color(0.9, 0.45, 0.75, 0.9))
 		if title_label != null:
-			title_label.text = "CHALLENGE ABYSS"
+			title_label.text = "CHALLENGE THE ABYSS"
 			title_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.95))
 			title_label.add_theme_color_override("font_shadow_color", Color(0.48, 0.05, 0.22, 0.95))
 			title_label.add_theme_color_override("font_outline_color", Color(0.85, 0.25, 0.65, 0.7))
@@ -648,7 +679,7 @@ func _draw_abyss_descent_prompt(canvas: Control) -> void:
 	var text_col := Color(0.85, 0.65, 0.95, a * 0.78)
 	var font := ThemeDB.fallback_font
 	if font != null:
-		canvas.draw_string(font, Vector2(cx - 110.0, cy + 38.0), "PULL DOWN FOR CHALLENGE ABYSS", HORIZONTAL_ALIGNMENT_CENTER, 220.0, 11, text_col)
+		canvas.draw_string(font, Vector2(cx - 110.0, cy + 38.0), "PULL DOWN FOR CHALLENGE THE ABYSS", HORIZONTAL_ALIGNMENT_CENTER, 220.0, 11, text_col)
 
 
 func _descend_to_challenge_mode() -> void:
@@ -1521,6 +1552,99 @@ func _on_level_pressed(level_number: int) -> void:
 			GameState.change_level(level_path)
 
 
+func _input(event: InputEvent) -> void:
+	if _is_mode_transitioning or _is_dragging_gauge:
+		return
+	if has_node("KingSectorConfirmModal") or has_node("ChallengeUnlockModal") or has_node("ResetConfirmModal"):
+		return
+	if scroll_container == null or not is_instance_valid(scroll_container) or not scroll_container.is_visible_in_tree():
+		return
+
+	var scroll_rect: Rect2 = scroll_container.get_global_rect()
+
+	if event is InputEventScreenTouch:
+		if event.pressed:
+			if scroll_rect.has_point(event.position):
+				_drag_touch_id = event.index
+				_drag_start_pos = event.position
+				_drag_last_pos = event.position
+				_is_dragging_scroll = false
+				_drag_velocity = 0.0
+				_drag_last_time = Time.get_ticks_msec() / 1000.0
+		elif not event.pressed and event.index == _drag_touch_id:
+			_drag_touch_id = -1
+			if _is_dragging_scroll:
+				_is_dragging_scroll = false
+				get_viewport().set_input_as_handled()
+				var tw := create_tween()
+				tw.tween_interval(0.12)
+				tw.tween_callback(func(): _suppress_level_click = false)
+			else:
+				_suppress_level_click = false
+
+	elif event is InputEventScreenDrag:
+		if event.index == _drag_touch_id:
+			var total_dy: float = absf(event.position.y - _drag_start_pos.y)
+			var total_dx: float = absf(event.position.x - _drag_start_pos.x)
+			if not _is_dragging_scroll:
+				if total_dy > 8.0 or total_dx > 14.0:
+					_is_dragging_scroll = true
+					_suppress_level_click = true
+					_reset_all_button_press_states()
+
+			if _is_dragging_scroll:
+				var dy: float = event.position.y - _drag_last_pos.y
+				_apply_scroll_delta(dy)
+				var now := Time.get_ticks_msec() / 1000.0
+				var dt := now - _drag_last_time
+				if dt > 0.001:
+					_drag_velocity = -dy / dt
+				_drag_last_time = now
+				_drag_last_pos = event.position
+				get_viewport().set_input_as_handled()
+
+	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			if scroll_rect.has_point(event.position):
+				_drag_touch_id = -999
+				_drag_start_pos = event.position
+				_drag_last_pos = event.position
+				_is_dragging_scroll = false
+				_drag_velocity = 0.0
+				_drag_last_time = Time.get_ticks_msec() / 1000.0
+		elif not event.pressed and _drag_touch_id == -999:
+			_drag_touch_id = -1
+			if _is_dragging_scroll:
+				_is_dragging_scroll = false
+				get_viewport().set_input_as_handled()
+				var tw := create_tween()
+				tw.tween_interval(0.12)
+				tw.tween_callback(func(): _suppress_level_click = false)
+			else:
+				_suppress_level_click = false
+
+	elif event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT):
+		if _drag_touch_id == -999:
+			var total_dy: float = absf(event.position.y - _drag_start_pos.y)
+			var total_dx: float = absf(event.position.x - _drag_start_pos.x)
+			if not _is_dragging_scroll:
+				if total_dy > 8.0 or total_dx > 14.0:
+					_is_dragging_scroll = true
+					_suppress_level_click = true
+					_reset_all_button_press_states()
+
+			if _is_dragging_scroll:
+				var dy: float = event.position.y - _drag_last_pos.y
+				_apply_scroll_delta(dy)
+				var now := Time.get_ticks_msec() / 1000.0
+				var dt := now - _drag_last_time
+				if dt > 0.001:
+					_drag_velocity = -dy / dt
+				_drag_last_time = now
+				_drag_last_pos = event.position
+				get_viewport().set_input_as_handled()
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel") or (event is InputEventKey and event.pressed and (event.keycode == KEY_ESCAPE or event.keycode == KEY_BACK)):
 		_on_back_pressed()
@@ -1591,6 +1715,20 @@ func _process(delta: float) -> void:
 	var target_alpha: float = 1.0 if _depth_tag_timer > 0.0 else 0.0
 	var fade_speed: float = 14.0 if target_alpha > _depth_tag_alpha else 3.5
 	_depth_tag_alpha = move_toward(_depth_tag_alpha, target_alpha, delta * fade_speed)
+
+	# Smooth kinetic inertia scroll deceleration
+	if not _is_dragging_scroll and absf(_drag_velocity) > 15.0:
+		var vbar := scroll_container.get_v_scroll_bar()
+		var page := vbar.page if vbar.page > 0.0 else scroll_container.size.y
+		var max_scroll := maxf(0.0, vbar.max_value - page)
+		var new_v := clampf(scroll_container.scroll_vertical + _drag_velocity * delta, 0.0, max_scroll)
+		scroll_container.scroll_vertical = int(new_v)
+		_drag_velocity = move_toward(_drag_velocity, 0.0, delta * 2400.0)
+		_depth_tag_timer = 1.0
+		if new_v <= 0.0 or new_v >= max_scroll:
+			_drag_velocity = 0.0
+	elif not _is_dragging_scroll:
+		_drag_velocity = 0.0
 
 	sonar_backdrop.queue_redraw()
 	if level_grid != null and is_instance_valid(level_grid):

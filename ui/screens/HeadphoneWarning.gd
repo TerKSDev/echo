@@ -13,18 +13,18 @@ func _ready() -> void:
 	headphone_icon.draw.connect(_draw_headphone_icon)
 
 	if OS.get_name() == "Android":
-		if GameState.is_mic_permission_granted():
-			GameState.mic_enabled = true
-			_start_headphone_warning()
-		elif not GameState.mic_permission_prompted:
+		if not GameState.is_mic_permission_granted() and not GameState.mic_permission_prompted:
+			# First-time boot: request permission
 			_permission_pending = true
 			GameState.request_mic_permission(func(_granted: bool) -> void:
 				_permission_pending = false
 				_start_headphone_warning()
 			)
 		else:
-			# Player previously made their choice; respect it without repeating prompts on boot
-			GameState.mic_enabled = false
+			# If permission was revoked in Android OS settings, safely reflect it
+			if not GameState.is_mic_permission_granted():
+				GameState.mic_enabled = false
+			# If permission is granted, respect the player's saved GameState.mic_enabled!
 			_start_headphone_warning()
 	else:
 		_start_headphone_warning()

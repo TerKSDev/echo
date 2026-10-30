@@ -452,9 +452,7 @@ func _on_mic_toggle_pressed() -> void:
 					GameState.save_settings()
 					var mic := _get_mic()
 					if mic != null:
-						mic.enabled = true
-						if mic.has_method("start"):
-							mic.start()
+						mic.start()
 				else:
 					GameState.mic_enabled = false
 					GameState.save_settings()
@@ -469,9 +467,7 @@ func _on_mic_toggle_pressed() -> void:
 		GameState.save_settings()
 		var mic := _get_mic()
 		if mic != null:
-			mic.enabled = true
-			if mic.has_method("start"):
-				mic.start()
+			mic.start()
 	else:
 		GameState.mic_enabled = false
 		GameState.save_settings()
@@ -489,7 +485,10 @@ func _update_mic_toggle_ui() -> void:
 	var mic := _get_mic()
 	var enabled: bool = GameState.mic_enabled and GameState.is_mic_permission_granted()
 	if mic != null:
-		mic.enabled = enabled
+		if enabled:
+			mic.start()
+		else:
+			mic.enabled = false
 	mic_toggle.self_modulate = Color.WHITE
 	var kind: int = ModalTemplate.ThemeKind.SINGULARITY if GameState.current_mode == GameState.GameMode.CHALLENGE else ModalTemplate.ThemeKind.SONAR
 	ModalTemplate.style_toggle_button(mic_toggle, enabled, "ENABLED", "MUTED", kind)

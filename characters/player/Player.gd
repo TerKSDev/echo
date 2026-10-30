@@ -301,11 +301,17 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 		elif event is InputEventScreenDrag:
+			var hud := get_parent().get_node_or_null("Hud")
+			if hud != null and hud.get("_joystick_active") == true and event.index == hud.get("_joystick_touch_id"):
+				return
 			var world_pos: Vector2 = get_canvas_transform().affine_inverse() * event.position
 			update_aim_pebble(world_pos)
 			get_viewport().set_input_as_handled()
 			return
 		elif event is InputEventScreenTouch and event.pressed:
+			var hud := get_parent().get_node_or_null("Hud")
+			if hud != null and hud.get("_joystick_active") == true and event.index == hud.get("_joystick_touch_id"):
+				return
 			var world_pos: Vector2 = get_canvas_transform().affine_inverse() * event.position
 			update_aim_pebble(world_pos)
 			finish_aim_pebble()
@@ -388,7 +394,6 @@ func _unhandled_input(event: InputEvent) -> void:
 				GameState.mic_enabled = true
 				GameState.save_settings()
 				if mic != null:
-					mic.enabled = true
 					mic.start()
 		else:
 			GameState.mic_enabled = false
@@ -1146,12 +1151,13 @@ func get_pebble_trajectory(target_world_pos: Vector2) -> Array[Vector2]:
 	var dir := offset.normalized() if not offset.is_zero_approx() else Vector2.RIGHT
 
 	var space := get_world_2d().direct_space_state
-	var p_rid := get_rid()
+	var excl := _get_self_exclude()
 
 	# First segment: from player toward target or wall
 	var q1 := PhysicsRayQueryParameters2D.create(global_position, global_position + dir * total_len)
 	q1.collision_mask = 1
-	q1.exclude = [p_rid]
+	q1.hit_from_inside = true
+	q1.exclude = excl
 	var hit1 := space.intersect_ray(q1)
 
 	if hit1.is_empty():
@@ -1161,22 +1167,32 @@ func get_pebble_trajectory(target_world_pos: Vector2) -> Array[Vector2]:
 	# Hit Wall 1: Ricochet bounce calculation
 	var hit1_pos: Vector2 = hit1.position
 	var n1: Vector2 = hit1.get("normal", -dir)
-	var d1: float = global_position.distance_to(hit1_pos)
+	if n1.is_zero_approx() or dir.dot(n1) > 0.0:
+		n1 = -dir
+	else:
+		n1 = n1.normalized()
 
+	var d1: float = global_position.distance_to(hit1_pos)
 	var remaining := (total_len - d1) * 0.72 # Friction/energy loss on impact
-	if remaining < 18.0 or n1 == Vector2.ZERO:
-		result.append(hit1_pos + n1 * 8.0)
+	if remaining < 18.0:
+		result.append(hit1_pos + n1 * 6.0)
 		return result
 
 	result.append(hit1_pos)
 
 	# Specular reflection: d_bounce = d - 2(d . n)n
 	var bounce_dir: Vector2 = dir.bounce(n1).normalized()
-	var bounce_start: Vector2 = hit1_pos + n1 * 2.0
+	if bounce_dir.dot(n1) < 0.0:
+		bounce_dir = (bounce_dir - 2.0 * bounce_dir.dot(n1) * n1).normalized()
+	if bounce_dir.is_zero_approx():
+		bounce_dir = n1
+
+	var bounce_start: Vector2 = hit1_pos + n1 * 4.0
 
 	var q2 := PhysicsRayQueryParameters2D.create(bounce_start, bounce_start + bounce_dir * remaining)
 	q2.collision_mask = 1
-	q2.exclude = [p_rid]
+	q2.hit_from_inside = true
+	q2.exclude = excl
 	var hit2 := space.intersect_ray(q2)
 
 	if hit2.is_empty():
@@ -1184,7 +1200,11 @@ func get_pebble_trajectory(target_world_pos: Vector2) -> Array[Vector2]:
 	else:
 		var hit2_pos: Vector2 = hit2.position
 		var n2: Vector2 = hit2.get("normal", -bounce_dir)
-		result.append(hit2_pos + n2 * 8.0)
+		if n2.is_zero_approx() or bounce_dir.dot(n2) > 0.0:
+			n2 = -bounce_dir
+		else:
+			n2 = n2.normalized()
+		result.append(hit2_pos + n2 * 6.0)
 
 	return result
 
@@ -1246,7 +1266,7 @@ func throw_pebble(target_world_pos: Vector2) -> bool:
 	pebbles -= 1
 	pebble_count_changed.emit(pebbles)
 
-	var trajectory := get_pebble_trajectory(target_world_pos)
+	var trajectory: Array[Vector2] = _cached_pebble_trajectory.duplicate() if _cached_pebble_trajectory.size() >= 2 else get_pebble_trajectory(target_world_pos)
 	var final_target: Vector2 = trajectory.back()
 
 	var proj := PebbleProjectile.new()

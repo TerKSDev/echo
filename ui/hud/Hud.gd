@@ -300,16 +300,10 @@ class WakeUpOverlay extends Control:
 		var corner_clear: float = (h * 0.70) * pow(p, 2.5)
 
 		var segs := 36
-		var top_pts := PackedVector2Array()
-		var btm_pts := PackedVector2Array()
-
-		top_pts.append(Vector2(0.0, -10.0))
-		top_pts.append(Vector2(w, -10.0))
-		btm_pts.append(Vector2(0.0, h + 10.0))
-		btm_pts.append(Vector2(w, h + 10.0))
-
 		var top_curve := PackedVector2Array()
 		var btm_curve := PackedVector2Array()
+		var min_ty: float = mid_y
+		var max_by: float = mid_y
 
 		for i in range(segs + 1):
 			var frac := float(i) / float(segs)
@@ -322,6 +316,19 @@ class WakeUpOverlay extends Control:
 			var by: float = mid_y + half_open
 			top_curve.append(Vector2(x, ty))
 			btm_curve.append(Vector2(x, by))
+			min_ty = minf(min_ty, ty)
+			max_by = maxf(max_by, by)
+
+		var top_min_y: float = minf(-50.0, min_ty - 50.0)
+		var btm_max_y: float = maxf(h + 50.0, max_by + 50.0)
+
+		var top_pts := PackedVector2Array()
+		var btm_pts := PackedVector2Array()
+
+		top_pts.append(Vector2(0.0, top_min_y))
+		top_pts.append(Vector2(w, top_min_y))
+		btm_pts.append(Vector2(0.0, btm_max_y))
+		btm_pts.append(Vector2(w, btm_max_y))
 
 		for i in range(segs, -1, -1):
 			top_pts.append(top_curve[i])
@@ -1249,10 +1256,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			_deactivate_joystick()
 		return
 	if has_node("DeathScreen") and $DeathScreen.visible:
-		if _joystick_active:
-			_deactivate_joystick()
-		return
-	if player.get("is_aiming_pebble") == true:
 		if _joystick_active:
 			_deactivate_joystick()
 		return

@@ -46,9 +46,13 @@ func start() -> void:
 	if OS.get_name() == "Android" and not GameState.is_mic_permission_granted():
 		enabled = false
 		return
-	if enabled:
-		return
-	_setup()
+	if _capture == null:
+		_setup()
+	else:
+		var p_mic: AudioStreamPlayer = get_node_or_null("PlayerMic") as AudioStreamPlayer
+		if p_mic != null and not p_mic.playing:
+			p_mic.play()
+	enabled = true
 
 
 func _setup() -> void:
@@ -69,11 +73,15 @@ func _setup() -> void:
 	if _capture != null:
 		_capture.clear_buffer()
 
-	var player_mic := AudioStreamPlayer.new()
-	player_mic.stream = AudioStreamMicrophone.new()
-	player_mic.bus = BUS_NAME
-	add_child(player_mic)
-	player_mic.play()
+	var player_mic: AudioStreamPlayer = get_node_or_null("PlayerMic") as AudioStreamPlayer
+	if player_mic == null:
+		player_mic = AudioStreamPlayer.new()
+		player_mic.name = "PlayerMic"
+		player_mic.stream = AudioStreamMicrophone.new()
+		player_mic.bus = BUS_NAME
+		add_child(player_mic)
+	if not player_mic.playing:
+		player_mic.play()
 
 	enabled = GameState.mic_enabled
 	noise_floor_db = GameState.mic_noise_floor_db

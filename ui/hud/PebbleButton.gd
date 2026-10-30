@@ -5,7 +5,10 @@ var _press_scale := 1.0
 var base_scale := 1.0
 var _anim_time := 0.0
 var _is_dragging := false
+var _drag_touch_id := -1
 var _drag_start := Vector2.ZERO
+var _has_dragged_out := false
+var _is_in_cancel_zone := false
 var _empty_flash := 0.0
 
 
@@ -13,8 +16,6 @@ func _ready() -> void:
 	flat = true
 	focus_mode = Control.FOCUS_NONE
 	pivot_offset = Vector2(size.x * 0.5, 36.0)
-	button_down.connect(_on_down)
-	button_up.connect(_on_up)
 	_player = get_tree().get_first_node_in_group("player")
 
 
@@ -33,61 +34,119 @@ func play_empty_feedback() -> void:
 	tw.tween_property(self, "position:x", orig_x, 0.04)
 
 
-func _on_down() -> void:
-	if _player != null and is_instance_valid(_player):
-		if "_stun_timer" in _player and float(_player._stun_timer) > 0.0:
-			play_empty_feedback()
-			return
-		if "pebbles" in _player and int(_player.pebbles) <= 0:
-			play_empty_feedback()
-			return
-		if _player.is_aiming_pebble:
-			_player.cancel_aim_pebble()
-			_is_dragging = false
-			return
-		_is_dragging = true
-		_drag_start = get_viewport().get_mouse_position()
-		_player.start_aim_pebble()
-		if GameState.blind_assist_mode:
-			var sfx := get_tree().get_first_node_in_group("sfx_manager") as SfxManager
-			if sfx != null and is_instance_valid(sfx):
-				sfx.play_inventory_pips(_player.pebbles)
-	var tw := create_tween()
-	tw.tween_property(self, "_press_scale", 0.92, 0.08).set_trans(Tween.TRANS_SINE)
-
-
-func _on_up() -> void:
-	var tw := create_tween()
-	tw.tween_property(self, "_press_scale", 1.0, 0.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-
-
 func _input(event: InputEvent) -> void:
-	if not _is_dragging or _player == null or not is_instance_valid(_player):
-		return
+	if _player == null or not is_instance_valid(_player):
+		_player = get_tree().get_first_node_in_group("player")
+		if _player == null:
+			return
 
-	if event is InputEventMouseMotion or event is InputEventScreenDrag:
-		var center_screen := global_position + Vector2(size.x * 0.5, 36.0)
-		var touch_pos: Vector2 = event.position if (event is InputEventScreenDrag) else get_viewport().get_mouse_position()
-		var offset := touch_pos - center_screen
-		if offset.length() > 14.0:
-			var sens: float = GameState.pebble_sensitivity
-			var aim_dist: float = clampf(offset.length() * 2.5 * sens, 50.0, 340.0)
-			var aim_dir: Vector2 = offset.normalized()
-			_player.update_aim_pebble(_player.global_position + aim_dir * aim_dist)
+	if event is InputEventScreenTouch:
+		if event.pressed:
+			var btn_rect := get_global_rect()
+			if btn_rect.grow(12.0).has_point(event.position):
+				if "_stun_timer" in _player and float(_player._stun_timer) > 0.0:
+					play_empty_feedback()
+					return
+				if "pebbles" in _player and int(_player.pebbles) <= 0:
+					play_empty_feedback()
+					return
+				_is_dragging = true
+				_drag_touch_id = event.index
+				_drag_start = event.position
+				_has_dragged_out = false
+				_is_in_cancel_zone = false
+				if not _player.is_aiming_pebble:
+					_player.start_aim_pebble()
+				if GameState.blind_assist_mode:
+					var sfx := get_tree().get_first_node_in_group("sfx_manager") as SfxManager
+					if sfx != null and is_instance_valid(sfx):
+						sfx.play_inventory_pips(_player.pebbles)
+				var tw := create_tween()
+				tw.tween_property(self, "_press_scale", 0.92, 0.08).set_trans(Tween.TRANS_SINE)
+				get_viewport().set_input_as_handled()
+		elif not event.pressed and event.index == _drag_touch_id:
+			_is_dragging = false
+			_drag_touch_id = -1
+			var tw := create_tween()
+			tw.tween_property(self, "_press_scale", 1.0, 0.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			if _player != null and is_instance_valid(_player) and _player.is_aiming_pebble:
+				if _is_in_cancel_zone:
+					_player.cancel_aim_pebble()
+				else:
+					_player.finish_aim_pebble()
+			_has_dragged_out = false
+			_is_in_cancel_zone = false
+			queue_redraw()
 			get_viewport().set_input_as_handled()
 
-	elif (event is InputEventMouseButton and not event.pressed and event.button_index == MOUSE_BUTTON_LEFT) or (event is InputEventScreenTouch and not event.pressed):
-		_is_dragging = false
-		var tw := create_tween()
-		tw.tween_property(self, "_press_scale", 1.0, 0.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-		if _player != null and is_instance_valid(_player) and _player.is_aiming_pebble:
-			var touch_pos: Vector2 = event.position if event is InputEventScreenTouch else get_viewport().get_mouse_position()
-			if touch_pos.distance_to(_drag_start) > 22.0:
-				_player.finish_aim_pebble()
+	elif event is InputEventScreenDrag:
+		if _is_dragging and event.index == _drag_touch_id:
+			var center_screen := global_position + Vector2(size.x * 0.5, 36.0)
+			var offset: Vector2 = event.position - center_screen
+			var btn_rect := get_global_rect()
+			if offset.length() > 20.0:
+				_has_dragged_out = true
+				_is_in_cancel_zone = false
+				var sens: float = GameState.pebble_sensitivity
+				var aim_dist: float = clampf(offset.length() * 2.5 * sens, 50.0, 340.0)
+				var aim_dir: Vector2 = offset.normalized()
+				_player.update_aim_pebble(_player.global_position + aim_dir * aim_dist)
+			elif _has_dragged_out and btn_rect.grow(12.0).has_point(event.position):
+				_is_in_cancel_zone = true
+			queue_redraw()
+			get_viewport().set_input_as_handled()
+
+	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			var btn_rect := get_global_rect()
+			if btn_rect.grow(8.0).has_point(event.position):
+				if "_stun_timer" in _player and float(_player._stun_timer) > 0.0:
+					play_empty_feedback()
+					return
+				if "pebbles" in _player and int(_player.pebbles) <= 0:
+					play_empty_feedback()
+					return
+				_is_dragging = true
+				_drag_touch_id = -999
+				_drag_start = event.position
+				_has_dragged_out = false
+				_is_in_cancel_zone = false
+				if not _player.is_aiming_pebble:
+					_player.start_aim_pebble()
+				var tw := create_tween()
+				tw.tween_property(self, "_press_scale", 0.92, 0.08).set_trans(Tween.TRANS_SINE)
 				get_viewport().set_input_as_handled()
-			else:
-				# Quick tap: keep aim mode active so player can tap target on map!
-				pass
+		elif not event.pressed and _drag_touch_id == -999:
+			_is_dragging = false
+			_drag_touch_id = -1
+			var tw := create_tween()
+			tw.tween_property(self, "_press_scale", 1.0, 0.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			if _player != null and is_instance_valid(_player) and _player.is_aiming_pebble:
+				if _is_in_cancel_zone:
+					_player.cancel_aim_pebble()
+				else:
+					_player.finish_aim_pebble()
+			_has_dragged_out = false
+			_is_in_cancel_zone = false
+			queue_redraw()
+			get_viewport().set_input_as_handled()
+
+	elif event is InputEventMouseMotion:
+		if _is_dragging and _drag_touch_id == -999:
+			var center_screen := global_position + Vector2(size.x * 0.5, 36.0)
+			var offset: Vector2 = event.position - center_screen
+			var btn_rect := get_global_rect()
+			if offset.length() > 20.0:
+				_has_dragged_out = true
+				_is_in_cancel_zone = false
+				var sens: float = GameState.pebble_sensitivity
+				var aim_dist: float = clampf(offset.length() * 2.5 * sens, 50.0, 340.0)
+				var aim_dir: Vector2 = offset.normalized()
+				_player.update_aim_pebble(_player.global_position + aim_dir * aim_dist)
+			elif _has_dragged_out and btn_rect.grow(12.0).has_point(event.position):
+				_is_in_cancel_zone = true
+			queue_redraw()
+			get_viewport().set_input_as_handled()
 
 
 func _process(delta: float) -> void:
@@ -124,6 +183,8 @@ func _draw() -> void:
 	var col_rim := Color(1.0, 0.78, 0.28, (0.75 if not is_empty else 0.28) * empty_alpha_mult)
 	if is_aiming:
 		col_rim = Color(1.0, 0.92, 0.5, 0.98)
+	if _is_in_cancel_zone:
+		col_rim = Color(1.0, 0.35, 0.35, 0.98)
 	if is_stunned:
 		col_rim = Color(1.0, 0.28, 0.5, 0.75)
 
@@ -174,10 +235,12 @@ func _draw() -> void:
 	draw_string(ThemeDB.fallback_font, badge_pos + Vector2(-9.0, 4.0), count_str, HORIZONTAL_ALIGNMENT_CENTER, 18, 11, num_col)
 
 	# 6. Micro Label Below
-	var label_text := "STUNNED" if is_stunned else ("AIMING..." if is_aiming else ("EMPTY" if is_empty else "PEBBLE"))
+	var label_text := "STUNNED" if is_stunned else ("CANCEL" if _is_in_cancel_zone else ("AIMING..." if is_aiming else ("EMPTY" if is_empty else "PEBBLE")))
 	var label_col := col_rim
 	if is_stunned:
 		label_col = Color(1.0, 0.38, 0.55, 0.85)
+	elif _is_in_cancel_zone:
+		label_col = Color(1.0, 0.35, 0.35, 0.95)
 	elif is_empty:
 		label_col = Color(0.55, 0.62, 0.7, 0.35)
 
