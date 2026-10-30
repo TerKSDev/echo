@@ -96,6 +96,10 @@ static func make_close_button(on_close: Callable, kind: int = ThemeKind.SONAR) -
 			normal.bg_color = Color(0.18, 0.06, 0.09, 0.55)
 			hover.bg_color = Color(0.34, 0.10, 0.15, 0.78)
 			close_btn.add_theme_color_override("font_color", Color(0.95, 0.75, 0.78, 0.88))
+		ThemeKind.SINGULARITY:
+			normal.bg_color = Color(0.20, 0.05, 0.18, 0.55)
+			hover.bg_color = Color(0.38, 0.10, 0.32, 0.78)
+			close_btn.add_theme_color_override("font_color", Color(1.0, 0.75, 0.92, 0.88))
 		_:
 			normal.bg_color = Color(0.05, 0.14, 0.24, 0.50)
 			hover.bg_color = Color(0.14, 0.30, 0.48, 0.75)
@@ -368,6 +372,10 @@ static func style_slider(slider: HSlider, kind: int = ThemeKind.SONAR) -> void:
 			fill.bg_color = Color(0.95, 0.30, 0.38, 0.95)
 			slot.bg_color = Color(0.14, 0.04, 0.06, 0.85)
 			slot.border_color = Color(0.65, 0.20, 0.28, 0.50)
+		ThemeKind.SINGULARITY:
+			fill.bg_color = Color(1.0, 0.45, 0.88, 0.95)
+			slot.bg_color = Color(0.18, 0.05, 0.16, 0.85)
+			slot.border_color = Color(0.70, 0.25, 0.60, 0.50)
 		_:
 			fill.bg_color = Color(0.32, 0.75, 1.0, 0.95)
 			slot.bg_color = Color(0.06, 0.14, 0.24, 0.85)

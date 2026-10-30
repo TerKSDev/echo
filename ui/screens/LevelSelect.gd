@@ -137,11 +137,13 @@ func _apply_safe_area() -> void:
 func _setup_main_background() -> void:
 	var bg_node := get_node_or_null("Background") as TextureRect
 	if bg_node != null:
+		var is_chal := (GameState.current_mode == GameState.GameMode.CHALLENGE)
+		var bg_path := "res://assets/bg_challenge_abyss.jpg" if is_chal else "res://assets/bg_cave_abyss.jpg"
 		var tex: Texture2D = null
-		if ResourceLoader.exists("res://assets/bg_cave_abyss.jpg"):
-			tex = load("res://assets/bg_cave_abyss.jpg")
+		if ResourceLoader.exists(bg_path):
+			tex = load(bg_path)
 		if tex == null:
-			var global_path := ProjectSettings.globalize_path("res://assets/bg_cave_abyss.jpg")
+			var global_path := ProjectSettings.globalize_path(bg_path)
 			var img := Image.new()
 			if img.load(global_path) == OK:
 				tex = ImageTexture.create_from_image(img)
@@ -551,18 +553,19 @@ func _create_level_buttons() -> void:
 
 
 func _update_header_and_mode_ui() -> void:
+	_setup_main_background()
 	var is_challenge := GameState.current_mode == GameState.GameMode.CHALLENGE
 	if is_challenge:
 		if tracker_label != null:
 			tracker_label.text = "((   F O R B I D D E N   A B Y S S   ))"
 			tracker_label.add_theme_color_override("font_color", Color(0.9, 0.45, 0.75, 0.9))
 		if title_label != null:
-			title_label.text = "CHALLENGE SECTORS"
+			title_label.text = "CHALLENGE ABYSS"
 			title_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.95))
 			title_label.add_theme_color_override("font_shadow_color", Color(0.48, 0.05, 0.22, 0.95))
 			title_label.add_theme_color_override("font_outline_color", Color(0.85, 0.25, 0.65, 0.7))
 		if subtitle_label != null:
-			subtitle_label.text = "Enter the deep void. Conquer the King Sector."
+			subtitle_label.text = "Plunge into the silent depths. Face the abyss."
 			subtitle_label.add_theme_color_override("font_color", Color(0.95, 0.65, 0.85, 0.85))
 		if sector_label != null:
 			sector_label.visible = false
@@ -1639,12 +1642,13 @@ func _init_spores() -> void:
 func _draw_sonar_backdrop() -> void:
 	var w := size.x
 	var h := size.y
+	var is_chal := (GameState.current_mode == GameState.GameMode.CHALLENGE)
 
 	for spore in _spores:
 		var pos: Vector2 = spore["pos"]
 		if pos.x < -10.0 or pos.x > w + 10.0 or pos.y < -10.0 or pos.y > h + 10.0:
 			continue
-		var col := Color(0.4, 0.85, 1.0, float(spore["alpha"]))
+		var col: Color = Color(0.95, 0.45, 0.85, float(spore["alpha"])) if is_chal else Color(0.4, 0.85, 1.0, float(spore["alpha"]))
 		sonar_backdrop.draw_circle(pos, float(spore["r"]), col)
 
 	for ripple in _ripples:
@@ -1661,13 +1665,14 @@ func _draw_sonar_backdrop() -> void:
 		var alpha := peak_a * fade
 
 		var center: Vector2 = ripple["pos"]
+		var rip_col: Color = Color(0.95, 0.45, 0.85, alpha) if is_chal else Color(0.35, 0.85, 1.0, alpha)
 		sonar_backdrop.draw_arc(
 			center,
 			radius,
 			0.0,
 			TAU,
 			48,
-			Color(0.35, 0.85, 1.0, alpha),
+			rip_col,
 			1.4
 		)
 
@@ -1822,7 +1827,7 @@ func _show_challenge_unlock_celebration_modal() -> void:
 	vbox.add_child(title)
 
 	var sub := Label.new()
-	sub.text = "THE DESCENT AWAITS  •  -4,500M  TO  -9,999M SP"
+	sub.text = "THE DESCENT AWAITS  •  -4,500M  TO  -9,250M"
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	sub.add_theme_font_size_override("font_size", 12)
 	sub.add_theme_color_override("font_color", Color(0.40, 0.75, 0.95, 0.80))
@@ -1833,7 +1838,7 @@ func _show_challenge_unlock_celebration_modal() -> void:
 	vbox.add_child(sep)
 
 	var desc1 := Label.new()
-	desc1.text = "◈ 21 Subterranean Abyss Sectors: Face absolute silence & apex blind predators\n◈ Abyssal Pacts: Balance grueling curses against powerful ancient boons\n◈ Global Leaderboard: Log total speedrun clear time on Huawei Game Service"
+	desc1.text = "◈ 20 Subterranean Abyss Sectors: Face absolute silence & apex blind predators\n◈ Abyssal Pacts: Balance grueling curses against powerful ancient boons\n◈ Global Leaderboard: Log total speedrun clear time on Huawei Game Service"
 	desc1.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	desc1.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	desc1.add_theme_font_size_override("font_size", 13)

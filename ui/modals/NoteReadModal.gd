@@ -18,6 +18,8 @@ var _author_lbl: Label
 var _depth_lbl: Label
 var _body_lbl: Label
 var _close_prompt: Label
+var _close_btn: Button = null
+var _opened_at_msec: int = 0
 var _type_tween: Tween = null
 var _is_typing := false
 
@@ -51,15 +53,39 @@ func _sync_viewport_size() -> void:
 		ModalTemplate.apply_full_rect(_center)
 
 
-func _unhandled_input(event: InputEvent) -> void:
+func _input(event: InputEvent) -> void:
 	if not _is_open:
 		return
+
+	# Keyboard shortcuts (ESC, SPACE, ENTER, UI CANCEL/ACCEPT)
 	if event.is_action_pressed("ui_cancel") or event.is_action_pressed("ui_accept") or (event is InputEventKey and event.pressed and (event.keycode == KEY_SPACE or event.keycode == KEY_ENTER or event.keycode == KEY_ESCAPE)):
-		if _is_typing and event.keycode != KEY_ESCAPE:
+		if _is_typing and (event is not InputEventKey or event.keycode != KEY_ESCAPE):
 			_finish_typing_immediately()
 		else:
 			close()
 		get_viewport().set_input_as_handled()
+		return
+
+	# Screen touch or mouse click anywhere on the screen
+	var is_click: bool = (event is InputEventMouseButton and event.pressed and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT)
+	var is_touch: bool = (event is InputEventScreenTouch and event.pressed)
+	if is_click or is_touch:
+		# Guard against accidental touch that opened the modal (180ms window)
+		if Time.get_ticks_msec() - _opened_at_msec < 180:
+			return
+
+		get_viewport().set_input_as_handled()
+
+		# Explicit tap on 'X' close button always closes directly
+		if _close_btn != null and is_instance_valid(_close_btn) and _close_btn.get_global_rect().has_point(event.position):
+			close()
+			return
+
+		# Tap anywhere else: complete typewriter if still animating, or close if already displayed
+		if _is_typing:
+			_finish_typing_immediately()
+		else:
+			close()
 
 
 func _finish_typing_immediately() -> void:
@@ -99,6 +125,7 @@ func display_note(note_data: Dictionary, on_closed: Callable = Callable()) -> vo
 	if _is_open:
 		return
 	_is_open = true
+	_opened_at_msec = Time.get_ticks_msec()
 	visible = true
 	_sync_viewport_size()
 
@@ -192,6 +219,7 @@ func _build_modal_shell() -> void:
 
 	var close_btn := ModalTemplate.make_close_button(close, ModalTemplate.ThemeKind.ARCHIVE)
 	header.add_child(close_btn)
+	_close_btn = close_btn
 
 	# --- Note Title ---
 	_title_lbl = Label.new()

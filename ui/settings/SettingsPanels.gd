@@ -29,6 +29,8 @@ static func update_palette_btn(btn: Button, chip: ColorRect) -> void:
 			btn.text = "EMERALD"
 		"amber":
 			btn.text = "AMBER"
+		"magenta", "violet", "purple":
+			btn.text = "MAGENTA"
 		"white":
 			btn.text = "WHITE"
 		_:
@@ -514,6 +516,8 @@ static func build_advanced_panel(scene: Control) -> VBoxContainer:
 			"emerald":
 				GameState.sonar_palette = "amber"
 			"amber":
+				GameState.sonar_palette = "magenta"
+			"magenta", "violet", "purple":
 				GameState.sonar_palette = "white"
 			_:
 				GameState.sonar_palette = "cyan"

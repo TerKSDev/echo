@@ -93,6 +93,7 @@ var speed_boost_timer := 0.0
 var speed_boost_mult := 1.0
 var is_in_water := false
 var is_investigating_decoy := false
+var alert_caused_by_player := false
 var _snore_timer := 2.5
 var eye_linger_timer := 0.0
 var spasm_timer := 0.0
@@ -239,6 +240,9 @@ func on_sound(pos: Vector2, loudness: float, radius: float, is_voice: bool = fal
 	if heard < thresh:
 		return
 
+	alert_caused_by_player = true
+	is_investigating_decoy = false
+
 	match enemy_type:
 		EnemyType.SCREAMER:
 			_handle_screamer_sound()
@@ -250,6 +254,7 @@ func on_sound(pos: Vector2, loudness: float, radius: float, is_voice: bool = fal
 
 func _notice(pos: Vector2, wall_blocked: bool = false) -> void:
 	is_investigating_decoy = false
+	alert_caused_by_player = true
 	var to_sound := (pos - global_position).normalized()
 	if not to_sound.is_zero_approx():
 		facing_dir = to_sound
@@ -307,6 +312,9 @@ func on_decoy_sound(pos: Vector2, loudness: float, radius: float, is_wall_clink:
 	if not to_sound.is_zero_approx():
 		facing_dir = to_sound
 
+	alert_caused_by_player = false
+	is_investigating_decoy = true
+
 	if enemy_type == EnemyType.SCREAMER:
 		_handle_screamer_sound()
 		return
@@ -326,7 +334,6 @@ func on_decoy_sound(pos: Vector2, loudness: float, radius: float, is_wall_clink:
 
 	# Clear path / open space: full decoy investigation (runs to the pebble)
 	target = pos
-	is_investigating_decoy = true
 	_stuck_timer = 0.0
 
 	match state:
@@ -350,6 +357,7 @@ func force_alert_to(pos: Vector2) -> void:
 	if _is_stationary():
 		return
 	target = pos
+	alert_caused_by_player = false
 	_enter(State.ALERT)
 	woke_up.emit(global_position)
 	reveal(1.0)
@@ -427,6 +435,8 @@ func _enter(s: State) -> void:
 	var changed := s != state
 	if s != State.INVESTIGATE and s != State.SEARCH:
 		is_investigating_decoy = false
+	if s == State.SLEEP or s == State.PATROL or s == State.RETURN:
+		alert_caused_by_player = false
 	state = s
 	timer = 0.0
 	_stuck_timer = 0.0

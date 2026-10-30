@@ -156,8 +156,6 @@ var _stars_row: HBoxContainer
 
 var _stat_time_val: Label
 var _stat_time_sub: Label
-var _stat_pings_val: Label
-var _stat_pings_sub: Label
 var _stat_alerts_val: Label
 var _stat_alerts_sub: Label
 
@@ -400,11 +398,6 @@ func _build_ui() -> void:
 	_stat_time_sub = t_pod["sub"]
 	stat_pods_hbox.add_child(t_pod["container"])
 
-	var p_pod := _build_stat_pod("SONAR PINGS", "0")
-	_stat_pings_val = p_pod["val"]
-	_stat_pings_sub = p_pod["sub"]
-	stat_pods_hbox.add_child(p_pod["container"])
-
 	var a_pod := _build_stat_pod("MONSTER ALERTS", "0")
 	_stat_alerts_val = a_pod["val"]
 	_stat_alerts_sub = a_pod["sub"]
@@ -540,7 +533,6 @@ func show_debrief(data: Dictionary, sfx: SfxManager = null) -> void:
 	var pings: int = int(data.get("pings", 0))
 	var alerts: int = int(data.get("alerts", 0))
 	var par_time: float = float(data.get("par_time", 45.0))
-	var par_pings: int = int(data.get("par_pings", 12))
 
 	var is_surv: bool = (data.get("is_survivor", true) == true)
 	var is_ghost: bool = (data.get("is_ghost", false) == true)
@@ -595,19 +587,6 @@ func show_debrief(data: Dictionary, sfx: SfxManager = null) -> void:
 			if _stat_time_sub != null:
 				_stat_time_sub.text = "PAR: %0.0fs" % par_time
 				_stat_time_sub.add_theme_color_override("font_color", Color(0.55, 0.70, 0.85))
-
-	if _stat_pings_val != null:
-		_stat_pings_val.text = "%d" % pings
-		if pings <= par_pings:
-			_stat_pings_val.add_theme_color_override("font_color", Color(0.35, 0.95, 0.70))
-			if _stat_pings_sub != null:
-				_stat_pings_sub.text = "STEALTH (<= %d)" % par_pings
-				_stat_pings_sub.add_theme_color_override("font_color", Color(0.35, 0.95, 0.70))
-		else:
-			_stat_pings_val.add_theme_color_override("font_color", Color(0.85, 0.92, 0.98))
-			if _stat_pings_sub != null:
-				_stat_pings_sub.text = "PAR: %d" % par_pings
-				_stat_pings_sub.add_theme_color_override("font_color", Color(0.55, 0.70, 0.85))
 
 	if _stat_alerts_val != null:
 		if alerts == 0:

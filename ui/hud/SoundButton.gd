@@ -33,23 +33,29 @@ func _process(delta: float) -> void:
 func _draw() -> void:
 	var center := Vector2(size.x * 0.5, 48.0)
 	var radius := 44.0
+	var is_chal: bool = (GameState.current_mode == GameState.GameMode.CHALLENGE)
 
 	# 1. Subtle Outer Glow halo / Tutorial beacon
 	if tutorial_pulse:
 		var t_wave := fposmod(_ripple_time * 1.6, 1.0)
 		var t_r := radius + 4.0 + t_wave * 26.0
 		var t_a := (1.0 - t_wave) * 0.85
-		draw_arc(center, t_r, 0.0, TAU, 36, Color(0.45, 0.92, 1.0, t_a), 2.2)
-		draw_circle(center, radius + 4.0, Color(0.20, 0.70, 1.0, 0.16 + 0.10 * sin(_ripple_time * 6.0)))
+		var t_col := Color(1.0, 0.50, 0.90, t_a) if is_chal else Color(0.45, 0.92, 1.0, t_a)
+		var t_glow := Color(0.85, 0.25, 0.75, 0.16 + 0.10 * sin(_ripple_time * 6.0)) if is_chal else Color(0.20, 0.70, 1.0, 0.16 + 0.10 * sin(_ripple_time * 6.0))
+		draw_arc(center, t_r, 0.0, TAU, 36, t_col, 2.2)
+		draw_circle(center, radius + 4.0, t_glow)
 	else:
-		draw_circle(center, radius + 5.0, Color(0.12, 0.45, 0.8, 0.15))
+		var halo_col := Color(0.85, 0.20, 0.65, 0.16) if is_chal else Color(0.12, 0.45, 0.8, 0.15)
+		draw_circle(center, radius + 5.0, halo_col)
 
 	# 2. Main Cavern Glass Disc
-	draw_circle(center, radius, Color(0.04, 0.12, 0.22, 0.78))
-	draw_circle(center, radius * 0.78, Color(0.08, 0.22, 0.36, 0.35))
+	var disc_col := Color(0.16, 0.03, 0.13, 0.88) if is_chal else Color(0.04, 0.12, 0.22, 0.78)
+	var inner_disc_col := Color(0.25, 0.05, 0.20, 0.45) if is_chal else Color(0.08, 0.22, 0.36, 0.35)
+	draw_circle(center, radius, disc_col)
+	draw_circle(center, radius * 0.78, inner_disc_col)
 
 	# 3. Base Border Ring & Cardinal Sonar Ticks
-	var base_rim := Color(0.26, 0.54, 0.82, 0.65)
+	var base_rim := Color(0.85, 0.25, 0.75, 0.78) if is_chal else Color(0.26, 0.54, 0.82, 0.65)
 	draw_arc(center, radius, 0.0, TAU, 48, base_rim, 1.8)
 	for i in range(4):
 		var ang := i * PI * 0.5
@@ -73,7 +79,8 @@ func _draw() -> void:
 	if charging and charge_val > 0.01:
 		var start_angle := -PI * 0.5
 		var sweep := TAU * clampf(charge_val, 0.0, 1.0)
-		var charge_color := Color(0.35, 0.85, 1.0).lerp(Color(1.0, 1.0, 1.0), charge_val)
+		var base_charge := Color(1.0, 0.42, 0.88) if is_chal else Color(0.35, 0.85, 1.0)
+		var charge_color := base_charge.lerp(Color(1.0, 1.0, 1.0), charge_val)
 		draw_arc(center, radius, start_angle, start_angle + sweep, 48, charge_color, 3.5)
 
 		# Spark glow at leading edge of charging circle
@@ -102,9 +109,10 @@ func _draw() -> void:
 
 	# 6. Micro Label Below
 	var label_text := "STUNNED" if is_stunned else ("CALLING..." if charging else ("HOLD TO CHARGE" if tutorial_hold_mode else ("TAP TO CALL" if tutorial_pulse else "ECHO")))
-	var label_col := Color(0.55, 0.8, 1.0, 0.7 if not charging else 0.95)
+	var normal_label_col := Color(0.95, 0.65, 0.88, 0.75 if not charging else 0.98) if is_chal else Color(0.55, 0.8, 1.0, 0.7 if not charging else 0.95)
+	var label_col := normal_label_col
 	if tutorial_pulse:
-		label_col = Color(0.75, 0.96, 1.0, 0.95)
+		label_col = Color(1.0, 0.75, 0.95, 0.95) if is_chal else Color(0.75, 0.96, 1.0, 0.95)
 	elif is_stunned:
 		label_col = Color(1.0, 0.38, 0.55, 0.85)
 	draw_string(ThemeDB.fallback_font, Vector2(0.0, 114.0), label_text, HORIZONTAL_ALIGNMENT_CENTER, int(size.x), 11, label_col)

@@ -58,6 +58,7 @@ func _draw() -> void:
 	var is_muted := false
 	var calibrating := false
 	var is_stunned := false
+	var is_chal: bool = (GameState.current_mode == GameState.GameMode.CHALLENGE)
 	if _player != null and is_instance_valid(_player):
 		if "_stun_timer" in _player and float(_player._stun_timer) > 0.0:
 			is_stunned = true
@@ -70,7 +71,8 @@ func _draw() -> void:
 					calibrating = true
 
 	# 1. Subtle dark glass capsule background
-	_bg_box.border_color = Color(1.0, 0.28, 0.5, 0.85) if is_stunned else Color(0.25, 0.52, 0.78, 0.42)
+	var normal_border := Color(0.85, 0.25, 0.75, 0.55) if is_chal else Color(0.25, 0.52, 0.78, 0.42)
+	_bg_box.border_color = Color(1.0, 0.28, 0.5, 0.85) if is_stunned else normal_border
 	draw_style_box(_bg_box, rect)
 
 	# 2. 5 clean dynamic acoustic equalizer bars
@@ -80,10 +82,11 @@ func _draw() -> void:
 	var min_h := 5.5
 
 	var bar_weights := [0.55, 0.8, 1.0, 0.8, 0.55]
-	var base_col := Color(0.35, 0.75, 1.0, 0.75) if not is_muted else Color(0.5, 0.5, 0.5, 0.4)
+	var normal_base_col := Color(0.95, 0.45, 0.85, 0.80) if is_chal else Color(0.35, 0.75, 1.0, 0.75)
+	var base_col := normal_base_col if not is_muted else Color(0.5, 0.5, 0.5, 0.4)
 	if is_stunned:
 		base_col = Color(1.0, 0.28, 0.52, 0.85)
-	var active_col := Color(0.9, 0.98, 1.0, 1.0)
+	var active_col := Color(1.0, 0.92, 0.98, 1.0) if is_chal else Color(0.9, 0.98, 1.0, 1.0)
 
 	for i in range(5):
 		var x_offset := (i - 2) * gap
@@ -111,9 +114,9 @@ func _draw() -> void:
 		text_col = Color(1.0, 0.85, 0.35, 0.95)
 	elif _flash > 0.1:
 		text = "VOICE ACTIVE"
-		text_col = Color(0.4, 0.95, 1.0, 1.0)
+		text_col = Color(1.0, 0.55, 0.92, 1.0) if is_chal else Color(0.4, 0.95, 1.0, 1.0)
 	else:
 		text = "VOICE SENSOR"
-		text_col = Color(0.45, 0.72, 0.95, 0.55)
+		text_col = Color(0.92, 0.55, 0.82, 0.75) if is_chal else Color(0.45, 0.72, 0.95, 0.55)
 
 	draw_string(ThemeDB.fallback_font, Vector2(-w * 0.5, h * 0.5 + 12.0), text, HORIZONTAL_ALIGNMENT_CENTER, int(w), 9, text_col)

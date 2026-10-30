@@ -83,15 +83,12 @@ static func create_section_card(header_title: String) -> Dictionary:
 
 
 static func create_category_divider() -> Control:
-	var c := Control.new()
-	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	c.custom_minimum_size = Vector2(0, 1)
 	var line := ColorRect.new()
 	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	line.set_anchors_preset(Control.PRESET_FULL_RECT)
-	line.color = Color(0.18, 0.35, 0.52, 0.22)
-	c.add_child(line)
-	return c
+	line.custom_minimum_size = Vector2(0, 1)
+	line.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	line.color = Color(0.24, 0.48, 0.72, 0.40)
+	return line
 
 
 static func create_setting_row(title_text: String, desc_text: String, action_control: Control) -> Control:

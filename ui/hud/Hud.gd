@@ -763,15 +763,25 @@ func play_level_intro(title_text: String, subtitle_text: String = "Listen closel
 		var fsize := 13 if title_text.length() >= 18 else (14 if title_text.length() >= 14 else 15)
 		_badge_name_lbl.add_theme_font_size_override("font_size", fsize)
 		_badge_name_lbl.text = title_text
+		if is_challenge:
+			_badge_name_lbl.add_theme_color_override("font_color", Color(1.0, 0.94, 0.98, 0.95))
+			_badge_name_lbl.add_theme_color_override("font_shadow_color", Color(0.65, 0.08, 0.45, 0.55))
+		else:
+			_badge_name_lbl.add_theme_color_override("font_color", Color(0.90, 0.96, 1.0, 0.90))
+			_badge_name_lbl.add_theme_color_override("font_shadow_color", Color(0.05, 0.45, 0.90, 0.45))
 	if _badge_depth_lbl != null:
 		var depth_fmt := ("~" + raw_depth.replace("-", "").strip_edges()) if raw_depth.ends_with("M") else raw_depth
 		_badge_depth_lbl.text = depth_fmt
+		if is_challenge:
+			_badge_depth_lbl.add_theme_color_override("font_color", Color(0.92, 0.55, 0.82, 0.75))
+		else:
+			_badge_depth_lbl.add_theme_color_override("font_color", Color(0.45, 0.78, 0.96, 0.65))
 
 	# 1. Fullscreen abyss curtain fading out smoothly
 	var curtain := ColorRect.new()
 	curtain.set_anchors_preset(Control.PRESET_FULL_RECT)
 	curtain.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	curtain.color = Color(0.0, 0.015, 0.035, 1.0)
+	curtain.color = Color(0.02, 0.005, 0.022, 1.0) if is_challenge else Color(0.0, 0.015, 0.035, 1.0)
 	add_child(curtain)
 
 	var c_tw := create_tween()
@@ -795,7 +805,12 @@ func play_level_intro(title_text: String, subtitle_text: String = "Listen closel
 	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	tag.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	tag.add_theme_color_override("font_color", Color(1.0, 0.78, 0.35, 0.90) if (is_challenge and cur_lvl >= 20) else Color(0.38, 0.85, 1.0, 0.85))
+	var tag_col: Color
+	if is_challenge:
+		tag_col = Color(1.0, 0.78, 0.35, 0.90) if cur_lvl >= 20 else Color(1.0, 0.55, 0.88, 0.95)
+	else:
+		tag_col = Color(0.38, 0.85, 1.0, 0.85)
+	tag.add_theme_color_override("font_color", tag_col)
 	tag.add_theme_font_size_override("font_size", 11)
 	banner.add_child(tag)
 
@@ -804,8 +819,9 @@ func play_level_intro(title_text: String, subtitle_text: String = "Listen closel
 	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	title_lbl.add_theme_color_override("font_color", Color(0.88, 0.97, 1.0, 1.0))
-	title_lbl.add_theme_color_override("font_shadow_color", Color(0.08, 0.45, 0.82, 0.65))
+	title_lbl.add_theme_color_override("font_color", Color(1.0, 0.94, 0.98, 1.0) if is_challenge else Color(0.88, 0.97, 1.0, 1.0))
+	var shadow_col := Color(0.65, 0.08, 0.45, 0.75) if is_challenge else Color(0.08, 0.45, 0.82, 0.65)
+	title_lbl.add_theme_color_override("font_shadow_color", shadow_col)
 	title_lbl.add_theme_constant_override("shadow_offset_y", 2)
 	title_lbl.add_theme_font_size_override("font_size", 30)
 	banner.add_child(title_lbl)
@@ -818,7 +834,7 @@ func play_level_intro(title_text: String, subtitle_text: String = "Listen closel
 	var scan_line := ColorRect.new()
 	scan_line.custom_minimum_size = Vector2(16.0, 2.0)
 	scan_line.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	scan_line.color = Color(0.38, 0.9, 1.0, 0.85)
+	scan_line.color = Color(1.0, 0.45, 0.88, 0.85) if is_challenge else Color(0.38, 0.9, 1.0, 0.85)
 	line_holder.add_child(scan_line)
 
 	var sub_lbl := Label.new()
@@ -828,7 +844,7 @@ func play_level_intro(title_text: String, subtitle_text: String = "Listen closel
 	sub_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	sub_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sub_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	sub_lbl.add_theme_color_override("font_color", Color(0.72, 0.88, 0.98, 0.85))
+	sub_lbl.add_theme_color_override("font_color", Color(0.95, 0.78, 0.92, 0.88) if is_challenge else Color(0.72, 0.88, 0.98, 0.85))
 	sub_lbl.add_theme_font_size_override("font_size", 13)
 	banner.add_child(sub_lbl)
 

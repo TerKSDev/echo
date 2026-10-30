@@ -117,8 +117,6 @@ func _connect_enemies_telemetry() -> void:
 		if enemy != null and is_instance_valid(enemy):
 			if not enemy.alert_triggered.is_connected(_on_enemy_alert):
 				enemy.alert_triggered.connect(_on_enemy_alert)
-			if not enemy.woke_up.is_connected(_on_enemy_alert):
-				enemy.woke_up.connect(func(_p): _on_enemy_alert(enemy))
 			if not enemy.screamed.is_connected(_on_enemy_alert):
 				enemy.screamed.connect(func(_p, _r): _on_enemy_alert(enemy))
 			if not enemy.alarmed.is_connected(_on_enemy_alert):
@@ -127,8 +125,22 @@ func _connect_enemies_telemetry() -> void:
 
 func _on_enemy_alert(enemy: Enemy) -> void:
 	if not _changing:
-		if enemy != null and is_instance_valid(enemy) and enemy.is_investigating_decoy:
-			return
+		if enemy != null and is_instance_valid(enemy):
+			# Ghost rating is only penalized by direct player noise (shout, steps, water splash, proximity)
+			if "alert_caused_by_player" in enemy and not enemy.alert_caused_by_player:
+				return
+			if enemy.is_investigating_decoy:
+				return
+			if enemy.get_meta("scripted_wake", false) == true:
+				enemy.set_meta("scripted_wake", false)
+				return
+			# Debounce: avoid counting repeated rapid triggers on the same enemy
+			var now_msec := Time.get_ticks_msec()
+			var last_alert_msec: int = int(enemy.get_meta("last_alert_msec", 0))
+			if now_msec - last_alert_msec < 600:
+				return
+			enemy.set_meta("last_alert_msec", now_msec)
+
 		_enemies_alerted += 1
 		if is_instance_valid(player) and player.has_method("trigger_terror_shiver"):
 			player.trigger_terror_shiver(3.0)
@@ -172,7 +184,16 @@ func _play_entry_sequence() -> void:
 	get_tree().create_timer(0.22).timeout.connect(func():
 		if is_instance_valid(player) and is_instance_valid(echo_layer):
 			var exclude: Array = [player.get_rid()]
-			echo_layer.emit_echo(player.global_position, 220.0, exclude, true)
+			var w_col: Color = GameState.get_sonar_color()
+			echo_layer.emit_echo(player.global_position, 220.0, exclude, true, w_col)
+			if "pulse_scale" in player:
+				player.pulse_scale = 1.25
+			if "_burst_radius" in player:
+				player._burst_radius = 8.0
+				player._burst_alpha = 0.65
+				player.queue_redraw()
+			if sfx != null:
+				sfx.play_echo_ping(0.28)
 			if GameState.blind_assist_mode and player.has_method("_emit_wall_echos"):
 				player._emit_wall_echos(0.35)
 	)
@@ -360,6 +381,7 @@ func _level_0_trigger_chase() -> void:
 		sleeper.state = Enemy.State.ALERT
 		sleeper.alert_time = 0.65
 		sleeper.reveal(1.0)
+		sleeper.set_meta("scripted_wake", true)
 		if player != null:
 			sleeper.force_alert_to(player.global_position)
 
@@ -1081,14 +1103,16 @@ func _press_switch(cell: Vector2i) -> void:
 				sfx.play_door_open(body.global_position)
 	if sfx != null:
 		sfx.play_sneak_toggle(false)
-	if player != null and player.has_method("make_sound"):
-		player.make_sound(0.06, false)
+	var switch_world_pos := cell_to_world(cell)
+	if echo_layer != null:
+		echo_layer.emit_echo(switch_world_pos, 180.0, [], false, Color(1.0, 0.82, 0.25))
 
 	# Text-defined levels can flag monsters with `wake=<switch id>`: stepping on that switch alerts them
 	if player != null and is_instance_valid(player):
 		for node in get_tree().get_nodes_in_group("enemy"):
 			var sleeper_enemy := node as Enemy
 			if sleeper_enemy != null and is_instance_valid(sleeper_enemy) and str(sleeper_enemy.get_meta("wake_on", "")).to_upper() == id:
+				sleeper_enemy.set_meta("scripted_wake", true)
 				sleeper_enemy.force_alert_to(player.global_position)
 
 	if _is_tutorial_level:

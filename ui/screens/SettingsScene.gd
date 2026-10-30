@@ -402,11 +402,12 @@ func _process(delta: float) -> void:
 func _draw_sonar_backdrop() -> void:
 	var w := size.x
 	var h := size.y
+	var base_col: Color = GameState.get_sonar_color()
 	for spore in _spores:
 		var pos: Vector2 = spore["pos"]
 		if pos.x < -10.0 or pos.x > w + 10.0 or pos.y < -10.0 or pos.y > h + 10.0:
 			continue
-		var col := Color(0.4, 0.85, 1.0, float(spore["alpha"]))
+		var col := Color(base_col.r, base_col.g, base_col.b, float(spore["alpha"]))
 		sonar_backdrop.draw_circle(pos, float(spore["r"]), col)
 
 	for ripple in _ripples:
@@ -419,7 +420,8 @@ func _draw_sonar_backdrop() -> void:
 		var fade := 1.0 - progress
 		fade = fade * fade
 		var alpha := peak_a * fade
-		sonar_backdrop.draw_arc(ripple["pos"], radius, 0.0, TAU, 48, Color(0.35, 0.85, 1.0, alpha), 1.4)
+		var rip_col := Color(base_col.r, base_col.g, base_col.b, alpha)
+		sonar_backdrop.draw_arc(ripple["pos"], radius, 0.0, TAU, 48, rip_col, 1.4)
 
 
 func _draw_menu_mic_meter(canvas: Control) -> void:

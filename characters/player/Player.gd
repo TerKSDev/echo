@@ -201,6 +201,8 @@ func _ready() -> void:
 
 
 func reset_for_level() -> void:
+	if trail != null:
+		trail.default_color = GameState.get_sonar_color()
 	pebbles = get_max_pebbles()
 	pebble_count_changed.emit(pebbles)
 	_second_wind_used = false
@@ -970,6 +972,8 @@ func reset(pos: Vector2) -> void:
 
 # Handle Player Drawing
 func _draw() -> void:
+	var is_chal := GameState.current_mode == GameState.GameMode.CHALLENGE
+	var is_pink := is_chal or GameState.sonar_palette in ["magenta", "violet", "purple"]
 	# Draw world-space footstep water ripples first (underneath player core)
 	for r: Dictionary in _step_ripples:
 		var age: float = float(r["age"])
@@ -979,11 +983,16 @@ func _draw() -> void:
 		var a: float = float(r["alpha"]) * (1.0 - p_ratio)
 		var local_pos: Vector2 = to_local(Vector2(r["pos"]))
 		var is_water_ripple: bool = (r.get("is_water", false) == true)
-		var ripple_col: Color = Color(0.24, 0.76, 1.0, a) if is_water_ripple else Color(0.32, 0.86, 1.0, a)
+		var ripple_col: Color
+		if is_pink:
+			ripple_col = Color(0.95, 0.45, 0.85, a) if is_water_ripple else Color(1.0, 0.55, 0.90, a)
+		else:
+			ripple_col = Color(0.24, 0.76, 1.0, a) if is_water_ripple else Color(0.32, 0.86, 1.0, a)
 		draw_arc(local_pos, rad, 0.0, TAU, 24, ripple_col, 1.6 if is_water_ripple else 1.4)
 		if p_ratio < 0.45 or is_water_ripple:
 			var inner_r: float = rad * (0.58 if is_water_ripple else 0.55)
-			draw_arc(local_pos, inner_r, 0.0, TAU, 18, Color(0.5, 0.92, 1.0, a * 0.55), 1.0)
+			var inner_col: Color = Color(1.0, 0.70, 0.95, a * 0.55) if is_pink else Color(0.5, 0.92, 1.0, a * 0.55)
+			draw_arc(local_pos, inner_r, 0.0, TAU, 18, inner_col, 1.0)
 
 	# Ignore drawing if the player is dead, show death collapse effect
 	if not alive:
@@ -1007,23 +1016,28 @@ func _draw() -> void:
 	if sb < 0.99:
 		var norm_a: float = 1.0 - sb
 		# Outer ambient breathing glow
-		draw_circle(core_ofs, (20.0 + 3.0 * breathe) * lerpf(1.0, 0.65, sb), Color(0.15, 0.6, 0.9, 0.08 * norm_a))
+		var glow_col := Color(0.85, 0.20, 0.70, 0.10 * norm_a) if is_pink else Color(0.15, 0.6, 0.9, 0.08 * norm_a)
+		draw_circle(core_ofs, (20.0 + 3.0 * breathe) * lerpf(1.0, 0.65, sb), glow_col)
 		# Inner soft aura
-		draw_circle(core_ofs, (13.0 + 1.5 * breathe) * lerpf(1.0, 0.75, sb), Color(0.25, 0.8, 1.0, 0.18 * norm_a))
+		var aura_col := Color(0.95, 0.35, 0.80, 0.22 * norm_a) if is_pink else Color(0.25, 0.8, 1.0, 0.18 * norm_a)
+		draw_circle(core_ofs, (13.0 + 1.5 * breathe) * lerpf(1.0, 0.75, sb), aura_col)
 
 	if sb > 0.01:
 		# Subtle focused dampener ring in Sneak mode
 		var ring_r: float = lerpf(14.0, 10.0 + 1.2 * breathe, sb)
-		draw_arc(core_ofs, ring_r, 0.0, TAU, 24, Color(0.2, 0.65, 0.85, 0.38 * sb), 1.5)
+		var ring_col := Color(0.90, 0.30, 0.75, 0.42 * sb) if is_pink else Color(0.2, 0.65, 0.85, 0.38 * sb)
+		draw_arc(core_ofs, ring_r, 0.0, TAU, 24, ring_col, 1.5)
 
 	# Main body core & hot center (smoothly interpolated size and opacity)
 	var body_r: float = lerpf(7.5, 5.0, sb) * pulse_scale
 	var body_a: float = lerpf(0.95, 0.58, sb)
-	draw_circle(core_ofs, body_r, Color(0.3, lerpf(0.92, 0.8, sb), 1.0, body_a))
+	var body_col := Color(1.0, lerpf(0.40, 0.25, sb), 0.85, body_a) if is_pink else Color(0.3, lerpf(0.92, 0.8, sb), 1.0, body_a)
+	draw_circle(core_ofs, body_r, body_col)
 
 	var center_r: float = lerpf(3.5, 2.5, sb) * pulse_scale
 	var center_a: float = lerpf(1.0, 0.82, sb)
-	draw_circle(core_ofs, center_r, Color(0.88, 0.97, 1.0, center_a))
+	var center_col := Color(1.0, 0.92, 0.98, center_a) if is_pink else Color(0.88, 0.97, 1.0, center_a)
+	draw_circle(core_ofs, center_r, center_col)
 
 	# Directional sonar heading cue when moving
 	if velocity.length() > 10.0:
@@ -1033,17 +1047,20 @@ func _draw() -> void:
 		var tip := core_ofs + heading * (13.0 + 2.0 * breathe) * cue_scale
 		var left_wing := heading.rotated(2.4) * (8.0 * cue_scale)
 		var right_wing := heading.rotated(-2.4) * (8.0 * cue_scale)
-		draw_line(tip, tip + left_wing, Color(0.4, 0.9, 1.0, cue_alpha), 1.5)
-		draw_line(tip, tip + right_wing, Color(0.4, 0.9, 1.0, cue_alpha), 1.5)
+		var cue_col := Color(1.0, 0.55, 0.90, cue_alpha) if is_pink else Color(0.4, 0.9, 1.0, cue_alpha)
+		draw_line(tip, tip + left_wing, cue_col, 1.5)
+		draw_line(tip, tip + right_wing, cue_col, 1.5)
 
 	# Sound emission burst shockwave
 	if _burst_alpha > 0.01:
-		draw_arc(Vector2.ZERO, _burst_radius, 0.0, TAU, 32, Color(0.6, 0.95, 1.0, _burst_alpha), 2.0)
+		var burst_col := Color(1.0, 0.60, 0.92, _burst_alpha) if is_pink else Color(0.6, 0.95, 1.0, _burst_alpha)
+		draw_arc(Vector2.ZERO, _burst_radius, 0.0, TAU, 32, burst_col, 2.0)
 
 	# Charging ring
 	if charging:
 		var ring_radius := 16.0 + charge * 14.0
-		var ring_color := Color(0.35, 0.85, 1.0).lerp(Color.WHITE, charge)
+		var base_charge_col := Color(1.0, 0.45, 0.85) if is_pink else Color(0.35, 0.85, 1.0)
+		var ring_color := base_charge_col.lerp(Color.WHITE, charge)
 		draw_arc(Vector2.ZERO, ring_radius, -PI / 2, -PI / 2 + TAU * charge, 32, ring_color, 2.0 + charge * 2.0)
 		# Spark tip
 		var tip_angle := -PI / 2 + TAU * charge
@@ -1056,19 +1073,24 @@ func _draw() -> void:
 	if marker > 0.01:
 		var p := to_local(target)
 		var p_pulse := 1.0 + 0.15 * sin(t * 8.0)
-		draw_arc(p, 9.0 * p_pulse, 0.0, TAU, 24, Color(0.3, 1.0, 1.0, 0.48 * marker), 1.8)
-		draw_circle(p, 2.2, Color(0.85, 1.0, 1.0, 0.78 * marker))
+		var m_outer := Color(1.0, 0.45, 0.90, 0.55 * marker) if is_pink else Color(0.3, 1.0, 1.0, 0.48 * marker)
+		var m_inner := Color(1.0, 0.88, 0.96, 0.82 * marker) if is_pink else Color(0.85, 1.0, 1.0, 0.78 * marker)
+		draw_arc(p, 9.0 * p_pulse, 0.0, TAU, 24, m_outer, 1.8)
+		draw_circle(p, 2.2, m_inner)
 		if _tap_flash > 0.01:
 			var tap_r: float = lerpf(22.0, 9.0, 1.0 - _tap_flash)
-			draw_arc(p, tap_r, 0.0, TAU, 24, Color(0.65, 0.98, 1.0, 0.65 * _tap_flash), 1.4)
+			var tap_col := Color(1.0, 0.65, 0.92, 0.65 * _tap_flash) if is_pink else Color(0.65, 0.98, 1.0, 0.65 * _tap_flash)
+			draw_arc(p, tap_r, 0.0, TAU, 24, tap_col, 1.4)
 
 	# Tactile wall contact shimmer when brushing/stopping against a wall in darkness
 	if _wall_bump_alpha > 0.01:
 		var bp := to_local(_wall_bump_pos)
 		var tangent := Vector2(-_wall_bump_normal.y, _wall_bump_normal.x)
 		var span: float = lerpf(6.0, 15.0, 1.0 - _wall_bump_alpha)
-		draw_line(bp - tangent * span, bp + tangent * span, Color(0.45, 0.92, 1.0, 0.75 * _wall_bump_alpha), 2.2)
-		draw_circle(bp, 2.5, Color(0.85, 0.98, 1.0, 0.85 * _wall_bump_alpha))
+		var bump_line := Color(1.0, 0.50, 0.88, 0.75 * _wall_bump_alpha) if is_pink else Color(0.45, 0.92, 1.0, 0.75 * _wall_bump_alpha)
+		var bump_dot := Color(1.0, 0.90, 0.97, 0.85 * _wall_bump_alpha) if is_pink else Color(0.85, 0.98, 1.0, 0.85 * _wall_bump_alpha)
+		draw_line(bp - tangent * span, bp + tangent * span, bump_line, 2.2)
+		draw_circle(bp, 2.5, bump_dot)
 
 	# Acoustic paralysis / Stun visual feedback
 	if _stun_timer > 0.0:

@@ -21,6 +21,8 @@ var _scale_slider: HSlider
 var _scale_val_lbl: Label
 var _chips: Dictionary = {}
 var _modified_elements: Dictionary = {}
+var _initial_layout_snapshot: Dictionary = {}
+var _confirm_dialog: Control = null
 
 # Element definitions: id -> { "control": Control, "data": Dictionary, "base_size": Vector2, "title": String, "short": String }
 var _elements: Dictionary = {}
@@ -28,11 +30,13 @@ var _selected_id: String = "SoundBtn"
 var _dragging := false
 var _drag_target_id: String = ""
 var _drag_touch_offset := Vector2.ZERO
+var _drag_touch_index: int = -1
 var _time := 0.0
 
 # Control Panel Dragging State
 var _panel_dragging := false
 var _panel_drag_offset := Vector2.ZERO
+var _panel_drag_touch_index: int = -1
 var _panel_manually_moved := false
 
 
@@ -200,6 +204,10 @@ func _setup_hud_proxies() -> void:
 
 		_update_proxy_transform(id, vp_size)
 
+	_initial_layout_snapshot.clear()
+	for id: String in _elements:
+		_initial_layout_snapshot[id] = _elements[id]["data"].duplicate()
+
 
 func _update_proxy_transform(id: String, vp_size: Vector2) -> void:
 	if not _elements.has(id):
@@ -221,32 +229,45 @@ func _update_proxy_transform(id: String, vp_size: Vector2) -> void:
 
 
 func _handle_proxy_input(event: InputEvent, id: String) -> void:
-	if event is InputEventMouseButton:
-		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-			_select_element(id)
-			_dragging = true
-			_drag_target_id = id
-			var ctrl: Control = _elements[id]["control"]
-			_drag_touch_offset = event.global_position - (ctrl.position + ctrl.size * 0.5)
-			accept_event()
+	if not _elements.has(id):
+		return
+	var ctrl: Control = _elements[id]["control"]
+
+	var is_press := false
+	var touch_idx := -1
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		is_press = true
+		touch_idx = -1
 	elif event is InputEventScreenTouch and event.pressed:
+		is_press = true
+		touch_idx = event.index
+
+	if is_press:
 		_select_element(id)
 		_dragging = true
 		_drag_target_id = id
-		var ctrl: Control = _elements[id]["control"]
-		_drag_touch_offset = event.position - (ctrl.position + ctrl.size * 0.5)
+		_drag_touch_index = touch_idx
+		var touch_global: Vector2 = ctrl.get_global_transform() * event.position
+		var ctrl_center: Vector2 = ctrl.global_position + ctrl.size * 0.5
+		_drag_touch_offset = touch_global - ctrl_center
 		accept_event()
 
 
 func _handle_panel_drag_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton:
-		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-			_panel_dragging = true
-			_panel_drag_offset = event.global_position - _panel.position
-			accept_event()
+	var is_press := false
+	var touch_idx := -1
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		is_press = true
+		touch_idx = -1
 	elif event is InputEventScreenTouch and event.pressed:
+		is_press = true
+		touch_idx = event.index
+
+	if is_press:
 		_panel_dragging = true
-		_panel_drag_offset = event.position - _panel.position
+		_panel_drag_touch_index = touch_idx
+		var touch_global: Vector2 = _panel.get_global_transform() * event.position
+		_panel_drag_offset = touch_global - _panel.global_position
 		accept_event()
 
 
@@ -269,18 +290,22 @@ func _input(event: InputEvent) -> void:
 			accept_event()
 		elif event is InputEventScreenDrag:
 			var sd := event as InputEventScreenDrag
-			var new_pos: Vector2 = sd.position - _panel_drag_offset
-			var panel_w: float = _panel.size.x
-			var panel_h: float = _panel.size.y
-			new_pos.x = clampf(new_pos.x, 8.0, vp_size.x - panel_w - 8.0)
-			new_pos.y = clampf(new_pos.y, 8.0, vp_size.y - panel_h - 8.0)
-			_panel.position = new_pos
-			_panel_manually_moved = true
-			accept_event()
+			if _panel_drag_touch_index == -1 or sd.index == _panel_drag_touch_index:
+				var new_pos: Vector2 = sd.position - _panel_drag_offset
+				var panel_w: float = _panel.size.x
+				var panel_h: float = _panel.size.y
+				new_pos.x = clampf(new_pos.x, 8.0, vp_size.x - panel_w - 8.0)
+				new_pos.y = clampf(new_pos.y, 8.0, vp_size.y - panel_h - 8.0)
+				_panel.position = new_pos
+				_panel_manually_moved = true
+				accept_event()
 		elif event is InputEventMouseButton and not event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			_panel_dragging = false
+			_panel_drag_touch_index = -1
 		elif event is InputEventScreenTouch and not event.pressed:
-			_panel_dragging = false
+			if _panel_drag_touch_index == -1 or event.index == _panel_drag_touch_index:
+				_panel_dragging = false
+				_panel_drag_touch_index = -1
 		return
 
 	# Handle dragging individual HUD proxy elements
@@ -293,14 +318,18 @@ func _input(event: InputEvent) -> void:
 		_clamp_and_store_position(_drag_target_id, new_center, vp_size)
 	elif event is InputEventScreenDrag:
 		var sd := event as InputEventScreenDrag
-		var new_center: Vector2 = sd.position - _drag_touch_offset
-		_clamp_and_store_position(_drag_target_id, new_center, vp_size)
-	elif event is InputEventMouseButton and not event.pressed:
+		if _drag_touch_index == -1 or sd.index == _drag_touch_index:
+			var new_center: Vector2 = sd.position - _drag_touch_offset
+			_clamp_and_store_position(_drag_target_id, new_center, vp_size)
+	elif event is InputEventMouseButton and not event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		_dragging = false
 		_drag_target_id = ""
+		_drag_touch_index = -1
 	elif event is InputEventScreenTouch and not event.pressed:
-		_dragging = false
-		_drag_target_id = ""
+		if _drag_touch_index == -1 or event.index == _drag_touch_index:
+			_dragging = false
+			_drag_target_id = ""
+			_drag_touch_index = -1
 
 
 func _clamp_and_store_position(id: String, new_center: Vector2, vp_size: Vector2) -> void:
@@ -401,16 +430,19 @@ func _draw_proxy_element(ctrl: Control, id: String) -> void:
 	var h: float = ctrl.size.y
 	var is_sel: bool = (_selected_id == id)
 	var t: float = _time
+	var is_chal: bool = (GameState.current_mode == GameState.GameMode.CHALLENGE)
 
 	match id:
 		"SoundBtn":
 			var c := Vector2(w * 0.5, 48.0)
 			var r := 44.0
 			# Cavern disc
-			ctrl.draw_circle(c, r, Color(0.04, 0.12, 0.22, 0.78))
-			ctrl.draw_circle(c, r * 0.78, Color(0.08, 0.22, 0.36, 0.35))
+			var disc_col := Color(0.16, 0.03, 0.13, 0.88) if is_chal else Color(0.04, 0.12, 0.22, 0.78)
+			var inner_col := Color(0.25, 0.05, 0.20, 0.45) if is_chal else Color(0.08, 0.22, 0.36, 0.35)
+			ctrl.draw_circle(c, r, disc_col)
+			ctrl.draw_circle(c, r * 0.78, inner_col)
 			# Border rim & cardinal ticks
-			var rim_col := Color(0.26, 0.54, 0.82, 0.65)
+			var rim_col := Color(0.85, 0.25, 0.75, 0.78) if is_chal else Color(0.26, 0.54, 0.82, 0.65)
 			ctrl.draw_arc(c, r, 0.0, TAU, 48, rim_col, 1.8)
 			for i in range(4):
 				var ang := i * PI * 0.5
@@ -425,28 +457,33 @@ func _draw_proxy_element(ctrl: Control, id: String) -> void:
 			ctrl.draw_arc(c, 22.0, PI * 0.72, PI * 1.28, 16, Color(icon_col, 0.6), 1.8)
 			# Clean label below
 			var font := ThemeDB.fallback_font
-			ctrl.draw_string(font, Vector2(0, 114.0), "ECHO", HORIZONTAL_ALIGNMENT_CENTER, int(w), 11, Color(0.55, 0.80, 1.0, 0.75))
-			ctrl.draw_string(font, Vector2(0, 127.0), "[E]", HORIZONTAL_ALIGNMENT_CENTER, int(w), 9, Color(0.55, 0.80, 1.0, 0.45))
+			var lbl_col := Color(0.95, 0.65, 0.88, 0.75) if is_chal else Color(0.55, 0.80, 1.0, 0.75)
+			ctrl.draw_string(font, Vector2(0, 114.0), "ECHO", HORIZONTAL_ALIGNMENT_CENTER, int(w), 11, lbl_col)
+			ctrl.draw_string(font, Vector2(0, 127.0), "[E]", HORIZONTAL_ALIGNMENT_CENTER, int(w), 9, Color(lbl_col, 0.45))
 
 		"SneakBtn":
 			var c := Vector2(w * 0.5, 48.0)
 			var r := 44.0
 			# Cavern disc
-			ctrl.draw_circle(c, r, Color(0.04, 0.12, 0.22, 0.78))
-			ctrl.draw_circle(c, r * 0.78, Color(0.08, 0.22, 0.36, 0.35))
+			var disc_col := Color(0.16, 0.03, 0.13, 0.88) if is_chal else Color(0.04, 0.12, 0.22, 0.78)
+			var inner_col := Color(0.25, 0.05, 0.20, 0.45) if is_chal else Color(0.08, 0.22, 0.36, 0.35)
+			ctrl.draw_circle(c, r, disc_col)
+			ctrl.draw_circle(c, r * 0.78, inner_col)
 			# Border rim & cardinal ticks
-			var rim_col := Color(0.26, 0.54, 0.82, 0.65)
+			var rim_col := Color(0.85, 0.25, 0.75, 0.78) if is_chal else Color(0.26, 0.54, 0.82, 0.65)
 			ctrl.draw_arc(c, r, 0.0, TAU, 48, rim_col, 1.8)
 			for i in range(4):
 				var ang := i * PI * 0.5
 				var dir := Vector2.from_angle(ang)
 				ctrl.draw_line(c + dir * (r - 5.5), c + dir * (r - 1.5), Color(rim_col, 0.38), 1.4)
 			# Stealth feather icon
-			Icons.draw_stealth(ctrl, c, Color(0.85, 0.94, 1.0, 0.88))
+			var icon_col := Color(1.0, 0.90, 0.96, 0.92) if is_chal else Color(0.85, 0.94, 1.0, 0.88)
+			Icons.draw_stealth(ctrl, c, icon_col)
 			# Labels
 			var font := ThemeDB.fallback_font
-			ctrl.draw_string(font, Vector2(0, 114.0), "SNEAK", HORIZONTAL_ALIGNMENT_CENTER, int(w), 11, Color(0.55, 0.80, 1.0, 0.72))
-			ctrl.draw_string(font, Vector2(0, 127.0), "[SHIFT]", HORIZONTAL_ALIGNMENT_CENTER, int(w), 9, Color(0.55, 0.80, 1.0, 0.45))
+			var lbl_col := Color(0.95, 0.65, 0.88, 0.75) if is_chal else Color(0.55, 0.80, 1.0, 0.72)
+			ctrl.draw_string(font, Vector2(0, 114.0), "SNEAK", HORIZONTAL_ALIGNMENT_CENTER, int(w), 11, lbl_col)
+			ctrl.draw_string(font, Vector2(0, 127.0), "[SHIFT]", HORIZONTAL_ALIGNMENT_CENTER, int(w), 9, Color(lbl_col, 0.45))
 
 		"PebbleBtn":
 			var c := Vector2(w * 0.5, 36.0)
@@ -474,17 +511,21 @@ func _draw_proxy_element(ctrl: Control, id: String) -> void:
 			var c := Vector2(w * 0.5, h * 0.5)
 			var r := minf(w, h) * 0.44
 			# Outer subtle halo
-			ctrl.draw_circle(c, r + 3.0, Color(0.12, 0.45, 0.8, 0.12))
+			var halo_col := Color(0.85, 0.20, 0.65, 0.14) if is_chal else Color(0.12, 0.45, 0.8, 0.12)
+			ctrl.draw_circle(c, r + 3.0, halo_col)
 			# Cavern dark glass disc
-			ctrl.draw_circle(c, r, Color(0.04, 0.12, 0.22, 0.8))
-			ctrl.draw_circle(c, r * 0.8, Color(0.08, 0.2, 0.35, 0.3))
+			var disc_col := Color(0.16, 0.03, 0.13, 0.85) if is_chal else Color(0.04, 0.12, 0.22, 0.8)
+			var inner_col := Color(0.25, 0.05, 0.20, 0.40) if is_chal else Color(0.08, 0.2, 0.35, 0.3)
+			ctrl.draw_circle(c, r, disc_col)
+			ctrl.draw_circle(c, r * 0.8, inner_col)
 			# Crisp Outer Rim
-			ctrl.draw_arc(c, r, 0.0, TAU, 36, Color(0.35, 0.65, 0.95, 0.85), 1.6)
+			var rim_col := Color(0.88, 0.32, 0.78, 0.85) if is_chal else Color(0.35, 0.65, 0.95, 0.85)
+			ctrl.draw_arc(c, r, 0.0, TAU, 36, rim_col, 1.6)
 			# Two vertical pause bars
 			var bar_w := 3.2
 			var bar_h := 14.0
 			var bar_gap := 4.5
-			var col := Color(0.85, 0.94, 1.0, 0.95)
+			var col := Color(0.98, 0.90, 0.96, 0.92) if is_chal else Color(0.85, 0.94, 1.0, 0.95)
 			ctrl.draw_line(Vector2(c.x - bar_gap, c.y - bar_h * 0.5), Vector2(c.x - bar_gap, c.y + bar_h * 0.5), col, bar_w)
 			ctrl.draw_line(Vector2(c.x + bar_gap, c.y - bar_h * 0.5), Vector2(c.x + bar_gap, c.y + bar_h * 0.5), col, bar_w)
 
@@ -492,20 +533,25 @@ func _draw_proxy_element(ctrl: Control, id: String) -> void:
 			var rect := Rect2(0, 0, w, h)
 			var bg_sb := StyleBoxFlat.new()
 			bg_sb.bg_color = Color(0.025, 0.075, 0.15, 0.85)
-			bg_sb.border_color = Color(0.30, 0.70, 0.95, 0.65)
+			bg_sb.border_color = Color(0.85, 0.25, 0.75, 0.65) if is_chal else Color(0.30, 0.70, 0.95, 0.65)
 			bg_sb.set_border_width_all(1)
 			bg_sb.set_corner_radius_all(14)
 			ctrl.draw_style_box(bg_sb, rect)
+			var bar_col := Color(0.95, 0.45, 0.85, 0.85) if is_chal else Color(0.40, 0.85, 1.0, 0.85)
 			for i in range(5):
 				var bx: float = w * 0.5 + (i - 2) * 10.5
 				var bh: float = 6.0 + 8.0 * (1.0 - absf(i - 2) * 0.3)
-				ctrl.draw_line(Vector2(bx, h * 0.5 - bh * 0.5), Vector2(bx, h * 0.5 + bh * 0.5), Color(0.40, 0.85, 1.0, 0.85), 2.8)
+				ctrl.draw_line(Vector2(bx, h * 0.5 - bh * 0.5), Vector2(bx, h * 0.5 + bh * 0.5), bar_col, 2.8)
 
 		"LevelInfo":
 			# Clean typography matching native _badge_container (no card panel box!)
 			var font := ThemeDB.fallback_font
-			ctrl.draw_string(font, Vector2(0.0, 18.0), "SHALLOW RING", HORIZONTAL_ALIGNMENT_LEFT, int(w), 15, Color(0.90, 0.96, 1.0, 0.90))
-			ctrl.draw_string(font, Vector2(0.0, 34.0), "~4,200 M", HORIZONTAL_ALIGNMENT_LEFT, int(w), 11, Color(0.45, 0.78, 0.96, 0.65))
+			var title_col := Color(1.0, 0.94, 0.98, 0.95) if is_chal else Color(0.90, 0.96, 1.0, 0.90)
+			var depth_col := Color(0.92, 0.55, 0.82, 0.75) if is_chal else Color(0.45, 0.78, 0.96, 0.65)
+			var lvl_title := "ABYSS DESCENT I" if is_chal else "SHALLOW RING"
+			var lvl_depth := "~4,500 M" if is_chal else "~4,200 M"
+			ctrl.draw_string(font, Vector2(0.0, 18.0), lvl_title, HORIZONTAL_ALIGNMENT_LEFT, int(w), 15, title_col)
+			ctrl.draw_string(font, Vector2(0.0, 34.0), lvl_depth, HORIZONTAL_ALIGNMENT_LEFT, int(w), 11, depth_col)
 
 	# Selection highlight border and bounding brackets
 	if is_sel:
@@ -775,7 +821,143 @@ func _on_reset_all_pressed() -> void:
 		sfx.play_deny_tick()
 
 
+func _has_unsaved_changes() -> bool:
+	if _initial_layout_snapshot.is_empty():
+		return false
+	for id: String in _elements:
+		if not _initial_layout_snapshot.has(id):
+			return true
+		var init_d: Dictionary = _initial_layout_snapshot[id]
+		var cur_d: Dictionary = _elements[id]["data"]
+		var d_ax: float = absf(float(cur_d.get("anchor_x", 0.0)) - float(init_d.get("anchor_x", 0.0)))
+		var d_ay: float = absf(float(cur_d.get("anchor_y", 0.0)) - float(init_d.get("anchor_y", 0.0)))
+		var d_ox: float = absf(float(cur_d.get("offset_x", 0.0)) - float(init_d.get("offset_x", 0.0)))
+		var d_oy: float = absf(float(cur_d.get("offset_y", 0.0)) - float(init_d.get("offset_y", 0.0)))
+		var d_sc: float = absf(float(cur_d.get("scale", 1.0)) - float(init_d.get("scale", 1.0)))
+		if d_ax > 0.001 or d_ay > 0.001 or d_ox > 2.0 or d_oy > 2.0 or d_sc > 0.01:
+			return true
+	return false
+
+
+func _show_unsaved_changes_confirm() -> void:
+	if _confirm_dialog != null and is_instance_valid(_confirm_dialog):
+		return
+
+	var root := Control.new()
+	root.name = "UnsavedChangesConfirmRoot"
+	root.z_index = 20
+	ModalTemplate.apply_full_rect(root)
+	root.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(root)
+	_confirm_dialog = root
+
+	var dimmer := ColorRect.new()
+	ModalTemplate.apply_full_rect(dimmer)
+	dimmer.color = Color(0.01, 0.02, 0.04, 0.88)
+	dimmer.mouse_filter = Control.MOUSE_FILTER_STOP
+	root.add_child(dimmer)
+
+	var center := CenterContainer.new()
+	ModalTemplate.apply_full_rect(center)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(center)
+
+	var frame := PanelContainer.new()
+	frame.custom_minimum_size = Vector2(ModalTemplate.CARD_WIDTH, 0)
+	var card_sb := ModalTemplate.make_card_style(ModalTemplate.ThemeKind.SONAR)
+	frame.add_theme_stylebox_override("panel", card_sb)
+	center.add_child(frame)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 16)
+	frame.add_child(vbox)
+
+	var header := HBoxContainer.new()
+	vbox.add_child(header)
+
+	var title_lbl := Label.new()
+	title_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_lbl.text = "UNSAVED CHANGES"
+	title_lbl.add_theme_font_size_override("font_size", 18)
+	title_lbl.add_theme_color_override("font_color", Color(1.0, 0.82, 0.38))
+	header.add_child(title_lbl)
+
+	var close_dialog := func():
+		if _confirm_dialog == null or not is_instance_valid(_confirm_dialog):
+			return
+		var close_tw := root.create_tween().set_parallel(true)
+		close_tw.tween_property(root, "modulate:a", 0.0, 0.14).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		close_tw.tween_property(frame, "scale", Vector2(0.95, 0.95), 0.14).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		close_tw.chain().tween_callback(func():
+			if root != null and is_instance_valid(root):
+				root.queue_free()
+			_confirm_dialog = null
+		)
+
+	var close_btn := ModalTemplate.make_close_button(close_dialog, ModalTemplate.ThemeKind.SONAR)
+	header.add_child(close_btn)
+
+	var divider := ColorRect.new()
+	divider.custom_minimum_size = Vector2(0, 1)
+	divider.color = Color(0.25, 0.55, 0.85, 0.35)
+	vbox.add_child(divider)
+
+	var msg_lbl := Label.new()
+	msg_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	msg_lbl.add_theme_font_size_override("font_size", 14)
+	msg_lbl.add_theme_color_override("font_color", Color(0.88, 0.94, 0.98, 0.95))
+	msg_lbl.text = "You have modified button positions or scale in the HUD layout.\n\nExiting now will discard your adjustments. Would you like to save your changes before leaving?"
+	vbox.add_child(msg_lbl)
+
+	var btn_row := HBoxContainer.new()
+	btn_row.add_theme_constant_override("separation", 14)
+	btn_row.alignment = BoxContainer.ALIGNMENT_END
+	vbox.add_child(btn_row)
+
+	var discard_btn := Button.new()
+	discard_btn.text = "DISCARD CHANGES"
+	discard_btn.custom_minimum_size = Vector2(160, 42)
+	discard_btn.focus_mode = Control.FOCUS_NONE
+	ModalTemplate.style_danger_button(discard_btn, false, false)
+	discard_btn.pressed.connect(func():
+		var sfx := get_tree().get_first_node_in_group("sfx_manager") as SfxManager
+		if sfx != null and is_instance_valid(sfx):
+			sfx.play_deny_tick()
+		_confirm_dialog = null
+		root.queue_free()
+		_close()
+	)
+	btn_row.add_child(discard_btn)
+
+	var save_btn := Button.new()
+	save_btn.text = "SAVE & EXIT"
+	save_btn.custom_minimum_size = Vector2(140, 42)
+	save_btn.focus_mode = Control.FOCUS_NONE
+	ModalTemplate.style_button(save_btn, true, ModalTemplate.ThemeKind.SONAR)
+	save_btn.pressed.connect(func():
+		_confirm_dialog = null
+		root.queue_free()
+		_on_save_pressed()
+	)
+	btn_row.add_child(save_btn)
+
+	# Smooth entry pop animation
+	root.modulate.a = 0.0
+	frame.scale = Vector2(0.94, 0.94)
+	frame.pivot_offset = Vector2(ModalTemplate.CARD_WIDTH * 0.5, 110.0)
+	var tw := root.create_tween().set_parallel(true)
+	tw.tween_property(root, "modulate:a", 1.0, 0.18).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(frame, "scale", Vector2.ONE, 0.20).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
 func _on_cancel_pressed() -> void:
+	if _confirm_dialog != null and is_instance_valid(_confirm_dialog):
+		_confirm_dialog.queue_free()
+		_confirm_dialog = null
+		return
+	if _has_unsaved_changes():
+		_show_unsaved_changes_confirm()
+		return
 	var sfx := get_tree().get_first_node_in_group("sfx_manager") as SfxManager
 	if sfx != null and is_instance_valid(sfx):
 		sfx.play_pact_reroll()

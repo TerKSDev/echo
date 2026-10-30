@@ -960,11 +960,15 @@ func apply_display_settings() -> void:
 
 
 func get_sonar_color() -> Color:
+	if current_mode == GameMode.CHALLENGE and sonar_palette == "cyan":
+		return Color(1.0, 0.45, 0.88, 1.0)
 	match sonar_palette:
 		"emerald":
 			return Color(0.20, 0.95, 0.65, 1.0)
 		"amber":
 			return Color(1.0, 0.78, 0.28, 1.0)
+		"magenta", "violet", "purple":
+			return Color(1.0, 0.45, 0.88, 1.0)
 		"white":
 			return Color(0.95, 0.98, 1.0, 1.0)
 		_:

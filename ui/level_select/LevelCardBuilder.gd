@@ -182,12 +182,8 @@ static func build_level_card(
 
 	if not is_unlocked:
 		# Conceal locked level names and depths for unprobed sectors
-		if is_king_sector:
-			display_title = "KING SECTOR"
-			display_subtitle = "---"
-		else:
-			display_title = "???"
-			display_subtitle = "---"
+		display_title = "???"
+		display_subtitle = "---"
 
 	# Style the card frame
 	if is_king_sector:
@@ -425,7 +421,7 @@ static func build_level_card(
 		status_chip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		status_chip.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		status_chip.add_theme_font_size_override("font_size", 13)
-		status_chip.text = "KING" if is_king_sector else "LOCKED"
+		status_chip.text = "???" if is_king_sector else "LOCKED"
 		status_chip.add_theme_color_override("font_color", Color(0.95, 0.55, 0.65) if is_king_sector else (Color(0.75, 0.50, 0.70, 0.90) if is_chal else Color(0.55, 0.68, 0.82, 0.90)))
 		status_box.add_child(status_chip)
 

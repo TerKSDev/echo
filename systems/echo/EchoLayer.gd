@@ -49,7 +49,11 @@ func clear_all() -> void:
 	motes.clear()
 	queue_redraw()
 
-func emit_echo(origin: Vector2, radius: float, exclude: Array = [], show_wave: bool = true, wave_color: Color = Color(0.3, 1.0, 1.0)) -> void:
+func emit_echo(origin: Vector2, radius: float, exclude: Array = [], show_wave: bool = true, wave_color: Color = Color.TRANSPARENT) -> void:
+	var final_wave_color := wave_color
+	if final_wave_color == Color.TRANSPARENT or final_wave_color.a <= 0.001:
+		final_wave_color = GameState.get_sonar_color()
+
 	var space := get_world_2d().direct_space_state
 	var exclude_rids: Array[RID] = []
 	for item in exclude:
@@ -133,12 +137,12 @@ func emit_echo(origin: Vector2, radius: float, exclude: Array = [], show_wave: b
 					last_bounce_hit = hit_pos
 
 			if should_record:
-				var pt_col: Color = wave_color
+				var pt_col: Color = final_wave_color
 				var col_obj: Object = hit.get("collider")
 				if col_obj != null and col_obj.has_meta("echo_color"):
 					pt_col = col_obj.get_meta("echo_color")
 				elif bounce > 0:
-					pt_col = wave_color.lerp(Color(0.18, 0.62, 0.98), 0.42)
+					pt_col = final_wave_color.lerp(Color(0.18, 0.62, 0.98), 0.42)
 				var arc_spacing: float = clampf(cum_dist * TAU / float(ray_count) * 0.58, 3.0, 6.8)
 				var rock_angle_jitter: float = randf_range(-0.16, 0.16)
 				var rock_tan: Vector2 = tan_vec.rotated(rock_angle_jitter)
@@ -167,7 +171,7 @@ func emit_echo(origin: Vector2, radius: float, exclude: Array = [], show_wave: b
 			"pos": origin,
 			"max_radius": radius,
 			"age": 0.0,
-			"col": wave_color,
+			"col": final_wave_color,
 			"clip": wave_clip_dists
 		})
 
@@ -186,7 +190,7 @@ func emit_echo(origin: Vector2, radius: float, exclude: Array = [], show_wave: b
 					"age": -dist_along / WAVE_SPEED, # awakens right when the sound wave sweeps through
 					"life": randf_range(0.9, 1.8),
 					"size": randf_range(1.0, 2.2),
-					"col": wave_color.lerp(Color(0.7, 0.92, 1.0), randf_range(0.2, 0.7))
+					"col": final_wave_color.lerp(Color(0.7, 0.92, 1.0), randf_range(0.2, 0.7))
 				})
 		if motes.size() > MAX_MOTE_PARTICLES:
 			motes = motes.slice(motes.size() - MAX_MOTE_PARTICLES)
