@@ -8,3 +8,4 @@
 addons/
 keys/
 *.keystore
+build/*.exe
