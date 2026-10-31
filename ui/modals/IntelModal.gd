@@ -311,8 +311,8 @@ func _populate_bestiary() -> void:
 		Color(0.95, 0.32, 0.72),
 		"SCREAMER",
 		"SONIC COCOON",
-		"Stationary vocal entity. When disturbed by consecutive sound waves, it unleashes a deafening screech that reverberates across the entire cavern.",
-		"Hide behind solid obstacles to block its concussive screech."
+		"Stationary vocal entity with Hive Resonance & Permanent Record: disturbing any one Screamer synchronizes all Screamers into alert, and their state never decays. Receiving a 2nd sound wave triggers a map-wide concussive shriek that stuns the player.",
+		"Use pebbles to bait out and safely discharge their 2nd shriek from behind cover."
 	)
 	_add_bestiary_card(
 		"listener",

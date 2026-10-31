@@ -335,8 +335,10 @@ class WakeUpOverlay extends Control:
 			btm_pts.append(btm_curve[i])
 
 		var eyelid_col := Color(0.005, 0.012, 0.022, 1.0)
-		draw_colored_polygon(top_pts, eyelid_col)
-		draw_colored_polygon(btm_pts, eyelid_col)
+		if top_pts.size() >= 3:
+			draw_colored_polygon(top_pts, eyelid_col)
+		if btm_pts.size() >= 3:
+			draw_colored_polygon(btm_pts, eyelid_col)
 
 		# Soft organic eyelid shadow along eyelash fringe
 		if p > 0.02 and p < 0.98:
@@ -1263,15 +1265,24 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Multi-touch Screen Input: both Left Hand and Right Hand freely supported anywhere on open screen!
 	if event is InputEventScreenTouch:
 		if event.pressed:
-			if event.position.y > 70.0:
-				_joystick_active = true
-				_joystick_touch_id = event.index
-				_joystick_center = event.position
-				_joystick_current = event.position
-				_joystick_fade = 1.0
-				if _joystick_canvas != null:
-					_joystick_canvas.queue_redraw()
-				get_viewport().set_input_as_handled()
+			# Do not steal an active joystick from another finger; allow multi-touch item use
+			if not _joystick_active and event.position.y > 70.0:
+				# Avoid starting joystick on the action button zone if buttons are present
+				var is_on_btn := false
+				for b_name in ["SoundBtn", "SneakBtn", "PebbleBtn", "PauseBtn"]:
+					var b_node := get_node_or_null(b_name) as Control
+					if b_node != null and b_node.visible and b_node.get_global_rect().grow(14.0).has_point(event.position):
+						is_on_btn = true
+						break
+				if not is_on_btn:
+					_joystick_active = true
+					_joystick_touch_id = event.index
+					_joystick_center = event.position
+					_joystick_current = event.position
+					_joystick_fade = 1.0
+					if _joystick_canvas != null:
+						_joystick_canvas.queue_redraw()
+					get_viewport().set_input_as_handled()
 		elif not event.pressed and event.index == _joystick_touch_id:
 			_deactivate_joystick()
 			get_viewport().set_input_as_handled()
@@ -1284,7 +1295,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Desktop / Mouse simulation
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
-			if event.position.y > 70.0:
+			if not _joystick_active and event.position.y > 70.0:
 				_joystick_active = true
 				_joystick_touch_id = -999
 				_joystick_center = event.position

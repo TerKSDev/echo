@@ -423,11 +423,11 @@ static func build_display_panel(scene: Control) -> VBoxContainer:
 			scene.call("preview_screen_shake", v)
 	))
 
-	# Sonar Glow Boost Slider
+	# Sonar Glow Boost Slider (0.0 to 2.0)
 	vis_content.add_child(SettingsUIFactory.create_slider_row("SONAR PHOSPHOR BRIGHTNESS", "Multiplies visibility and lingering decay glow of wall echo marks.", GameState.sonar_glow_boost, false, func(v: float):
-		GameState.sonar_glow_boost = v
+		GameState.sonar_glow_boost = clampf(v, 0.0, 2.0)
 		GameState.save_settings()
-	))
+	, 0.0, 2.0, 0.05))
 
 	# Vignette & Distortion Toggle
 	var vig_btn := Button.new()

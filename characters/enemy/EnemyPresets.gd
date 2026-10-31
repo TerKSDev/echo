@@ -22,7 +22,7 @@ const PRESETS: Array[Dictionary] = [
 		"can_hear_sneak": true, "can_hear_walk": true, "can_hear_voice": true,
 		"patrol_speed": 75.0, "chase_speed": 175.0,
 		"alert_time": 0.65, "investigate_timeout": 3.5,
-		"init_state": 1, "sleep_wake_radius": 75.0, "sneak_wake_radius": 36.0, "sneak_sense_radius": 32.0,
+		"init_state": 1, "sleep_wake_radius": 75.0, "sneak_wake_radius": 36.0, "sneak_sense_radius": 45.0,
 		"color": Color(1.0, 0.82, 0.25), # Amber gold
 	},
 	{ # CHASER - most sensitive (walk ~160px), very fast, longer chase, deaf to sneaking
@@ -30,7 +30,7 @@ const PRESETS: Array[Dictionary] = [
 		"can_hear_sneak": false, "can_hear_walk": true, "can_hear_voice": true,
 		"patrol_speed": 90.0, "chase_speed": 202.0,
 		"alert_time": 0.65, "investigate_timeout": 5.0,
-		"init_state": 1, "sleep_wake_radius": 75.0, "sneak_wake_radius": 30.0, "sneak_sense_radius": 24.0,
+		"init_state": 1, "sleep_wake_radius": 75.0, "sneak_wake_radius": 30.0, "sneak_sense_radius": 42.0,
 		"color": Color(1.0, 0.18, 0.18), # Crimson
 	},
 	{ # SCREAMER - stationary, shrieks on 2nd voice/pebble/water splash (>= 1s apart), ignores dry footsteps

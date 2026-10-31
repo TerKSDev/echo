@@ -146,16 +146,22 @@ func emit_echo(origin: Vector2, radius: float, exclude: Array = [], show_wave: b
 				var arc_spacing: float = clampf(cum_dist * TAU / float(ray_count) * 0.58, 3.0, 6.8)
 				var rock_angle_jitter: float = randf_range(-0.16, 0.16)
 				var rock_tan: Vector2 = tan_vec.rotated(rock_angle_jitter)
+				# Sneak steps (very low radius < 75) only create faint, rapidly decaying contours
+				var pt_initial_age := -cum_dist / WAVE_SPEED
+				var pt_strength: float = hit_strength
+				if radius <= 75.0:
+					pt_strength *= 0.22 # Much dimmer contour for sneak footfalls
 				points.append({
 					"pos": hit_pos,
 					"tan": rock_tan,
 					"norm": normal,
 					"hlen": arc_spacing * randf_range(0.85, 1.15),
-					"age": -cum_dist / WAVE_SPEED,
-					"strength": hit_strength,
+					"age": pt_initial_age,
+					"strength": pt_strength,
 					"col": pt_col,
 					"bounce": bounce,
-					"crag": randf() # Natural rock fissure variation
+					"crag": randf(), # Natural rock fissure variation
+					"is_sneak_point": (radius <= 75.0)
 				})
 
 			if normal == Vector2.ZERO:
@@ -343,8 +349,12 @@ func _process(delta):
 		var wp := 0
 		for i in points.size():
 			var p: Dictionary = points[i]
-			var next_age: float = float(p["age"]) + delta
-			if next_age < LIFETIME:
+			var is_sneak: bool = p.get("is_sneak_point", false)
+			# Sneak contours dissolve much faster (3.2x speed)
+			var age_delta: float = delta * (3.2 if is_sneak else 1.0)
+			var next_age: float = float(p["age"]) + age_delta
+			var max_pt_life: float = (LIFETIME * 0.45) if is_sneak else LIFETIME
+			if next_age < max_pt_life:
 				p["age"] = next_age
 				points[wp] = p
 				wp += 1

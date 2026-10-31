@@ -679,7 +679,7 @@ func _draw_abyss_descent_prompt(canvas: Control) -> void:
 	var text_col := Color(0.85, 0.65, 0.95, a * 0.78)
 	var font := ThemeDB.fallback_font
 	if font != null:
-		canvas.draw_string(font, Vector2(cx - 110.0, cy + 38.0), "PULL DOWN FOR CHALLENGE THE ABYSS", HORIZONTAL_ALIGNMENT_CENTER, 220.0, 11, text_col)
+		canvas.draw_string(font, Vector2(cx - 110.0, cy + 38.0), "CHALLENGE THE ABYSS", HORIZONTAL_ALIGNMENT_CENTER, 220.0, 11, text_col)
 
 
 func _descend_to_challenge_mode() -> void:
@@ -967,7 +967,7 @@ func _draw_king_sector_descent_prompt(canvas: Control) -> void:
 	var text_col := Color(1.0, 0.65, 0.78, a * 0.85)
 	var font := ThemeDB.fallback_font
 	if font != null:
-		canvas.draw_string(font, Vector2(cx - 130.0, cy + 38.0), "PULL DOWN FOR KING SECTOR", HORIZONTAL_ALIGNMENT_CENTER, 260.0, 11, text_col)
+		canvas.draw_string(font, Vector2(cx - 130.0, cy + 38.0), "THE LAST CHALLENGE", HORIZONTAL_ALIGNMENT_CENTER, 260.0, 11, text_col)
 
 
 func _show_king_sector_confirmation_modal() -> void:

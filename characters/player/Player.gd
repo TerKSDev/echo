@@ -25,15 +25,15 @@ const ACCEL := 900.0
 const FRICTION := 1200.0
 
 # Step Sound
-const STEP_LOUDNESS_WALK := 0.22
-const STEP_LOUDNESS_SNEAK := 0.03
+const STEP_LOUDNESS_WALK := 0.20
+const STEP_LOUDNESS_SNEAK := 0.015
 const STRIDE_DIST_WALK := 115.0
 const STRIDE_DIST_SNEAK := 96.0
 
-# Voice Sound
+# Voice Sound (tuned to 8~10 tiles: 32px * 8.5~10 = ~270~320px)
 const CHARGE_TIME := 0.8
-const MIN_LOUDNESS := 0.3
-const MAX_LOUDNESS := 0.6
+const MIN_LOUDNESS := 0.22
+const MAX_LOUDNESS := 0.42
 const CLICK_MIC_IGNORE_TIME := 0.3 # Ignore mic right after a click (the click noise itself)
 
 const TRAIL_LENGTH := 12

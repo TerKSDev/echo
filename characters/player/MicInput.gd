@@ -39,6 +39,19 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
 
+func _exit_tree() -> void:
+	stop()
+
+
+func stop() -> void:
+	enabled = false
+	var p_mic: AudioStreamPlayer = get_node_or_null("PlayerMic") as AudioStreamPlayer
+	if p_mic != null and p_mic.playing:
+		p_mic.stop()
+	if _capture != null:
+		_capture.clear_buffer()
+
+
 func start() -> void:
 	if not GameState.mic_enabled:
 		enabled = false
@@ -157,33 +170,34 @@ func is_input_allowed() -> bool:
 
 
 func _process(delta: float) -> void:
+	# Drain audio buffer continuously to prevent ring buffer overflow/freeze on Android devices
+	var frames := 0
+	var buf: PackedVector2Array
+	if _capture != null:
+		frames = _capture.get_frames_available()
+		if frames > 0:
+			buf = _capture.get_buffer(frames)
+
 	if suppress_timer > 0.0:
 		suppress_timer = maxf(0.0, suppress_timer - delta)
-		if _capture != null:
-			_capture.clear_buffer()
 		level_db = -80.0
 		if _state != State.CALIBRATING:
 			_state = State.IDLE
 		return
 
 	if not enabled:
-		if _capture != null:
-			_capture.clear_buffer()
 		level_db = -80.0
 		return
 
 	var peak := 0.0
-	if _capture != null:
-		var frames := _capture.get_frames_available()
-		if frames > 0:
-			var buf := _capture.get_buffer(frames)
-			var stride := 4 if frames > 256 else 1
-			for i in range(0, frames, stride):
-				var sample: Vector2 = buf[i]
-				peak = maxf(peak, maxf(absf(sample.x), absf(sample.y)))
-			level_db = linear_to_db(maxf(peak, 0.00001))
-		else:
-			level_db = move_toward(level_db, -80.0, delta * 95.0)
+	if frames > 0:
+		var stride := 4 if frames > 256 else 1
+		for i in range(0, frames, stride):
+			var sample: Vector2 = buf[i]
+			peak = maxf(peak, maxf(absf(sample.x), absf(sample.y)))
+		level_db = linear_to_db(maxf(peak, 0.00001))
+	else:
+		level_db = move_toward(level_db, -80.0, delta * 95.0)
 
 	_timer += delta
 	var trigger_db: float = get_trigger_db()

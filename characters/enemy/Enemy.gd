@@ -371,7 +371,9 @@ func apply_speed_boost(multiplier: float = 1.35, duration: float = 7.5) -> void:
 
 # --- Screamer ----------------------------------------------------------------
 # 1st sound: alert only. 2nd sound: shriek (attracts monsters, immobilizes player).
-# Afterwards it falls asleep again.
+# Screamer traits:
+# 1. Permanent Record: Counter never decays automatically over time.
+# 2. Global Resonance: When any Screamer enters alert (1st sound), all Screamers synchronize to alert!
 
 func _handle_screamer_sound() -> void:
 	if state == State.SCREAM or screamer_cooldown > 0.0:
@@ -381,15 +383,28 @@ func _handle_screamer_sound() -> void:
 		return
 
 	screamer_count += 1
-	screamer_decay_timer = 6.0
 	screamer_gap_timer = SCREAMER_MIN_GAP
 	reveal(1.0)
 
 	if screamer_count == 1:
 		_enter(State.ALERT)
 		woke_up.emit(global_position)
+		# Global Resonance: Synchronize all other Screamers across the level into Alert state
+		_broadcast_screamer_alert()
 	else:
 		_trigger_scream()
+
+
+func _broadcast_screamer_alert() -> void:
+	for node in get_tree().get_nodes_in_group("enemy"):
+		var other := node as Enemy
+		if other != null and is_instance_valid(other) and other != self:
+			if other.enemy_type == EnemyType.SCREAMER:
+				if other.state != State.SCREAM and other.screamer_count == 0:
+					other.screamer_count = 1
+					other.screamer_gap_timer = SCREAMER_MIN_GAP
+					other._enter(State.ALERT)
+					other.reveal(0.85)
 
 
 func _trigger_scream() -> void:
@@ -698,12 +713,7 @@ func _physics_process(delta: float) -> void:
 
 # Cooldowns, counter decay and buff expiry
 func _tick_timers(delta: float) -> void:
-	if screamer_decay_timer > 0.0:
-		screamer_decay_timer -= delta
-		if screamer_decay_timer <= 0.0 and screamer_count > 0:
-			screamer_count = 0
-			if state == State.ALERT:
-				_enter(State.SLEEP)
+	# Screamer counts now permanently persist until triggered (Permanent Record trait)
 	screamer_cooldown = maxf(0.0, screamer_cooldown - delta)
 	screamer_gap_timer = maxf(0.0, screamer_gap_timer - delta)
 

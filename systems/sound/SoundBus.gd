@@ -133,8 +133,8 @@ func _on_enemy_screamed(pos: Vector2, radius: float) -> void:
 
 						if _sfx != null:
 							_sfx.play_player_stun()
-						# Penetrates walls: 1.0s stun even in cover, 1.6s full stun in the open
-						var stun_dur: float = 1.0 if in_cover else 1.6
+						# Penetrates walls: 0.65s stun in cover, 1.1s stun in the open (slightly reduced to encourage baiting plays)
+						var stun_dur: float = 0.65 if in_cover else 1.10
 						_player.immobilize(stun_dur)
 			)
 

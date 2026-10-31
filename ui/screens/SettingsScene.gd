@@ -149,6 +149,11 @@ func _setup_tab_bar() -> void:
 			wire_juice(btn)
 
 
+func _exit_tree() -> void:
+	if _menu_mic != null and is_instance_valid(_menu_mic):
+		_menu_mic.stop()
+
+
 func _switch_tab(tab_idx: int, play_sound: bool = true) -> void:
 	if play_sound:
 		_play_ui_sound(_wav_click, -7.0, 1.05)

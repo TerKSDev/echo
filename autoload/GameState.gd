@@ -785,7 +785,7 @@ var custom_hud_layout: Dictionary = {} # {"SoundBtn": {anchor_x, offset_x, ancho
 # Display & Graphics Settings
 var fullscreen_enabled := false
 var screen_shake_intensity := 1.0  # 0.0 .. 1.0 (0%, 50%, 100%)
-var sonar_glow_boost := 1.0        # 0.6 .. 1.4
+var sonar_glow_boost := 1.0        # 0.0 .. 2.0
 var vignette_enabled := true       # Pulse vignette & chromatic threat shading
 var vsync_enabled := true
 var max_fps := 60                  # 60, 120, 0 (uncapped)
@@ -815,6 +815,11 @@ var _bgm_note_timer := 1.2
 var _bgm_drop_timer := 2.8
 var _bgm_note_step := 0
 var _bgm_active := false
+
+# AudioStreamPlayer fixed pool to prevent continuous dynamic node allocations
+const BGM_SFX_POOL_SIZE := 4
+var _bgm_sfx_pool: Array[AudioStreamPlayer] = []
+var _bgm_sfx_pool_idx := 0
 
 
 func _ready() -> void:
@@ -1036,12 +1041,12 @@ func load_settings() -> void:
 	controls_layout = str(cfg.get_value("controls", "controls_layout", "right"))
 	sound_indicator_enabled = (cfg.get_value("controls", "sound_indicator_enabled", true) == true)
 	blind_assist_mode = (cfg.get_value("controls", "blind_assist_mode", true) == true)
-	pebble_sensitivity = clampf(float(cfg.get_value("controls", "pebble_sensitivity", 1.0)), 0.5, 2.5)
+	pebble_sensitivity = clampf(float(cfg.get_value("controls", "pebble_sensitivity", 1.0)), 0.5, 2.0)
 	custom_hud_layout = cfg.get_value("controls", "custom_hud_layout", {})
 
 	fullscreen_enabled = (cfg.get_value("display", "fullscreen_enabled", false) == true)
 	screen_shake_intensity = clampf(float(cfg.get_value("display", "screen_shake_intensity", 1.0)), 0.0, 1.0)
-	sonar_glow_boost = clampf(float(cfg.get_value("display", "sonar_glow_boost", 1.0)), 0.6, 1.4)
+	sonar_glow_boost = clampf(float(cfg.get_value("display", "sonar_glow_boost", 1.0)), 0.0, 2.0)
 	vignette_enabled = (cfg.get_value("display", "vignette_enabled", true) == true)
 	vsync_enabled = (cfg.get_value("display", "vsync_enabled", true) == true)
 	max_fps = int(cfg.get_value("display", "max_fps", 60))
@@ -1711,6 +1716,15 @@ func _setup_menu_bgm() -> void:
 	_bgm_pad_player.volume_db = -26.0
 	add_child(_bgm_pad_player)
 
+	# Initialize reusable pool for generative BGM notes and droplets
+	_bgm_sfx_pool.clear()
+	for i in range(BGM_SFX_POOL_SIZE):
+		var p := AudioStreamPlayer.new()
+		p.name = "BgmSfxPlayer_%d" % i
+		p.bus = &"BGM"
+		add_child(p)
+		_bgm_sfx_pool.append(p)
+
 
 func update_bgm_for_mode() -> void:
 	if _bgm_pad_player == null:
@@ -1773,13 +1787,13 @@ func _process(delta: float) -> void:
 func _play_bgm_sfx(stream: AudioStreamWAV, vol_db: float, pitch: float) -> void:
 	if stream == null or not _bgm_active:
 		return
-	var player := AudioStreamPlayer.new()
+	if _bgm_sfx_pool.is_empty():
+		return
+	var player: AudioStreamPlayer = _bgm_sfx_pool[_bgm_sfx_pool_idx]
+	_bgm_sfx_pool_idx = (_bgm_sfx_pool_idx + 1) % _bgm_sfx_pool.size()
 	player.stream = stream
 	player.volume_db = vol_db
 	player.pitch_scale = pitch
-	player.bus = &"BGM"
-	add_child(player)
-	player.finished.connect(player.queue_free)
 	player.play()
 
 
