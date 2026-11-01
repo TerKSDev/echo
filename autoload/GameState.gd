@@ -480,238 +480,238 @@ const LORE_NOTES: Dictionary = {
 	"L01_1": {
 		"level": 1,
 		"title": "Field Log: The Deep Plunge",
-		"author": "Dr. Aris Thorne • Vanguard VII",
+		"author": "An Unknown Explorer • Vanguard VII",
 		"depth": "-4,200 M",
 		"text": "The elevator cables snapped at 0400 hours. We plunged through four kilometers of basalt before the emergency brakes melted into the shaft. We survived, but our lanterns were smashed. Here at -4,200 meters, darkness has weight. Yet in this suffocating void, if you hold your breath, the stone hums. Sound is our only sight now."
 	},
 	"L02_1": {
 		"level": 2,
 		"title": "Biologist Note: Slumber in Silt",
-		"author": "Biologist Maya Lin",
+		"author": "An Unknown Biologist",
 		"depth": "-3,980 M",
 		"text": "We found the first specimen curled in the sediment. It has no eyes—not even vestigial sockets—only oversized tympanic membranes along its flanks. As long as we sneak, gliding our boots along the ground without lifting our heels, it remains in catatonic dormancy. Run, however, and it awakens with terrifying speed."
 	},
 	"L03_1": {
 		"level": 3,
 		"title": "Tactical Log: The Thrown Stone",
-		"author": "Scout Jarek",
+		"author": "An Unknown Scout",
 		"depth": "-3,760 M",
-		"text": "A beast was blocking the only corridor out of the flooded chamber. Thorne took a handful of dry gravel from his pocket and threw it against the far stalactite. The clatter drew the creature away like a moth to a flame. The blind predators here don't chase you; they chase sound. Mislead their ears, and they are powerless."
+		"text": "A beast was blocking the only corridor out of the flooded chamber. One of our explorers took a handful of dry gravel from his pocket and threw it against the far stalactite. The clatter drew the creature away like a moth to a flame. The blind predators here don't chase you; they chase sound. Mislead their ears, and they are powerless."
 	},
 	"L04_1": {
 		"level": 4,
 		"title": "Field Log: The Crimson Hunter",
-		"author": "Dr. Aris Thorne",
+		"author": "An Unknown Explorer",
 		"depth": "-3,540 M",
 		"text": "Three apex predators block the eastern halls: Chasers. Unlike the pacing sentries, their auditory nerves are tuned exclusively to sharp acoustic spikes—they are completely deaf to creeping footsteps. Yet the moment a voice echo or normal bootstep touches them, they charge the sound origin at blinding velocity. Toss a pebble into a far alcove, then slip past in dead silence."
 	},
 	"L04_2": {
 		"level": 4,
 		"title": "Acoustic Physics: Porous Shielding",
-		"author": "Engineer Kaelen",
+		"author": "An Unknown Engineer",
 		"depth": "-3,540 M",
 		"text": "The cavern partitions here are composed of volcanic pumice. Sound waves attempting to penetrate a solid stone corner lose up to seventy percent of their kinetic amplitude. When a threat roars in the dark, do not run down an open hallway—duck behind a thick wall. Stone absorbs panic."
 	},
 	"L05_1": {
 		"level": 5,
 		"title": "Survey Note: The Pacing Sentinel",
-		"author": "Dr. Aris Thorne",
+		"author": "An Unknown Explorer",
 		"depth": "-3,320 M",
 		"text": "There are creatures that never sleep. They pace perpetual geometric loops around the megalithic pillars, tracing the same route with mechanical precision. Their gait is measured, rhythmically tapping the floor. It is almost as if they are blind sentinels stationed here eons ago to enforce an ancient quarantine."
 	},
 	"L06_1": {
 		"level": 6,
 		"title": "Monolith Log: The Hive Ear",
-		"author": "Biologist Maya Lin",
+		"author": "An Unknown Biologist",
 		"depth": "-3,100 M",
 		"text": "At the center of Hush Hall sits an emerald monolith that breathes: The Listener. It possesses no limbs, and it ignores footsteps completely, yet its tympanic core spans the entire chamber. It accumulates vocal echoes and thrown stones like sand in an hourglass. On reaching its 3rd disturbance (or 2nd under feedback curse), it broadcasts a sector-wide alarm that drives every beast toward you."
 	},
 	"L06_2": {
 		"level": 6,
 		"title": "Scout's Scrawl: The Broken Compass",
-		"author": "Scout Jarek",
+		"author": "An Unknown Scout",
 		"depth": "-3,100 M",
 		"text": "Magnetic north is dead down here. But when you strike the stone with a boot, the echo returns faster from the near wall and slower from the distant corridor. My ears are becoming eyes. If we ever make it back to the sun, I wonder if daylight will hurt to look at."
 	},
 	"L07_1": {
 		"level": 7,
 		"title": "Autopsy Fragment: Vocal Cocoon",
-		"author": "Biologist Maya Lin",
+		"author": "An Unknown Biologist",
 		"depth": "-2,880 M",
 		"text": "In this gallery we encountered stationary organisms suspended in the dark like pulsating fuchsia cocoons: Screamers. They cannot walk, but when disturbed by two consecutive sound waves, the cocoon unleashes a deafening shriek that reverberates across the entire cavern—summoning every mobile predator in range."
 	},
 	"L08_1": {
 		"level": 8,
 		"title": "Fluid Dynamics: Viscous Drag",
-		"author": "Engineer Kaelen",
+		"author": "An Unknown Engineer",
 		"depth": "-2,660 M",
 		"text": "Subterranean aquifers have flooded these stairs. Wading through knee-deep water cuts movement speed in half, and every splash amplifies footsteps threefold. But water also reveals: when a beast wades fifty paces away, pressure ripples reach your boots long before its breathing touches your ears."
 	},
 	"L08_2": {
 		"level": 8,
 		"title": "Stillness: The Riverbed Secret",
-		"author": "Maya Lin",
+		"author": "An Unknown Biologist",
 		"depth": "-2,660 M",
 		"text": "The secret to surviving the flooded stairs is stillness. When the sentinel patrols the landing right above you, do not attempt to scramble away in the mud. Freeze. The moment your legs cease moving, the ripples dissipate into the black water, and you become just another submerged stone."
 	},
 	"L09_1": {
 		"level": 9,
 		"title": "Warning: The Resonance Chain",
-		"author": "Biologist Maya Lin",
+		"author": "An Unknown Biologist",
 		"depth": "-2,440 M",
 		"text": "Our worst fears were realized in Sector 09. When a Screamer unleashes its shriek, that shockwave pierces straight through stone walls—not only luring nearby hunters, but also feeding the Listener's resonance counter from afar. Keep the Screamers quiet, or their chain reaction will awaken the entire sector."
 	},
 	"L09_2": {
 		"level": 9,
 		"title": "Tactical Log: The Deliberate Decoy",
-		"author": "Dr. Aris Thorne",
+		"author": "An Unknown Explorer",
 		"depth": "-2,440 M",
 		"text": "We turned the Listener against its own guardians. The eastern exit was impassable, swarming with prowlers. I stood at the threshold of the north passage and deliberately shouted five times, then bolted into the upper conduit. The alarm drew every beast straight to the monolith. Chaos can be carved into an open door."
 	},
 	"L10_1": {
 		"level": 10,
 		"title": "Archaeology: The Twin Architects",
-		"author": "Elena • Antiquities Scholar",
+		"author": "An Unknown Scholar",
 		"depth": "-2,220 M",
 		"text": "These vaults were not carved by erosion. The ashlar masonry fits together without mortar, sealed by dual pressure plates. The left vault bears glyphs of slumber; the right bears glyphs of shrieking resonance. The ancient architects knew that escape requires conquering both sides of fear."
 	},
 	"L10_2": {
 		"level": 10,
 		"title": "Discarded Gear: Lightening the Load",
-		"author": "Scout Jarek",
+		"author": "An Unknown Scout",
 		"depth": "-2,220 M",
-		"text": "Vance dropped his field kit near the right vault switch. I forbade him from retrieving it—the sentry was already turning the corner. We leave our heavy rations and metal canisters behind. Only what keeps us quiet and agile moves forward."
+		"text": "Our comrade dropped his field kit near the right vault switch. I forbade him from retrieving it—the sentry was already turning the corner. We leave our heavy rations and metal canisters behind. Only what keeps us quiet and agile moves forward."
 	},
 	"L11_1": {
 		"level": 11,
 		"title": "Observation: Shadows on the Rafters",
-		"author": "Maya Lin",
+		"author": "An Unknown Biologist",
 		"depth": "-2,000 M",
 		"text": "Two thousand meters depth. We looked up into the darkness and saw them perched along the high vault: Crimson Chasers. They do not patrol the silt; they nest directly above the key mechanism. The instant the lock turns, their claws release. Run without hesitation when the light appears."
 	},
 	"L12_1": {
 		"level": 12,
 		"title": "Sacred Space: The Silent Nave",
-		"author": "Elena • Antiquities Scholar",
+		"author": "An Unknown Scholar",
 		"depth": "-1,780 M",
 		"text": "A subterranean cathedral spanning thousands of square meters. Twelve colossal pillars support the crushing weight of the strata above. This was once a sanctuary of an ancient acoustic civilization who worshipped silence as sacred. To them, unnecessary sound was profanity."
 	},
 	"L12_2": {
 		"level": 12,
 		"title": "Prowler Tracking: The Clockwork Loop",
-		"author": "Engineer Kaelen",
+		"author": "An Unknown Engineer",
 		"depth": "-1,780 M",
 		"text": "The three sentinels pace this cathedral like interlocking clockwork gears. One shuttles the central aisle; two orbit the pillar clusters in strict clockwise rings. When obstacles are massive and predictable, terror diminishes. Study their cadence, and the cathedral becomes an open highway."
 	},
 	"L13_1": {
 		"level": 13,
 		"title": "Warning: The Four False Mouths",
-		"author": "Scout Jarek",
+		"author": "An Unknown Scout",
 		"depth": "-1,560 M",
 		"text": "The crossroads split into four branches, but three terminate in dead-end nest hollows choked with slumbering beasts. Only the northeast branch held the bypass switch. If you are lost, do not shout for rescue. An echo from a dead end bounces back hollow and flat. Listen for the open draft."
 	},
 	"L13_2": {
 		"level": 13,
 		"title": "Personal Diary: The Halfway Ascent",
-		"author": "Maya Lin",
+		"author": "An Unknown Biologist",
 		"depth": "-1,560 M",
-		"text": "We have climbed more than 2,600 vertical meters from the crash site. My boots are worn through, and our skin is pale as lime. But Jarek insists he smelled wet moss today—not the sulfur of the deep mantle, but surface moisture seeped through karst. We are drawing closer."
+		"text": "We have climbed more than 2,600 vertical meters from the crash site. My boots are worn through, and our skin is pale as lime. But our scout insists he smelled wet moss today—not the sulfur of the deep mantle, but surface moisture seeped through karst. We are drawing closer."
 	},
 	"L14_1": {
 		"level": 14,
 		"title": "Crypt Protocol: The Sprint Corridor",
-		"author": "Dr. Aris Thorne",
+		"author": "An Unknown Explorer",
 		"depth": "-1,340 M",
-		"text": "This was an ancient trial corridor designed for speed. The instant the key was lifted, the crypt alcoves shuddered open behind us. Three apex predators chased us down sixty meters of unbroken stone. If Vance had not hurled pebbles into the side alcoves to deflect their lunges, none of us would have cleared the trench."
+		"text": "This was an ancient trial corridor designed for speed. The instant the key was lifted, the crypt alcoves shuddered open behind us. Three apex predators chased us down sixty meters of unbroken stone. If pebbles had not been hurled into the side alcoves to deflect their lunges, none of us would have cleared the trench."
 	},
 	"L14_2": {
 		"level": 14,
 		"title": "Medical Log: Adrenaline Reserve",
-		"author": "Maya Lin",
+		"author": "An Unknown Biologist",
 		"depth": "-1,340 M",
 		"text": "My fingers tremble as I write this. Sprints like that push the cardiovascular system to its absolute redline in oxygen-starved air. But the human spirit is stubborn: when silence fails, instinct takes the reins. We refuse to die down here."
 	},
 	"L15_1": {
 		"level": 15,
 		"title": "Ecology: The Drowned Gallery",
-		"author": "Elena • Antiquities Scholar",
+		"author": "An Unknown Scholar",
 		"depth": "-1,120 M",
 		"text": "A suspended stone catwalk spans across an expansive flooded gallery. The walkway is infested with dormant Screamers hanging from ceiling alcoves; the black water below is infested with Sleepers. We split our route: crawling along dry beams where voice was fatal, then dropping into the cold lake where speed was choked."
 	},
 	"L15_2": {
 		"level": 15,
 		"title": "Geothermal Survey: Crustal Thinning",
-		"author": "Engineer Kaelen",
+		"author": "An Unknown Engineer",
 		"depth": "-1,120 M",
 		"text": "The water here is glacial runoff that percolated through surface limestone millennia ago. The ambient air temperature is climbing—from four degrees at the crash site to nearly eleven degrees here. The crust above us is thinning. The surface is real."
 	},
 	"L16_1": {
 		"level": 16,
 		"title": "Fortress Protocol: The Triple Airlock",
-		"author": "Dr. Aris Thorne",
+		"author": "An Unknown Explorer",
 		"depth": "-900 M",
 		"text": "Less than a kilometer beneath the open sky. An ancient bastion seals the vertical shaft with three consecutive airlock gates. The architects knew that abyssal predators must never breach the sunlit world. Each gate requires a key from a separate wing. We had to divide our courage and move like phantoms."
 	},
 	"L16_2": {
 		"level": 16,
 		"title": "The Crossing: Invisible in Air",
-		"author": "Scout Jarek",
+		"author": "An Unknown Scout",
 		"depth": "-900 M",
 		"text": "The Listener sits dead center at the four-way crossing. Every trip between the wings brings you within arm's reach of its acoustic core. I held my breath until my vision blurred black. To conquer the three locks, you must become invisible to the very air itself."
 	},
 	"L17_1": {
 		"level": 17,
 		"title": "The Four Ordeals: Ancient Trial",
-		"author": "Elena • Antiquities Scholar",
+		"author": "An Unknown Scholar",
 		"depth": "-680 M",
 		"text": "Four wings, four ancient trials. Northwest tests stealth against hunters; south tests timing against sentries; west tests silence against screechers; east tests endurance through water. Whoever engineered this sanctuary was testing whether an explorer had mastered every principle of subterranean survival."
 	},
 	"L17_2": {
 		"level": 17,
 		"title": "Letter to the Surface: Almost Home",
-		"author": "Maya Lin",
+		"author": "An Unknown Biologist",
 		"depth": "-680 M",
 		"text": "If anyone ever recovers this journal, know that we did not give in to despair. In the dark, you discover what you are truly made of. When you cannot rely on sight, you learn to see with your mind. We are climbing toward the morning."
 	},
 	"L18_1": {
 		"level": 18,
 		"title": "The Spiral: Geometry of Composure",
-		"author": "Dr. Aris Thorne",
+		"author": "An Unknown Explorer",
 		"depth": "-460 M",
 		"text": "A massive concentric spiral carved into the granite core. Three concentric patrol rings, each watched by a relentless sentry. The path winds inward, forcing you to pass within inches of their routes. It requires supreme composure: advance one step, wait for the patrol to pass, then slip into the inner ring."
 	},
 	"L18_2": {
 		"level": 18,
 		"title": "The Karst Draft: Wind of the Living",
-		"author": "Engineer Kaelen",
+		"author": "An Unknown Engineer",
 		"depth": "-460 M",
 		"text": "The breeze is unmistakable now. For the first time in weeks, we can feel a faint cyclical current—the planet inhaling and exhaling through karst fissures above. Four hundred and sixty meters. We can hear the distant hum of wind in the trees."
 	},
 	"L19_1": {
 		"level": 19,
 		"title": "The Black Lake: The Shrine Island",
-		"author": "Elena • Antiquities Scholar",
+		"author": "An Unknown Scholar",
 		"depth": "-240 M",
 		"text": "A vast underground lake stretches beneath a vaulted limestone cavern. In the center lies a shrine island guarded by the Listener, flanked by patrolling sentinels along both shores. Crossing this freezing expanse without disturbing the water is the final barrier. Beyond the eastern bank lies the breach."
 	},
 	"L19_2": {
 		"level": 19,
 		"title": "Final Camp: The Pearlescent Crack",
-		"author": "Dr. Aris Thorne",
+		"author": "An Unknown Explorer",
 		"depth": "-240 M",
 		"text": "We made camp on the dry limestone ledge of the Black Lake. Our rations are exhausted, our clothes are rags. But above us, through a hairline fracture in the ceiling, I saw something that brought tears to my eyes: not a flashlight, but the faint, pearlescent glimmer of dawn on wet stone. One last climb."
 	},
 	"L20_1": {
 		"level": 20,
 		"title": "The Breach: Forty Meters",
-		"author": "Dr. Aris Thorne",
+		"author": "An Unknown Explorer",
 		"depth": "-40 M",
 		"text": "Forty meters beneath the open sky. The cavern ascends in six colossal tiers toward the sanctum of the final key. The air is warm and smells of pine and ozone. But the abyss will not let go easily—the ancient guardians and apex hunters guard the breach in force. We will throw our last pebbles and run for the sun."
 	},
 	"L20_2": {
 		"level": 20,
-		"title": "Elena's Message: To the One Who Follows",
-		"author": "Elena • Antiquities Scholar",
+		"title": "A Message: To the One Who Follows",
+		"author": "An Unknown Scholar",
 		"depth": "-40 M",
 		"text": "To the wanderer who finds this note in the shadows: you have made it this far. You have learned that silence is strength, that calmness overcomes fear, and that an echo can guide the lost. Take courage. The sun is waiting just beyond the stone. Step through the gate and breathe."
 	}
@@ -852,7 +852,7 @@ func _init_audio_buses() -> void:
 		AudioServer.set_bus_name(bgm_idx, "BGM")
 		AudioServer.set_bus_send(bgm_idx, "Master")
 
-	# 3. SFX Bus + Environmental Subterranean Cavern Reverb
+	# 3. SFX Bus
 	var sfx_idx := AudioServer.get_bus_index("SFX")
 	if sfx_idx == -1:
 		AudioServer.add_bus()
@@ -860,21 +860,30 @@ func _init_audio_buses() -> void:
 		AudioServer.set_bus_name(sfx_idx, "SFX")
 		AudioServer.set_bus_send(sfx_idx, "Master")
 
+	# 4. Spatial SFX Bus with Dedicated Environmental Cavern Reverb & Air Filter
+	# Separating 2D spatial positioning from non-spatial UI/Player sounds preserves pin-point stereo directionality!
+	var spatial_idx := AudioServer.get_bus_index("SpatialSFX")
+	if spatial_idx == -1:
+		AudioServer.add_bus()
+		spatial_idx = AudioServer.bus_count - 1
+		AudioServer.set_bus_name(spatial_idx, "SpatialSFX")
+		AudioServer.set_bus_send(spatial_idx, "Master")
+
 	var has_reverb := false
-	for eff_i in AudioServer.get_bus_effect_count(sfx_idx):
-		if AudioServer.get_bus_effect(sfx_idx, eff_i) is AudioEffectReverb:
+	for eff_i in AudioServer.get_bus_effect_count(spatial_idx):
+		if AudioServer.get_bus_effect(spatial_idx, eff_i) is AudioEffectReverb:
 			has_reverb = true
 			break
 	if not has_reverb:
 		var reverb := AudioEffectReverb.new()
-		reverb.room_size = 0.46       # Medium-large subterranean cavern
-		reverb.damping = 0.42         # Natural limestone absorption
-		reverb.spread = 0.88          # Stereo immersion
-		reverb.hipass = 0.12          # Retain clean punchy sub-bass
-		reverb.predelay_msec = 22.0   # 22ms early reflection gap
-		reverb.dry = 0.88             # Crisp direct acoustic attack
-		reverb.wet = 0.16             # Delicate, lush subterranean acoustic tail
-		AudioServer.add_bus_effect(sfx_idx, reverb)
+		reverb.room_size = 0.42       # Subterranean limestone cavern
+		reverb.damping = 0.52         # Organic high-frequency limestone absorption
+		reverb.spread = 1.0           # Full stereo immersion
+		reverb.hipass = 0.16          # Crisp tight sub-bass
+		reverb.predelay_msec = 16.0   # 16ms early reflection gap for direct acoustic transient clarity
+		reverb.dry = 0.92             # Crisp, pin-point direct acoustic arrival
+		reverb.wet = 0.12             # Subtle, non-masking cavern acoustic trail
+		AudioServer.add_bus_effect(spatial_idx, reverb)
 
 	apply_audio_settings()
 
@@ -892,6 +901,10 @@ func apply_audio_settings() -> void:
 	var sfx_idx := AudioServer.get_bus_index("SFX")
 	if sfx_idx != -1:
 		AudioServer.set_bus_volume_db(sfx_idx, linear_to_db(maxf(sfx_volume, 0.0001)))
+
+	var spatial_idx := AudioServer.get_bus_index("SpatialSFX")
+	if spatial_idx != -1:
+		AudioServer.set_bus_volume_db(spatial_idx, linear_to_db(maxf(sfx_volume, 0.0001)))
 
 
 # Effective dB threshold required to trigger a voice echo

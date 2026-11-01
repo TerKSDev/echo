@@ -239,7 +239,7 @@ func _populate_hub() -> void:
 		"story",
 		"STORY",
 		"VANGUARD VII EXPEDITION LOGS",
-		"Field journals and deep cavern recordings left by Dr. Thorne, Maya Lin, and Jarek.",
+		"Field journals and deep cavern recordings left by the unknown vanguard team.",
 		"COLLECTED: %d / %d (%.0f%%)" % [col_notes, tot_notes, pct],
 		Color(1.0, 0.82, 0.38),
 		Callable(Icons, "draw_archives_story")
@@ -896,7 +896,7 @@ func _populate_story() -> void:
 	b_top.add_child(b_badge)
 
 	var b_desc := Label.new()
-	b_desc.text = "Subterranean archives left by Dr. Thorne, Maya Lin, Scout Jarek, and Elena. Hidden across the 20 Story Mode Sectors. Touch them during cavern ascents to recover."
+	b_desc.text = "Subterranean archives left by the lost expedition team. Hidden across the 20 Story Mode Sectors. Touch them during cavern ascents to recover."
 	b_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	b_desc.add_theme_font_size_override("font_size", 11)
 	b_desc.add_theme_color_override("font_color", Color(0.72, 0.82, 0.92, 0.8))

@@ -556,7 +556,8 @@ func _level_0_activate_charge_prompt() -> void:
 
 
 func _on_tutorial_charge_emitted(_pos: Vector2, loudness: float, is_voice: bool, _is_sneak: bool = false) -> void:
-	if not is_voice or loudness < 0.55:
+	# Check if the player emitted a well-charged voice echo (aligned with MAX_LOUDNESS)
+	if not is_voice or loudness < 0.36:
 		return
 	if is_instance_valid(player) and player.sound_emitted.is_connected(_on_tutorial_charge_emitted):
 		player.sound_emitted.disconnect(_on_tutorial_charge_emitted)

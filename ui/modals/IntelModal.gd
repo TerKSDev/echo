@@ -363,7 +363,7 @@ func _populate_lore_notes() -> void:
 	b_top.add_child(b_badge)
 
 	var b_desc := Label.new()
-	b_desc.text = "Subterranean archives left by Dr. Thorne, Maya Lin, Scout Jarek, and Elena. Hidden across the 20 Story Mode Sectors. Touch them in the caverns to recover."
+	b_desc.text = "Subterranean archives left by the lost expedition team. Hidden across the 20 Story Mode Sectors. Touch them in the caverns to recover."
 	b_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	b_desc.add_theme_font_size_override("font_size", 10)
 	b_desc.add_theme_color_override("font_color", Color(0.72, 0.82, 0.92, 0.8))

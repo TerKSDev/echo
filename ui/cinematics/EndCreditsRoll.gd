@@ -1,13 +1,6 @@
 extends Control
 class_name EndCreditsRoll
 ## Cinematic Movie-Style Rolling End Credits for ECHO: STAY SILENT.
-## Features:
-## - Absolute 50% Screen-Center Axis Alignment (zero lopsidedness)
-## - Standalone Title Card at start, seamlessly matching ending cutscene
-## - Second block held completely off-screen until scrolling commences
-## - Symmetrical 2-column grid for playtesters
-## - Fail-Safe Input: Hold to fast-forward (3.5x), Double-tap to skip (no dragging)
-## - Final "THANK YOU FOR PLAYING" isolates in screen center, pauses, and fades to black.
 
 signal credits_finished
 
@@ -339,29 +332,26 @@ func _populate_credits() -> void:
 
 	# 6. Core Team & Production Roles
 	_add_section("CORE PRODUCTION & DEVELOPMENT")
-	_add_credit_pair("Project Lead & Director", "[ Director Name ]")
-	_add_credit_pair("Lead Gameplay Programmer", "[ Lead Programmer ]")
-	_add_credit_pair("Systems & Architecture", "[ Systems Engineer ]")
-	_add_credit_pair("Lead Game & Level Design", "[ Game Designer ]")
-	_add_credit_pair("Sound Engine & Synthesis", "[ Audio Engineer ]")
-	_add_credit_pair("Procedural Music & Ambience", "[ Music Composer ]")
-	_add_credit_pair("Narrative & Worldbuilding", "[ Narrative Designer ]")
-	_add_credit_pair("Art Direction & Concepts", "[ Art Director ]")
-	_add_credit_pair("UI / UX & Interaction Design", "[ UI/UX Designer ]")
-	_add_credit_pair("Mobile & Touch Optimization", "[ Mobile Engineer ]")
+	_add_credit_pair("Project Lead & Director", "TerKSDev")
+	_add_credit_pair("Lead Gameplay Programmer", "TerKSDev")
+	_add_credit_pair("Systems & Architecture", "TerKSDev")
+	_add_credit_pair("Lead Game & Level Design", "Kentsee")
+	_add_credit_pair("Sound Engine & Synthesis", "TerKSDev")
+	_add_credit_pair("Procedural Music & Ambience", "Kentsee")
+	_add_credit_pair("Narrative & Worldbuilding", "Kentsee")
+	_add_credit_pair("Art Direction & Concepts", "CHLew")
+	_add_credit_pair("UI / UX & Interaction Design", "CHLew")
+	_add_credit_pair("Mobile & Touch Optimization", "CHLew")
 	_add_spacer(120.0)
 
 	# 7. Playtesters & QA (Symmetric 2-Column Grid)
 	_add_section("EXPEDITION PLAYTESTERS & QA")
-	_add_credit_pair("QA Lead & Balance Testing", "[ QA Lead ]")
+	_add_credit_pair("QA Lead & Balance Testing", "CHLew, Kentsee")
 	_add_spacer(36.0)
 	_add_subline("BETA EXPEDITION EXPLORERS", Color(1.0, 0.85, 0.45, 0.90), 13)
 	_add_spacer(16.0)
 	_add_playtesters_grid([
-		"[ Playtester 01 ]", "[ Playtester 02 ]",
-		"[ Playtester 03 ]", "[ Playtester 04 ]",
-		"[ Playtester 05 ]", "[ Playtester 06 ]",
-		"[ Playtester 07 ]", "[ Playtester 08 ]"
+		"miyann", "银狐ouo",
 	])
 	_add_spacer(16.0)
 	_add_subline("... and all participants in our closed alpha expeditions.", Color(0.65, 0.75, 0.85, 0.60), 12)
@@ -387,7 +377,6 @@ func _populate_credits() -> void:
 
 	# 10. Special Thanks
 	_add_section("SPECIAL THANKS")
-	_add_credit_pair("Family, Mentors & Friends", "[ Family & Mentors ]")
 	_add_credit_pair("Open Source Community", "Godot Foundation & Contributors")
 	_add_credit_pair("Artistic Inspiration", "All creators of ambient, atmospheric games")
 	_add_credit_pair("Belief in Silence", "Everyone who dared to listen in the dark")

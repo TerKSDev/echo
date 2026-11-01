@@ -32,6 +32,57 @@ var _peak_db := -80.0
 var _calib_peak := -80.0
 var _calib_sum := 0.0
 var _calib_count := 0
+var _voice_frame_hits := 0 # Tracks consecutive frames matching voice characteristics
+
+
+# Lightweight temporal Voice Activity Detection (VAD).
+# Analyzes Zero-Crossing Rate (ZCR) and energy distribution to distinguish
+# real human vocalization (shouts, words, whistles) from physical device handling,
+# breath puffs, and surface impacts.
+func _is_voice_like(buf: PackedVector2Array, frames: int) -> bool:
+	if frames < 32:
+		return false
+
+	var zero_crossings := 0
+	var prev_sample := 0.0
+	var total_energy := 0.0
+	var peak := 0.0
+
+	for i in range(frames):
+		var s: float = (buf[i].x + buf[i].y) * 0.5
+		var abs_s := absf(s)
+		total_energy += s * s
+		if abs_s > peak:
+			peak = abs_s
+		if (s >= 0.0 and prev_sample < 0.0) or (s < 0.0 and prev_sample >= 0.0):
+			zero_crossings += 1
+		prev_sample = s
+
+	if peak < 0.003:
+		return false
+
+	# Normalized Zero-Crossing Rate (proportional to signal dominant frequency band)
+	var zcr: float = float(zero_crossings) / float(frames)
+	var rms: float = sqrt(total_energy / float(frames))
+
+	# Crest Factor: peak-to-RMS ratio
+	# Sharp clicks / taps / shocks have a very high crest factor (> 4.8)
+	# Human vocal cords have a sustained, richer sinusoidal body with moderate crest factor (1.4 ~ 3.8)
+	var crest_factor: float = peak / maxf(rms, 0.0001)
+
+	# 1. Reject ultra-low frequency breath puffs, wind drift, and pocket friction (ZCR < 0.03)
+	if zcr < 0.03:
+		return false
+
+	# 2. Reject harsh mechanical friction, screen taps, or hiss static (ZCR > 0.44)
+	if zcr > 0.44:
+		return false
+
+	# 3. Reject transient impulse spikes (chassis bumps, fingernail clicks)
+	if crest_factor > 4.6 and zcr < 0.15:
+		return false
+
+	return true
 
 
 func _ready() -> void:
@@ -225,29 +276,37 @@ func _process(delta: float) -> void:
 			# Do not emit gameplay voice echoes while paused, suppressed, or when sound is locked
 			if not is_input_allowed():
 				return
-			if level_db > trigger_db:
+			if level_db > trigger_db and _is_voice_like(buf, frames):
 				_state = State.ATTACK
 				_timer = 0.0
 				_peak_db = level_db
+				_voice_frame_hits = 1
 
 		State.ATTACK:
 			if not is_input_allowed():
 				_state = State.IDLE
 				return
 			_peak_db = maxf(_peak_db, level_db)
+			if _is_voice_like(buf, frames):
+				_voice_frame_hits += 1
+
 			# Discard brief transient clicks/spikes (chassis taps, speaker pop) that do not sustain
 			if level_db < trigger_db - 4.0:
 				_state = State.IDLE
 				return
 			if _timer >= ATTACK_WINDOW:
-				var lowest: float = trigger_db
-				var highest: float = maxf(minf(lowest + MAX_MARGIN_DB, -1.0), lowest + 1.0)
-				var k: float = clampf(inverse_lerp(lowest, highest, _peak_db), 0.0, 1.0)
+				# Ensure at least 2 frames demonstrated harmonic voice characteristics across the attack window
+				if _voice_frame_hits >= 2:
+					var lowest: float = trigger_db
+					var highest: float = maxf(minf(lowest + MAX_MARGIN_DB, -1.0), lowest + 1.0)
+					var k: float = clampf(inverse_lerp(lowest, highest, _peak_db), 0.0, 1.0)
 
-				voice_detected.emit(k)
-				suppress(1.20) # Self-acoustic ducking: blocks echo ping and cavern reverb feedback loop!
-				_state = State.COOLDOWN
-				_timer = 0.0
+					voice_detected.emit(k)
+					suppress(1.20) # Self-acoustic ducking: blocks echo ping and cavern reverb feedback loop!
+					_state = State.COOLDOWN
+					_timer = 0.0
+				else:
+					_state = State.IDLE
 
 		State.COOLDOWN:
 			if _timer >= COOLDOWN:

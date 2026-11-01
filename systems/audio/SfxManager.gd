@@ -332,9 +332,11 @@ func play_listener_alarm(pos: Vector2) -> void:
 
 func play_enemy_step(pos: Vector2, is_chasing: bool, occluded: bool) -> void:
 	var vol_db: float = -6.0 if is_chasing else -13.0
+	var pitch: float = randf_range(1.05, 1.18) if is_chasing else randf_range(0.85, 0.98)
 	if occluded:
 		vol_db -= 9.0
-	var pitch: float = randf_range(1.05, 1.18) if is_chasing else randf_range(0.85, 0.98)
+		# Thick rock occlusion low-pass effect: sound pitch slightly drops and softens through solid basalt
+		pitch *= 0.88
 	_play_spatial(_wav_enemy_step, pos, vol_db, pitch, 420.0)
 
 
@@ -473,9 +475,9 @@ func _setup_audio_pools() -> void:
 
 	for i in SPATIAL_POOL_SIZE:
 		var p := AudioStreamPlayer2D.new()
-		p.bus = &"SFX"
-		p.attenuation = 1.5
-		p.panning_strength = 1.4
+		p.bus = &"SpatialSFX"
+		p.attenuation = 2.0         # Quadratic physical inverse-square falloff for strong distance contrast
+		p.panning_strength = 2.4    # Pronounced stereo separation: sharp left/right pinpoint imaging
 		add_child(p)
 		_spatial_pool.append(p)
 
@@ -496,10 +498,31 @@ func _play_spatial(stream: AudioStreamWAV, pos: Vector2, volume_db: float, pitch
 		return
 	var p: AudioStreamPlayer2D = _spatial_pool[_spatial_idx]
 	_spatial_idx = (_spatial_idx + 1) % SPATIAL_POOL_SIZE
+
+	# Calculate real-time distance and angle relative to the player for binaural audio cues
+	var eff_pitch := pitch
+	var eff_vol := volume_db
+	if _player_ref != null and is_instance_valid(_player_ref):
+		var p_pos: Vector2 = _player_ref.global_position
+		var dist: float = p_pos.distance_to(pos)
+		var dist_ratio: float = clampf(dist / maxf(max_dist, 1.0), 0.0, 1.0)
+
+		# 1. Atmospheric High-Frequency Absorption (Air Attenuation):
+		# Distant sounds in a cavern naturally lose high frequencies, sounding darker and slightly lower.
+		# Near sounds stay bright, immediate, and punchy.
+		eff_pitch *= lerpf(1.0, 0.91, dist_ratio * dist_ratio)
+
+		# 2. Interaural Level Difference (ILD) Edge Clarification:
+		# Lateral sound waves (hard left or hard right) get a slight presence boost
+		var offset_vec: Vector2 = pos - p_pos
+		if dist > 8.0:
+			var lateral_factor: float = absf(offset_vec.normalized().x)
+			eff_vol += lateral_factor * 1.5
+
 	p.stream = stream
 	p.global_position = pos
-	p.volume_db = volume_db
-	p.pitch_scale = pitch
+	p.volume_db = eff_vol
+	p.pitch_scale = eff_pitch
 	p.max_distance = max_dist
 	p.play()
 
